@@ -76,7 +76,7 @@ The in-process adapter exposes the following *logical* calls (not a new wire pro
 | `catalog()` | Available Thing-type summaries and author-chosen `entrypoints` |
 | `discover(ThingRef)` | Bound Thing description, typed interaction references / schemas, declared errors and optional semantic/effect metadata, declared link types, plus context supplied by the app |
 
-`discover` returns `{description, context}`. Clients can follow `description.interactions[].ref` or `context.affordances[].ref` to invoke a matching handler or subscribe to an Event. Follow-up references are meaningful only within the connected application's scope.
+`discover` returns `{description, context}`. Clients can follow `description.interactions[].ref` or `context.next[].ref` (for Interaction candidates) to invoke a matching handler, subscribe to an Event, or discover a related Thing. Follow-up references are meaningful only within the connected application's scope.
 
 The app should publish only what the caller may see. **The reference implementation has no authorization/filtering mechanism**; deployment without one is unsafe for sensitive services.
 
