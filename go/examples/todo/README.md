@@ -30,6 +30,8 @@ runtime, with no hand-maintained string-to-handler map.
 | `task.complete` | Complete once; detect stale versions and repeat completion |
 | `task.delete` | Delete only the caller's task with version precondition |
 
+All four Actions explicitly declare `hasSideEffects: true` and conservatively declare `idempotent: false`. A version precondition prevents a stale write from being committed twice in this process, but that alone does not establish end-to-end retry safety after network timeouts. The two Queries do not carry Action-only effect fields.
+
 A single shared `$defs.Task` schema describes response data for create,
 list, get, rename, and complete. Task is **data**, not a Thing or an
 independently invocable resource.
