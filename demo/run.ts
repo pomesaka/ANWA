@@ -12,12 +12,14 @@ print("Discover calculator.divide", calculator.discover("calculator.divide"));
 print("Add", await calculator.interact("calculator.add", { a: 2, b: 3 }));
 
 const orders = createOrders();
+// Simulated verified identity supplied by a trusted Adapter, never by Interaction input.
+const alice = {caller:{subject:"alice"}};
 print(
   "Cancel pending",
   await orders.interact("order.cancel", {
     orderId: "pending",
     reason: "Changed my mind",
-  }),
+  }, alice),
 );
 print(
   "Already shipped",
