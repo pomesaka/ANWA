@@ -20,7 +20,8 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache: false
-      - run: test -z "$(gofmt -l anwa examples)"
+      - run: test -z "$(gofmt -l anwa codegen cmd examples)"
+      - run: go run ./cmd/anwa-codegen -in ../demo/calculator/anwa.json -out examples/calculator/contract.gen.go -package main -check
       - run: go vet ./...
       - run: go test -race ./...
       - run: go run ./examples/calculator > /dev/null
