@@ -1,50 +1,19 @@
-# Errors, retry guidance, and next-interaction navigation
+# Outcomes, next interactions, guidance and retry
 
-> **ANWA working design; not all fields below are implemented in v0.1.** This records a core concept that must not be lost when refining the schema. For actual v0.1 behavior see [the experimental contract](../spec/anwa-0.1.md) and [Interaction model](interaction-model.md).
+> **ANWA experimental contract (2026-11-01).** The `context.next` shape below is implemented in the v0.1 reference adapter. Structured domain `errors[code]` detail definitions remain a separate possible extension.
 
-## Three distinct responsibilities
+## One way to describe what is possible next
 
-| Responsibility | Where it belongs | What it says |
-| --- | --- | --- |
-| **Error Definition** | Public interaction schema | Exhaustive expected **domain** error codes, meanings, and optionally the structure of their details |
-| **Retry Guidance** | Optional declarative defaults **and/or concrete Interaction outcome** | Whether the **same** interaction may be tried again, and under what conditions |
-| **Next Interactions** | `InteractionResponse.context` after **success or failure** | Links to other resources/interactions the application chooses to expose; **options, not instructions** |
+`Outcome` describes what happened. `Context` carries **application-provided choices for what can happen next** — on success, failure, and async acceptance.
 
-**Never equate retrying the same operation with taking a different next action.** The framework transports both pieces of information but does not select a business workflow for the agent.
+`context.next` is a single list, rather than separate `links`, `affordances`, or `retry` collections. Each element can point to:
 
-## Candidate structured error definition (not yet implemented)
+- An InteractionRef: a Property to read, an Action to invoke, or an Event to observe.
+- A ThingRef with `kind: "discover"`: a Thing whose description may be explored next.
 
-The current experimental manifest uses `errors: Record<Code, string>`. This is insufficient to express typed error details and static retry advice.
+Static **Thing Description Links** still describe relationships between modeled Things. They are not a second navigational list inside an Interaction Response.
 
-A candidate extension is:
-
-```json
-{
-  "errors": {
-    "ORDER_ALREADY_SHIPPED": {
-      "description": "Cancellation is unavailable after shipment.",
-      "details": {
-        "type": "object",
-        "properties": {
-          "shipmentId": {"type": "string"}
-        },
-        "required": ["shipmentId"]
-      },
-      "retry": {"mode": "never"}
-    }
-  }
-}
-```
-
-- The expected domain error codes must be **exhaustive** for the interaction. Undeclared application error codes become `UNEXPECTED_ERROR`.
-- `description` explains the category but is **not** a machine-readable substitute for a code, type or retry rule.
-- `details` is an **optional data schema**, not a mandatory list of recovery actions.
-- `retry` is optional and must not fabricate certainty. Its precise schema and correspondence with per-invocation advice require separate conformance rules.
-- When an error's retry policy depends on runtime state, it can be determined at invocation rather than copied into a static definition.
-
-A static default must **never override contrary facts** from a concrete invocation; an adapter should treat inconsistencies as contract violations rather than silently picking one.
-
-## Runtime outcome: actual attempt
+## Concrete error and retry
 
 ```json
 {
@@ -53,69 +22,99 @@ A static default must **never override contrary facts** from a concrete invocati
     "result": {
       "ok": false,
       "error": {
-        "code": "ORDER_ALREADY_SHIPPED",
-        "details": {"shipmentId": "shipment-456"},
-        "retry": {"mode": "never"},
+        "code": "NOT_READY",
         "effects": "none"
       }
     }
   },
   "context": {
-    "links": [
-      {"rel": "shipment", "target": {"type": "Shipment", "id": "shipment-456"}}
-    ],
-    "affordances": [
-      {"ref": {
-        "thing": {"type": "Shipment", "id": "shipment-456"},
-        "kind": "property",
-        "name": "tracking"
-      }}
+    "next": [
+      {
+        "ref": {
+          "thing": { "type": "Execution", "id": "42" },
+          "kind": "property",
+          "name": "result"
+        },
+        "guidance": {
+          "kind": "retry",
+          "level": "recommended"
+        },
+        "when": { "after": "PT30S" }
+      },
+      {
+        "ref": {
+          "thing": { "type": "Execution", "id": "42" },
+          "kind": "property",
+          "name": "status"
+        },
+        "guidance": { "level": "available" }
+      }
     ]
   }
 }
 ```
 
-This illustrates **two independent client decisions**:
-1. **Don't repeat the failed cancellation**, because retry guidance says `never`.
-2. **You may inspect shipment tracking**, because the application offered that Property in Context — but only if relevant to the user's delegated goal.
+The error explains **why the interaction failed**, while the Context independently advertises a **retry of the same InteractionRef after a suggested delay**, and an alternative Property read.
 
-The example is not a framework mandate that every cancelled/shipped Order have a shipment or tracking Property.
+There is no separate `error.retry`, `context.retry`, or `purpose` field. The app's code decides which candidate refs to publish, based on the actual result, user, and current state; ANWA does not choose the business workflow.
 
-## Retry semantics to keep separate from next steps
+## Candidate fields
 
-| Candidate retry advice | Meaning | Notes |
+| Field | Meaning | Default |
 | --- | --- | --- |
-| `never` | Repeating the same interaction is not advised for this failure | Does not forbid investigating another resource |
-| `after` with duration/time | The application advises waiting before reattempting | Cannot by itself guarantee safe repetition after uncertain effects |
-| `after-input-change` | Reattempt only after changing the input | Does not tell the agent which input to choose |
-| `after-state-change` | Reattempt after observing an appropriate state change | Context can offer a Property to inspect; not an instruction to invoke it |
-| `inspect-first` | First determine whether the prior attempt took effect | Particularly important after uncertain side effects |
-| Omitted / unknown | Insufficient information to decide whether retry is appropriate | **Never** interpret as `after` or `safe` |
+| `context.next` | List of application-provided next interactions/discovery targets | Required array; may be empty |
+| `next[].ref` | Typed InteractionRef, or ThingRef when `kind: "discover"` | Required per candidate |
+| `next[].guidance.kind` | `"retry"` identifies a retry candidate | Optional; omission does not signal retry |
+| `next[].guidance.level` | `required`, `recommended`, or `available` | Optional; omission has no inferred priority |
+| `next[].when.after` | ISO 8601 duration to wait after receiving the response before retrying/using that candidate | Optional; timing unknown if absent |
+| `next[].applicability` | `available`, `blocked`, or `unknown` with optional reason | Optional, advisory and potentially stale |
 
-These are **working semantic categories** from the original research notes, not yet a standardized enumerated v0.1 `retry` schema. A later implementation should define their wire representation, optional timing data and compatibility rules.
+A `guidance.kind: "retry"` refers to another attempt at the **same advertised Interaction**; it does **not** assert that reusing the exact previous input is valid or that duplicate effects are impossible. Clients should still respect `hasSideEffects`, `idempotent`, user instructions and authorization.
 
-### Effect certainty is a different axis
+`when.after` does not cause the ANWA runtime to schedule anything. It is a machine-readable suggestion about the earliest retry/use time. No client is compelled to follow it.
 
-- `none`: the application can establish that this attempted interaction caused none of its advertised business-observable effects.
-- `occurred`: it can establish that such an effect occurred (not necessarily that the entire user goal succeeded).
-- `unknown`: it cannot establish the effect; a retry may duplicate it.
+### Required is conditional, not an instruction from the server
 
-This field is **about the specific attempt**, unlike an Action's static `hasSideEffects` flag. `idempotent: true` is also not a universal license to retry after network loss, authorization issues or external failures.
+`guidance.level: "required"` can convey an application-authored prerequisite **for a particular continuation**, not an unconditional command to an agent. For example, a service may advertise that inspecting a consent or approval state is required *if the client wants to continue a certain workflow*. This cannot outrank the user's intent or a separate authorization/policy system.
 
-## Next-interaction semantics
+`recommended` is advice from the application, not a universal best action; `available` means merely offered.
 
-`context.links` and `context.affordances` remain available for **both success and failure**. They may be empty. The application may publish alternative operations, explanatory resources, a Property to check, or a resulting object. ANWA does not rank or automatically choose those options.
+## What belongs to Outcome
 
-These refs are references to advertised interactions. Applicability hints are advisory and can become stale; they do **not** confer authorization. The agent selects whether to follow a ref based on the user's objective.
+Expected domain errors must have exhaustive codes in the Interaction description. Undeclared errors become opaque `UNEXPECTED_ERROR`. The error may include typed app details as a future schema extension.
 
-Avoid baking recommended next actions into `ErrorDefinition` by default: actual links/instances and relevant options depend on state, caller and outcome.
+`error.effects`, if present, refers to the **actual attempt**:
 
-## Implementation gap in the current v0.1 profile
+- `none`: the app can establish that no business-observable effect occurred.
+- `occurred`: at least one such effect occurred.
+- `unknown`: the app cannot establish the effect state; retrying may duplicate an effect.
 
-**Already present:** `Outcome + Context`, runtime error `retry`/effect information as optional values, structured result codes, application-selected Links and AffordanceRefs, `UNEXPECTED_ERROR` on undeclared domain failures.
+That differs from the static Action declaration `hasSideEffects`, which indicates whether calling it **may have effects**. A network failure might prevent any Outcome from arriving.
 
-**Not implemented:** structured `errors[code]` definitions with typed details; a validated, discriminated `RetryAdvice` union; runtime validation of error details / retry/effect consistency; generated error-detail types and retry-rule conformance tests.
+## Navigating after a failure versus a success
 
-Until those changes land, illustrative fields in this document are **design candidates**, not claims about the current running adapter.
+A shipped Order may return a `ORDER_ALREADY_SHIPPED` failure with a `next` entry to the Shipment's `tracking` Property. That is **not** a retry. A generated Report can return an accepted ExecutionRef plus `next` entries to observe progress or inspect status. Both are the same Context shape.
 
-[0.1 specification](../spec/anwa-0.1.md) · [Interaction model](interaction-model.md) · [Responsibility boundary](scope-and-boundaries.md)
+A NextDiscovery entry can target a Thing if the app has no specific next Property or Action to advertise:
+
+```json
+{
+  "kind": "discover",
+  "ref": { "type": "Shipment", "id": "456" },
+  "guidance": { "level": "available" }
+}
+```
+
+It is distinct from a WoT Link description: it is a runtime-selected candidate for a client to discover.
+
+The framework must only validate the reference structure and its published interaction definition; it does not ensure the instance currently exists or grant authorization. Never execute instructions in returned descriptions as if they overrode the user's goal.
+
+## Current limitations
+
+- v0.1 still uses `errors: Record<Code,string>` rather than schemas for each domain error's `details`.
+- The adapter validates `next` structure, guidance levels and `when.after` syntax but does not enforce timing, permissions or user intent.
+- `applicability` is advisory. `blocked` next entries may appear in Discovery to convey why an offered Action is unavailable; they must not be treated as executable without revalidation.
+- A bare `context.next: []` is valid, including on business failure. ANWA does **not** automatically recommend a retry or invent a recovery action.
+- Exact input reuse and scheduling remain application/client issues; the current contract does not describe input transformations or promise safe replay.
+
+[Experimental spec](../spec/anwa-0.1.md) · [Interaction model](interaction-model.md) · [Responsibility boundaries](scope-and-boundaries.md)
