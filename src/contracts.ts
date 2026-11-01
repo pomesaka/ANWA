@@ -14,12 +14,18 @@ export type Operation<
   R extends Refs<M>,
 > = M["interactions"][R];
 
-export type ExecutableRefs<M extends Manifest> = string extends Refs<M> ? string : {
-  [R in Refs<M>]: Operation<M, R> extends {kind: "event"} ? never : R;
-}[Refs<M>];
-export type ObservableRefs<M extends Manifest> = string extends Refs<M> ? string : {
-  [R in Refs<M>]: Operation<M, R> extends {kind: "event"} ? R : never;
-}[Refs<M>];
+export type ExecutableRefs<M extends Manifest> =
+  string extends Refs<M>
+    ? string
+    : {
+        [R in Refs<M>]: Operation<M, R> extends { kind: "event" } ? never : R;
+      }[Refs<M>];
+export type ObservableRefs<M extends Manifest> =
+  string extends Refs<M>
+    ? string
+    : {
+        [R in Refs<M>]: Operation<M, R> extends { kind: "event" } ? R : never;
+      }[Refs<M>];
 
 type RequiredKeys<S> = S extends { required: readonly (infer K)[] }
   ? Extract<K, string>
