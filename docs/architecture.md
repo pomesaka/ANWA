@@ -61,7 +61,7 @@ Named Guards now protect **Queries, Actions and Events**. Binding is default-den
 
 ## Schema-derived TypeScript types
 
-The author-maintained `anwa.json` is the source of truth. `bun run codegen` produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
+The author-maintained `anwa.json` is the source of truth. Shared payload shapes may live in `$defs` and be referenced with local `$ref` (without introducing Thing semantics). `bun run codegen` expands those references and produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
 
 CI regenerates the contract and fails on drift; it also runs strict `bun check`, Formatter, Oxlint, Bun tests and demos. Runtime validation remains essential for untrusted agent inputs.
 

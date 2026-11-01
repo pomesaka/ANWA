@@ -19,12 +19,13 @@ These responsibilities are not four mandatory network protocols. The current ref
 
 ## Public manifest
 
-The experimental manifest contains exactly three top-level fields:
+The experimental manifest has three required top-level fields and an optional reusable data-schema definition map:
 
 | Field | Status | Meaning |
 | --- | --- | --- |
 | `anwa: "0.2"` | Required | Experimental contract profile |
 | `interactions` | Required nonempty map | App-scoped `InteractionRef → InteractionDefinition` |
+| `$defs` | Optional map | Named payload schemas referenced as `#/$defs/Name`; **not** Thing declarations |
 | `entrypoints` | Required nonempty list | References to declared Interactions offered to a connecting agent |
 
 The supported Interaction kinds are:
@@ -33,9 +34,9 @@ The supported Interaction kinds are:
 - **`action`** — invoke an operation, with optional side-effect and idempotency declarations.
 - **`event`** — observe an app-defined stream of events, with optional input.
 
-Every Interaction has a `kind` and a meaningful `description`. It may also declare an `input`, `output`, exhaustive expected `errors`, and optional `semanticTypes`. Actions alone may additionally declare named `guard`, `hasSideEffects`, and `idempotent`. Omitted side-effect and idempotency values are **unknown**, not `false`.
+Every Interaction has a `kind` and a meaningful `description`. It may also declare an `input`, `output`, exhaustive expected `errors`, and optional `semanticTypes`. Any Interaction may declare a named `guard`. Actions alone may additionally declare `hasSideEffects` and `idempotent`. Omitted side-effect and idempotency values are **unknown**, not `false`.
 
-The reference validator implements a **constrained subset** of JSON Schema Draft 2020-12 for data types, not full specification conformance.
+The reference validator implements a **constrained subset** of JSON Schema Draft 2020-12 for data types, not full specification conformance. It additionally supports authoring-time reuse with a root `$defs` map and local `$ref` objects (`{"$ref":"#/$defs/Task"}`). References must target declared definitions, appear without sibling keywords, and be acyclic; remote references and arbitrary JSON Pointers are unsupported. Code generation expands these references into standalone literal schemas for TypeScript inference, so reusable **data shapes** do not introduce Thing identity or change Interaction execution semantics.
 
 ### Example — no domain object required
 
@@ -74,7 +75,7 @@ const app = new AnwaApp(schema).bind({
   "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
   "calculator.divide": async ({ input }) => input.b === 0
     ? reply(fail("DIVIDE_BY_ZERO")) : reply(ok(input.a / input.b))
-});
+}, { public: ["calculator.add", "calculator.divide"] });
 
 app.catalog();
 await app.discover("calculator.add");
