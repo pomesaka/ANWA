@@ -80,7 +80,7 @@ These terms help discuss ANWA's goals, but are **not normative WoT terms** and s
 | **Implementation / Handler / Resolver** | Ordinary application code implementing Actions, Property reads, Link resolution and effects | Actual business logic and access checks |
 | **State / Transition** | Named domain state and a potentially valid change under a specified trigger | Declared possible transitions do not automatically guarantee atomic enforcement |
 | **Guard / Guard reference** | Named check referenced by the schema; evaluated by application code | May return structured allow/deny and reason; not a YAML predicate language |
-| **Guard decision** | Code-backed allow/deny result, explicitly obtained by the owning Handler | Handler constructs `Context.next`; Guard itself does not choose a business workflow |
+| **Guard decision** | Code-backed allow/deny result evaluated by the Runtime before an Action's `run` | Denial skips `run`; the Interaction's `onDenied` returns `Context.next`. Business authorization and atomic storage still belong to the application |
 | **Interaction Response** | Proposed ANWA application-level envelope with Outcome and Context | **Not** a WoT standard response type and not yet a fixed wire format |
 | **Outcome / Result** | Settled operation success or domain failure; an accepted execution may instead be returned | `ok` indicates the invocation outcome, not necessarily achievement of a larger business goal |
 | **Interaction Context** | Application-supplied `next` entries referencing top-level InteractionRef strings, optionally with bound input, guidance, wait time and applicability | Required `next` list may be empty; candidates are not privileged instructions |
