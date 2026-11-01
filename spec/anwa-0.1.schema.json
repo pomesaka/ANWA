@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pomesaka/ANWA/blob/feat/anwa-0.1-spec-and-demos/spec/anwa-0.1.schema.json",
+  "title": "ANWA 0.1 experimental Description manifest",
+  "type": "object",
+  "required": [
+    "anwa",
+    "entrypoints",
+    "things"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "anwa": {
+      "const": "0.1"
+    },
+    "entrypoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ThingRef"
+      }
+    },
+    "things": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/Thing"
+      }
+    }
+  },
+  "$defs": {
+    "ThingRef": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "InteractionRef": {
+      "type": "object",
+      "required": [
+        "thing",
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "thing": {
+          "$ref": "#/$defs/ThingRef"
+        },
+        "kind": {
+          "enum": [
+            "property",
+            "action",
+            "event"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Interaction": {
+      "type": "object",
+      "required": [
+        "description"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "type": "object"
+        },
+        "output": {
+          "type": "object"
+        },
+        "guard": {
+          "type": "string",
+          "minLength": 1
+        },
+        "errors": {
+          "type": "object"
+        }
+      }
+    },
+    "Thing": {
+      "type": "object",
+      "required": [
+        "title",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Interaction"
+          }
+        },
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Interaction"
+          }
+        },
+        "events": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Interaction"
+          }
+        },
+        "links": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "description",
+              "target"
+            ],
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "target": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "LinkRef": {
+      "type": "object",
+      "required": [
+        "rel",
+        "target"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "$ref": "#/$defs/ThingRef"
+        }
+      }
+    },
+    "AffordanceRef": {
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/InteractionRef"
+        },
+        "applicability": {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "available",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "Context": {
+      "type": "object",
+      "required": [
+        "links",
+        "affordances"
+      ],
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LinkRef"
+          }
+        },
+        "affordances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AffordanceRef"
+          }
+        }
+      }
+    },
+    "Result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "ok",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "value": {}
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "ok",
+            "error"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "type": "object",
+              "required": [
+                "code"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "message": {
+                  "type": "string"
+                },
+                "details": {},
+                "retry": {
+                  "type": "object"
+                },
+                "effects": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "InteractionResponse": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "context"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "result"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "settled"
+                },
+                "result": {
+                  "$ref": "#/$defs/Result"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "execution"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "accepted"
+                },
+                "execution": {
+                  "$ref": "#/$defs/ThingRef"
+                }
+              }
+            }
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/Context"
+        }
+      }
+    }
+  }
+}

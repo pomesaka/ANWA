@@ -1,0 +1,212 @@
+/** Dependency-free ANWA 0.1 in-memory reference adapter; NOT production ready. */
+export const thing = (type, id) => ({ type, id: String(id) });
+export const interaction = (target, kind, name) => ({ thing: target, kind, name });
+export const ok = (value = null) => ({ ok: true, value });
+export const fail = (code, message, extra = {}) => ({
+  ok: false, error: { code, ...(message ? { message } : {}), ...extra }
+});
+export const accepted = execution => ({ kind: "accepted", execution });
+const emptyContext = () => ({ links: [], affordances: [] });
+const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+function validate(schema, value, at = "$") {
+  if (!schema) return null;
+  if (schema.enum && !schema.enum.some(v => Object.is(v, value))) return at + " is not in enum";
+  const t = schema.type;
+  const typeOK = t === "object" ? value !== null && typeof value === "object" && !Array.isArray(value)
+    : t === "array" ? Array.isArray(value)
+    : t === "integer" ? Number.isInteger(value)
+    : t === "number" ? typeof value === "number" && Number.isFinite(value)
+    : t === "null" ? value === null : !t || typeof value === t;
+  if (!typeOK) return at + " must be " + t;
+  if (t === "object") {
+    for (const key of schema.required ?? []) {
+      if (!own(value, key)) return at + "." + key + " is required";
+    }
+    for (const [key, item] of Object.entries(value)) {
+      const sub = schema.properties?.[key];
+      if (!sub) {
+        if (schema.additionalProperties === false) return at + "." + key + " is not allowed";
+      } else {
+        const issue = validate(sub, item, at + "." + key);
+        if (issue) return issue;
+      }
+    }
+  }
+  if (t === "array" && schema.items) {
+    for (let i = 0; i < value.length; i++) {
+      const issue = validate(schema.items, value[i], at + "[" + i + "]");
+      if (issue) return issue;
+    }
+  }
+  return null;
+}
+
+function assertRef(ref) {
+  if (!ref || typeof ref.type !== "string" || !ref.type ||
+      typeof ref.id !== "string" || !ref.id) {
+    throw new Error("ThingRef needs nonempty type and string id");
+  }
+}
+
+export class AnwaApp {
+  constructor(schema) {
+    if (schema?.anwa !== "0.1" || !schema.things || typeof schema.things !== "object") {
+      throw new Error("Expected ANWA 0.1 schema with things");
+    }
+    if (!Array.isArray(schema.entrypoints) || schema.entrypoints.length === 0) {
+      throw new Error("Expected at least one entrypoint");
+    }
+    for (const entry of schema.entrypoints) {
+      assertRef(entry);
+      if (!schema.things[entry.type]) throw new Error("Undeclared entrypoint type: " + entry.type);
+    }
+    this.schema = schema;
+    this.bindings = new Map();
+  }
+
+  catalog() {
+    return {
+      anwa: this.schema.anwa,
+      things: Object.entries(this.schema.things).map(([type, model]) => ({
+        type, title: model.title, description: model.description
+      })),
+      entrypoints: this.schema.entrypoints
+    };
+  }
+
+  bind(type, { properties = {}, actions = {}, events = {}, guards = {},
+               context = () => emptyContext() }) {
+    const model = this.schema.things[type];
+    if (!model) throw new Error("Undeclared Thing type: " + type);
+    for (const [kind, handlers] of [["properties", properties], ["actions", actions], ["events", events]]) {
+      for (const name of Object.keys(model[kind] ?? {})) {
+        if (typeof handlers[name] !== "function") {
+          throw new Error("Missing " + kind + " implementation: " + type + "." + name);
+        }
+      }
+      for (const name of Object.keys(handlers)) {
+        if (!own(model[kind] ?? {}, name)) {
+          throw new Error("Undeclared " + kind + " handler: " + type + "." + name);
+        }
+      }
+    }
+    for (const action of Object.values(model.actions ?? {})) {
+      if (action.guard && typeof guards[action.guard] !== "function") {
+        throw new Error("Missing guard implementation: " + type + "." + action.guard);
+      }
+    }
+    if (typeof context !== "function") throw new Error("context must be a function");
+    this.bindings.set(type, { properties, actions, events, guards, context });
+    return this;
+  }
+
+  #lookup(target, kind, name) {
+    assertRef(target);
+    const model = this.schema.things[target.type];
+    const binding = this.bindings.get(target.type);
+    if (!model || !binding) throw new Error("Unknown or unbound Thing: " + target.type);
+    if (!kind) return { model, binding };
+    const bucket = { property: "properties", action: "actions", event: "events" }[kind];
+    if (!bucket || !own(model[bucket] ?? {}, name)) {
+      throw new Error("Unknown interaction: " + target.type + "." + kind + "." + name);
+    }
+    return { model, binding, spec: model[bucket][name], handler: binding[bucket][name] };
+  }
+
+  describe(target) {
+    const { model } = this.#lookup(target);
+    return {
+      thing: target, title: model.title, description: model.description,
+      interactions: Object.entries({ properties: "property", actions: "action", events: "event" })
+        .flatMap(([bucket, kind]) => Object.entries(model[bucket] ?? {}).map(([name, spec]) => ({
+          ref: interaction(target, kind, name),
+          description: spec.description,
+          ...(spec.input ? { input: spec.input } : {}),
+          ...(spec.output ? { output: spec.output } : {})
+        }))),
+      links: model.links ?? {}
+    };
+  }
+
+  async assess(target, actionName) {
+    const { binding, spec } = this.#lookup(target, "action", actionName);
+    if (!spec.guard) return { allowed: true };
+    const decision = await binding.guards[spec.guard]({ thing: target, app: this });
+    if (typeof decision?.allowed !== "boolean" || (!decision.allowed && !decision.error?.code)) {
+      throw new Error("Invalid guard decision for " + target.type + "." + actionName);
+    }
+    return decision;
+  }
+
+  #context(raw) {
+    const result = { ...emptyContext(), ...(raw ?? {}) };
+    if (!Array.isArray(result.links) || !Array.isArray(result.affordances)) {
+      throw new Error("Invalid context arrays");
+    }
+    for (const link of result.links) {
+      if (typeof link.rel !== "string") throw new Error("Invalid link relation");
+      this.#lookup(link.target);
+    }
+    for (const affordance of result.affordances) {
+      const ref = affordance.ref;
+      this.#lookup(ref?.thing, ref?.kind, ref?.name);
+    }
+    return result;
+  }
+
+  async discover(target) {
+    const { binding } = this.#lookup(target);
+    const raw = await binding.context({ thing: target, phase: "discovery", app: this });
+    return { description: this.describe(target), context: this.#context(raw) };
+  }
+
+  async interact(ref, input) {
+    const { binding, spec, handler } = this.#lookup(ref?.thing, ref?.kind, ref?.name);
+    if (ref.kind === "event") throw new Error("Use observe() for EventAffordances");
+    const issue = spec.input ? validate(spec.input, input)
+      : input === undefined ? null : "Interaction does not accept input";
+    let outcome;
+    if (issue) {
+      outcome = { kind: "settled", result: fail("INVALID_INPUT", issue) };
+    } else {
+      try {
+        const decision = ref.kind === "action"
+          ? await this.assess(ref.thing, ref.name) : { allowed: true };
+        if (!decision.allowed) {
+          outcome = { kind: "settled", result: { ok: false, error: decision.error } };
+        } else {
+          const result = await handler({ thing: ref.thing, input, app: this });
+          if (result?.kind === "accepted") {
+            this.#lookup(result.execution);
+            outcome = { kind: "accepted", execution: result.execution };
+          } else if (typeof result?.ok === "boolean" &&
+                     (result.ok ? own(result, "value") : !!result.error?.code)) {
+            if (result.ok && spec.output) {
+              const bad = validate(spec.output, result.value);
+              if (bad) throw new Error("Output contract violated: " + bad);
+            }
+            outcome = { kind: "settled", result };
+          } else {
+            throw new Error("Handler returned invalid Result");
+          }
+        }
+      } catch {
+        // Application exceptions should not expose internal details to untrusted clients.
+        outcome = { kind: "settled", result: fail("INTERNAL_ERROR", "The interaction failed unexpectedly") };
+      }
+    }
+    const raw = await binding.context({
+      thing: ref.thing, interaction: ref, outcome, phase: "result", app: this
+    });
+    return { outcome, context: this.#context(raw) };
+  }
+
+  observe(ref, options = {}) {
+    const { handler } = this.#lookup(ref?.thing, ref?.kind, ref?.name);
+    if (ref.kind !== "event") throw new Error("Only EventAffordances may be observed");
+    const events = handler({ thing: ref.thing, app: this, ...options });
+    if (!events?.[Symbol.asyncIterator]) throw new Error("Event handler must return AsyncIterable");
+    return events;
+  }
+}
