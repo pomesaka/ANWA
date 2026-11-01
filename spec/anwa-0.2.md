@@ -31,10 +31,10 @@ The experimental manifest has three required top-level fields and an optional re
 The supported Interaction kinds are:
 
 - **`query`** — read or retrieve typed information. This is an ANWA term, not WoT's Thing-bound PropertyAffordance.
-- **`action`** — invoke an operation, with optional side-effect and idempotency declarations.
+- **`action`** — invoke an operation, with **required** side-effect and idempotency declarations.
 - **`event`** — observe an app-defined stream of events, with optional input.
 
-Every Interaction has a `kind` and a meaningful `description`. It may also declare an `input`, `output`, exhaustive expected `errors`, and optional `semanticTypes`. Any Interaction may declare a named `guard`. Actions alone may additionally declare `hasSideEffects` and `idempotent`. Omitted side-effect and idempotency values are **unknown**, not `false`.
+Every Interaction has a `kind` and a meaningful `description`. It may also declare an `input`, `output`, exhaustive expected `errors`, and optional `semanticTypes`. Any Interaction may declare a named `guard`. Every Action **must** declare both `hasSideEffects` and `idempotent` as explicit booleans; Query and Event must not declare them. An Action missing either field is invalid, not implicitly `false`. The booleans describe intended operation semantics and are not verified by the runtime.
 
 The reference validator implements a **constrained subset** of JSON Schema Draft 2020-12 for data types, not full specification conformance. It additionally supports authoring-time reuse with a root `$defs` map and local `$ref` objects (`{"$ref":"#/$defs/Task"}`). References must target declared definitions, appear without sibling keywords, and be acyclic; remote references and arbitrary JSON Pointers are unsupported. Code generation expands these references into standalone literal schemas for TypeScript inference, so reusable **data shapes** do not introduce Thing identity or change Interaction execution semantics.
 
@@ -127,6 +127,14 @@ Every **delivered application-level** result contains an `outcome` and a `contex
 `required` is app-authored prerequisite information for a **chosen continuation**, never a command to override the user. ANWA does not select a business workflow or blindly retry an action. There is **no separate** `error.retry`, `context.retry`, `context.links`, or `context.affordances` list.
 
 Domain errors are defined per Interaction with exhaustive codes. Undeclared application errors become `UNEXPECTED_ERROR`. `error.effects`, when known, describes what happened during **this attempt** (`none`, `occurred`, `unknown`), separate from the Action's static `hasSideEffects`.
+
+### Required Action effect declarations
+
+- `hasSideEffects: true` means the operation **can** modify state or produce externally observable effects. `false` is appropriate for a pure calculation; **it is not a guarantee** that an implementation is side-effect-free.
+- `idempotent: true` means repeating the **same invocation** has the same intended application-side effects as executing it once; the responses may differ (for example, a repeated version-checked update can return `VERSION_CONFLICT`). `false` means no idempotency guarantee is declared.
+- Neither declaration grants permission, implements duplicate-request detection, certifies exactly-once delivery, or makes automatic retries safe after an uncertain network failure. Callers must also consider `error.effects`, authorization, concurrency, and application-level retry policy.
+
+**Compatibility:** requiring these flags strengthens the experimental v0.2 manifest validator and is a breaking schema-authoring change for manifests that omitted them. Existing v0.2 demos already declare both flags; the Go Todo demo now does too.
 
 ## Asynchronous work — no special resource model
 
