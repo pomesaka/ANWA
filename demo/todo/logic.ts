@@ -475,13 +475,11 @@ export class TodoLogic {
         fail("DEPENDENCY_BLOCKED", "Finish dependencies first", {
           effects: "none",
         }),
-        unresolved
-          .slice(0, 5)
-          .map((taskId) => ({
-            ref: "task.get",
-            input: { workspaceId: input.workspaceId, taskId },
-            guidance: { level: "recommended" },
-          })),
+        unresolved.slice(0, 5).map((taskId) => ({
+          ref: "task.get",
+          input: { workspaceId: input.workspaceId, taskId },
+          guidance: { level: "recommended" },
+        })),
       );
     t.status = "done";
     t.completedAt = now();
