@@ -61,7 +61,7 @@ Named Guards now protect **Queries, Actions and Events**. Binding is default-den
 
 ## Language adapters
 
-ANWA's public JSON manifest is language-neutral. The Go adapter reads the same manifest and implements the same standalone Interaction, Guard, Discovery, and Outcome + Context model using explicit Go Handler bindings. It validates the constrained payload schema subset and resolves local reusable definitions. Unlike the TypeScript code-generated literal manifest, Go bindings do not currently have compile-time manifest-derived types. See the [Go guide](../go/README.md).
+ANWA's public JSON manifest is language-neutral. The Go adapter reads the same manifest, resolves local reusable definitions, and generates a strict `ServerInterface` with typed request/output structures and response variants. An application-defined Go struct must implement every generated Interaction method at compile time; the generated adapter bridges this interface to the Guard-enforced in-process runtime. Auth and discovery policies remain explicit application inputs, and the runtime still validates untrusted JSON, declared errors, and `context.next`. Go types are not a substitute for runtime schema enforcement. See the [Go guide](../go/README.md).
 
 ## Schema-derived TypeScript types
 
