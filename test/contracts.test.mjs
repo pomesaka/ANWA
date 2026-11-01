@@ -122,7 +122,8 @@ test("agent-oriented semantic annotations are validated and exposed, without cha
   const d = await app.discover(thing("Calculator", "main"));
   const add = d.description.interactions.find(i => i.ref.name === "add");
   assert.deepEqual(add.semanticTypes, ["urn:example:arithmetic-addition"]);
-  assert.deepEqual(add.effectKinds, []);
+  assert.equal(add.hasSideEffects, false);
+  assert.equal(add.idempotent, true);
   assert.equal((await app.interact(refFor(thing("Calculator", "main"), "add"), {a: 2, b: 2}))
     .outcome.result.value, 4);
 });
@@ -133,15 +134,34 @@ function refFor(thingRef, name) {
 
 test("semantic and effect declarations have precise scope and conservative defaults", () => {
   const doc = structuredClone(fixtures[1]);
-  assert.deepEqual(doc.things.Order.actions.cancel.effectKinds, ["domain-state"]);
-  doc.things.Order.properties.summary.effectKinds = [];
+  assert.equal(doc.things.Order.actions.cancel.hasSideEffects, true);
+  assert.equal(doc.things.Order.actions.cancel.idempotent, false);
+  doc.things.Order.properties.summary.hasSideEffects = false;
   doc.things.Order.actions.cancel.semanticTypes = ["relative-not-a-uri"];
   const paths = validateManifest(doc).map(d => d.path);
-  assert.ok(paths.some(p => p.includes("summary.effectKinds")));
+  assert.ok(paths.some(p => p.includes("summary.hasSideEffects")));
   assert.ok(paths.some(p => p.includes("cancel.semanticTypes")));
-  delete doc.things.Order.properties.summary.effectKinds;
+  delete doc.things.Order.properties.summary.hasSideEffects;
   delete doc.things.Order.actions.cancel.semanticTypes;
-  delete doc.things.Order.actions.cancel.effectKinds;
+  delete doc.things.Order.actions.cancel.hasSideEffects;
+  delete doc.things.Order.actions.cancel.idempotent;
   assert.deepEqual(validateManifest(doc), []);
-  // Absent effectKinds means UNKNOWN, not read-only or no-effects.
+  const app = new AnwaApp(doc).bind("Order", {
+    properties: { summary: async () => ({ok:true,value:{id:"x",status:"pending"}}) },
+    actions: { cancel: async () => ({ok:true,value:{status:"cancelled"}}) },
+    guards: { canCancel: async () => ({allowed:true}) }
+  }).bind("Shipment", { properties:{tracking:async()=>({ok:true,value:"delivered"})} });
+  const cancel = app.describe(thing("Order", "x")).interactions.find(x => x.ref.name === "cancel");
+  assert.equal(Object.hasOwn(cancel, "hasSideEffects"), false);
+  assert.equal(Object.hasOwn(cancel, "idempotent"), false);
+  // Omitted values remain UNKNOWN; they do not default to false.
+});
+
+test("Action boolean flags reject textual or non-Action values", () => {
+  const bad = structuredClone(fixtures[1]);
+  bad.things.Order.actions.cancel.hasSideEffects = "false";
+  bad.things.Order.properties.summary.idempotent = true;
+  const paths = validateManifest(bad).map(x => x.path);
+  assert.ok(paths.some(p => p.endsWith("cancel.hasSideEffects")));
+  assert.ok(paths.some(p => p.endsWith("summary.idempotent")));
 });
