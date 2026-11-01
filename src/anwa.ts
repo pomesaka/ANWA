@@ -20,6 +20,20 @@ import type {
   ErrorCodes,
 } from "./contracts.ts";
 
+/** Supplied only by a trusted authentication adapter. Never derive this from Interaction input. */
+export interface VerifiedCaller {
+  readonly subject: string;
+  readonly claims?: Readonly<Record<string, unknown>>;
+}
+export interface RequestContext {
+  readonly caller?: VerifiedCaller | null;
+}
+export interface DiscoveryArgs {
+  readonly ref: string;
+  readonly caller: VerifiedCaller | null;
+}
+export type DiscoveryPolicy = (args: DiscoveryArgs) => boolean;
+
 export interface DomainError<C extends string = string> {
   code: C;
   message?: string;
@@ -55,13 +69,13 @@ export interface AcceptedResponse {
 export type InteractionResponse<T = unknown, C extends string = string> =
   SettledResponse<T, C> | AcceptedResponse;
 
-type RuntimeArgs = { ref: string; input: any; app: AnwaApp<any> };
+type RuntimeArgs = { ref: string; input: any; app: AnwaApp<any>; caller: VerifiedCaller | null };
 type RuntimeRun = (args: RuntimeArgs & { cursor?: number }) => unknown;
 type RuntimeBinding =
   | RuntimeRun
   | {
       run: RuntimeRun;
-      onDenied: (
+      onDenied?: (
         args: RuntimeArgs & { error: DomainError },
       ) => NextInteraction[] | Promise<NextInteraction[]>;
     };
@@ -170,6 +184,8 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   readonly schema: M;
   private readonly handlers = new Map<string, RuntimeBinding>();
   private guards: Record<string, RuntimeGuard> = {};
+  private readonly publicRefs = new Set<string>();
+  private discoveryPolicy?: DiscoveryPolicy;
 
   constructor(schema: M) {
     const errors = validateManifest(schema);
@@ -184,11 +200,27 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   bind(
     handlers: BindingsFor<M>,
     ...settings: GuardNames<M> extends never
-      ? [options?: { guards?: GuardsFor<M> }]
-      : [options: { guards: GuardsFor<M> }]
+      ? [options: { public?: readonly Refs<M>[]; discoverable?: DiscoveryPolicy; guards?: GuardsFor<M> }]
+      : [options: { public?: readonly Refs<M>[]; discoverable?: DiscoveryPolicy; guards: GuardsFor<M> }]
   ): this {
-    const options = (settings[0] ?? {}) as { guards?: GuardsFor<M> };
+    const options = settings[0] as {
+      public?: readonly Refs<M>[];
+      discoverable?: DiscoveryPolicy;
+      guards?: GuardsFor<M>;
+    };
     const guards = options.guards ?? ({} as GuardsFor<M>);
+    const publicRefs = options.public ?? [];
+    if (!Array.isArray(publicRefs)) throw Error("Public Interaction references must be an array");
+    const publicSet = new Set<string>();
+    for (const ref of publicRefs) {
+      if (typeof ref !== "string" || !own(this.schema.interactions, ref))
+        throw Error("Undeclared public Interaction: " + String(ref));
+      if (this.schema.interactions[ref].guard)
+        throw Error("Guarded Interaction cannot bypass Guard via public: " + ref);
+      publicSet.add(ref);
+    }
+    if (options.discoverable !== undefined && typeof options.discoverable !== "function")
+      throw Error("discoverable must be a function");
     const rawHandlers = handlers as Record<string, unknown>;
     const rawGuards = guards as Record<string, unknown>;
     for (const [ref, spec] of Object.entries(this.schema.interactions)) {
@@ -200,10 +232,14 @@ export class AnwaApp<const M extends Manifest = Manifest> {
           !binding ||
           typeof binding !== "object" ||
           Array.isArray(binding) ||
-          typeof (binding as any).run !== "function" ||
-          typeof (binding as any).onDenied !== "function"
+          typeof (binding as {run?: unknown}).run !== "function"
         )
-          throw Error("Guarded Interaction requires {run, onDenied}: " + ref);
+          throw Error("Guarded Interaction requires {run}: " + ref);
+        if (spec.kind !== "event" &&
+            typeof (binding as {onDenied?: unknown}).onDenied !== "function")
+          throw Error("Guarded Query/Action requires {run, onDenied}: " + ref);
+      } else if (!publicSet.has(ref)) {
+        throw Error("Interaction requires a named Guard or explicit public declaration: " + ref);
       } else if (typeof binding !== "function") {
         throw Error("Unbound or invalid Interaction: " + ref);
       }
@@ -215,6 +251,9 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     for (const [ref, value] of Object.entries(rawHandlers))
       this.handlers.set(ref, value as RuntimeBinding);
     this.guards = rawGuards as Record<string, RuntimeGuard>;
+    this.publicRefs.clear();
+    for (const ref of publicSet) this.publicRefs.add(ref);
+    this.discoveryPolicy = options.discoverable;
     return this;
   }
 
