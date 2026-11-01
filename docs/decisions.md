@@ -29,6 +29,16 @@
 
 See [Schema authoring and validation](schema-authoring.md) for the current implementation and limitations.
 
+## Agent-first schema design clarification (2026-11-01)
+
+- Primary consumers of the schema are **agents generating/implementing applications** and **agents discovering/invoking applications**. Human writing/editing convenience is not a design objective.
+- Preserve an **unambiguous machine-verifiable public contract** and progressive Discovery rather than optimizing the manifest's visual compactness.
+- Optional `semanticTypes` give application-authored semantic identifiers (absolute URI/URN); optional Action `effectKinds` distinguish declared possible domain-state or external-system effects. An omitted effect classification means **unknown**, not none.
+- Semantic and effect annotations are **untrusted metadata**. They do not certify authorization, actual side effects, business rule enforcement, or automatic safe retries.
+- Actual utility for unfamiliar AI agents remains unmeasured; neither structured JSON nor readable prose is proof of better task completion.
+
+See [Agent-native schema contract](../spec/agent-native-schema.md).
+
 ## Things explicitly delegated to application developers
 
 These are **not pending ANWA decisions**:
