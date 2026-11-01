@@ -22,10 +22,12 @@ The `anwa.json` manifest contains:
 | `things[type].title` / `description` | Required strings | Discoverable name and semantic purpose |
 | `properties` / `actions` / `events` | Optional maps | Interaction name → description |
 | `links` | Optional map | Declared relation description and target Thing type |
+| `semanticTypes` | Optional on Thing/interaction | Nonempty array of unique absolute HTTP(S) URI or URN identifiers of application-chosen meaning; no JSON-LD conformance implied |
+| `effectKinds` | Optional on Action only | Unique array of `domain-state` / `external-system`; `[]` explicitly asserts neither, omission means unknown |
 
 A declared interaction requires a `description`. Optional `input` and `output` are **JSON Schema 2020-12** documents describing typed payloads. Absent `input` means no input. Absent `output` means no declared successful output shape. A named `guard` reference and `errors` may be declared, **but are not core requirements**. When an interaction can return expected domain failures, its `errors` map **must exhaustively enumerate their codes**. Missing `errors` means the interaction has no declared domain failures; it does not allow arbitrary error codes. Runtime-provided `INVALID_INPUT` and `UNEXPECTED_ERROR` are reserved, not listed in application schemas.
 
-See [JSON Schema for the ANWA manifest and reusable response types](anwa-0.1.schema.json). The reference tooling validates ANWA-specific manifest structure, references, documented interactions, error codes, and a **constrained JSON Schema subset** (`type`, `enum`, `description`, `required`, `properties`, `items` and `additionalProperties:false`). Unsupported input/output keywords are rejected by the manifest validator rather than silently accepted. **Full JSON Schema 2020-12 validation is not implemented.** See [Schema authoring and generated interfaces](../docs/schema-authoring.md).
+See [JSON Schema for the ANWA manifest and reusable response types](anwa-0.1.schema.json) and the [agent-native schema design contract](agent-native-schema.md). The reference tooling validates ANWA-specific manifest structure, references, documented interactions, error codes, and a **constrained JSON Schema subset** (`type`, `enum`, `description`, `required`, `properties`, `items` and `additionalProperties:false`). Unsupported input/output keywords are rejected by the manifest validator rather than silently accepted. **Full JSON Schema 2020-12 validation is not implemented.** See [Schema authoring and generated interfaces](../docs/schema-authoring.md).
 
 ## 3. Reference semantics
 
@@ -67,7 +69,7 @@ The in-process adapter exposes the following *logical* calls (not a new wire pro
 | Call | What a client gets |
 | --- | --- |
 | `catalog()` | Available Thing-type summaries and author-chosen `entrypoints` |
-| `discover(ThingRef)` | Bound Thing description, typed interaction references / schemas, declared link types, plus context supplied by the app |
+| `discover(ThingRef)` | Bound Thing description, typed interaction references / schemas, declared errors and optional semantic/effect metadata, declared link types, plus context supplied by the app |
 
 `discover` returns `{description, context}`. Clients can follow `description.interactions[].ref` or `context.affordances[].ref` to invoke a matching handler or subscribe to an Event. Follow-up references are meaningful only within the connected application's scope.
 
@@ -110,6 +112,7 @@ A domain failure uses exactly the same outer shape:
 - A Link is `{rel:string,target:ThingRef}`. The relation's meaning is application-defined; global registration is not assumed.
 - An affordance reference is `{ref:InteractionRef}`. It may optionally include an application-supplied `applicability` hint (`available` / `blocked` / `unknown`), separate from WoT's Interaction Affordance definition and from authorization.
 - **The application selects** contextual links/affordances; ANWA conveys and validates them, but does not decide which next action best satisfies a user's goal.
+- Action-level `effectKinds` are **untrusted author-declared categories of possible effects**, not guarantees; omitted values mean unknown. An outcome's `error.effects` instead relates to effects after a particular attempt.
 - Expected domain error `code`s **must appear in that interaction's declared `errors` map**. Undeclared domain errors, handler exceptions and contract violations become opaque `UNEXPECTED_ERROR` results (`effects: unknown`), with no internal detail disclosed. `INVALID_INPUT` is a separate framework validation failure. Error `message`, `details`, `retry` and effect information are optional, application-supplied fields; retry advice is not a guarantee of safe duplication.
 - `settled/ok` means this particular interaction completed, not necessarily that the user's broader task has completed.
 - This contract applies only to **delivered application-level outcomes**. A dropped connection may yield no ANWA Result.
@@ -165,7 +168,7 @@ npm test               # also checks declared error behavior at runtime
 
 The generated TypeScript types are based on the manifest's declared input/output schemas and domain error codes. They can guide typed Handler implementations, but cannot prove the real code satisfies business constraints or side-effect invariants. The current demos are JavaScript and do not yet compile against the generated declarations.
 
-AI-friendliness is **not established merely by structured JSON**: field descriptions, meaningful operation names, discoverability, error coverage and progressive descriptions can help, but comparative agent evaluations have not been performed. The raw machine-readable manifest is not necessarily the best human authoring or agent consumption format.
+AI-friendliness is **not established merely by structured JSON**: machine-addressable semantic identifiers, field descriptions, action effect hints, error coverage and progressive Discovery provide candidate signals, but comparative agent evaluations have not been performed. The raw machine-readable manifest is not necessarily the best **agent consumption interface**. Human ease of authoring is **not** an ANWA design objective.
 
 External API delegation/federated references are a future research direction; the current prototype only resolves refs within one connected application.
 
@@ -178,6 +181,7 @@ External API delegation/federated references are a future research direction; th
 5. Negotiation of async and observation extensions; compatibility with base clients.
 6. WoT TD 1.1 mapping (Forms, security and other mandatory fields) versus WoT-inspired vocabulary only.
 7. Runtime conformance tests, versioning, transport adapter guarantees.
+8. Evidence that optional `semanticTypes` and `effectKinds` improve unfamiliar agents' task accuracy without creating false safety confidence.
 
 ## Primary specifications
 
