@@ -79,7 +79,7 @@ test("Type generation is keyed by top-level InteractionRef", () => {
 test("Binding rejects absent or undeclared handlers", () => {
   const app = new AnwaApp(manifests[0]);
   assert.throws(
-    () => app.bind({ "calculator.add": async () => reply(ok(1)) }),
+    () => app.bind({ "calculator.add": async () => reply(ok(1)) }, {public:["calculator.add", "calculator.divide"]}),
     /Unbound or invalid Interaction/,
   );
   assert.throws(
@@ -88,7 +88,7 @@ test("Binding rejects absent or undeclared handlers", () => {
         "calculator.add": async () => reply(ok(1)),
         "calculator.divide": async () => reply(ok(1)),
         unknown: async () => reply(ok(1)),
-      }),
+      }, {public:["calculator.add", "calculator.divide"]}),
     /Unknown or invalid/,
   );
 });
@@ -268,7 +268,7 @@ test("Missing denial callback is rejected instead of silently bypassing policy",
 test("Undeclared errors are mapped to opaque framework errors", async () => {
   const app = new AnwaApp(minimal()).bind({
     "test.run": async () => reply(fail("SECRET", "private")),
-  });
+  }, {public:["test.run"]});
   const result = await app.interact("test.run");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
     assert.deepEqual(result.outcome.result.error, {
@@ -283,7 +283,7 @@ test("Handler must return Outcome + Context, not just a bare Result", async () =
   const app = new AnwaApp(minimal()).bind({
     "test.run": async () =>
       ok(null) as unknown as import("../src/anwa.ts").SettledResponse,
-  });
+  }, {public:["test.run"]});
   const result = await app.interact("test.run");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
     assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
@@ -298,7 +298,7 @@ test("Invalid next candidate prevents success with malformed guidance", async ()
   ]) {
     const app = new AnwaApp(minimal()).bind({
       "test.run": async () => reply(ok(null), next as any),
-    });
+    }, {public:["test.run"]});
     const result = await app.interact("test.run");
     if (result.outcome.kind === "settled" && !result.outcome.result.ok)
       assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
@@ -324,7 +324,7 @@ test("Each Handler chooses its own Context independently", async () => {
       reply(ok("read"), [
         { ref: "test.run", guidance: { level: "available" } },
       ]),
-  });
+  }, {public:["test.run", "test.read"]});
   const one = await app.interact("test.run");
   const two = await app.interact("test.read");
   assert.equal(one.context.next[0].ref, "test.read");
