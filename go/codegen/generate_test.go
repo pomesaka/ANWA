@@ -80,3 +80,21 @@ func TestRejectGoNameCollisions(t *testing.T) {
 		t.Fatalf("expected identifier collision, got %v", err)
 	}
 }
+
+func TestEventOnlyManifestDoesNotGenerateUnusedImports(t *testing.T) {
+	m := anwa.Manifest{ANWA: "0.2", EntryPoints: []string{"activity.events"},
+		Interactions: map[string]anwa.Interaction{
+			"activity.events": {Kind: "event", Description: "Observe events"},
+		},
+	}
+	source, err := Generate(m, "generated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(source), "\"\"fmt\"\"") {
+		t.Fatal("event-only generated package must not import fmt")
+	}
+	if !strings.Contains(string(source), "ActivityEvents(ctx context.Context") {
+		t.Fatal("event method not generated")
+	}
+}
