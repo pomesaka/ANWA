@@ -93,6 +93,7 @@ go run ./cmd/anwa-codegen \
 - This is a transport-independent, experimental **Go reference runtime**.
   It does not authenticate callers, host HTTP routes, provide durable jobs,
   or replace atomic application authorization.
+- Every Action must explicitly declare `hasSideEffects` and `idempotent` booleans in `anwa.json`; omitted flags fail validation. These are author-declared semantics, **not** automatic retry or duplicate-detection guarantees.
 - Go enforces typed method signatures, required model fields, and the declared
   success type. JSON Schema enum constraints, semantic rules, untrusted data,
   guard decisions, and allowed next references **still require runtime checks**.
