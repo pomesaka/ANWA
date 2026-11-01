@@ -150,50 +150,92 @@ test("Runtime enforces named guard before run and uses per-Interaction onDenied"
 
 test("Invalid input never reaches the Guard or protected business run", async () => {
   const schema = {
-    anwa: "0.2", entrypoints: ["test.run"],
-    interactions: {"test.run": {
-      kind: "action", description: "Guarded validation test", guard: "check",
-      input: {type: "object", properties: {key: {type: "string"}},
-        required: ["key"], additionalProperties: false},
-      errors: {EXPECTED_FAILURE: "Policy failure"}
-    }}
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guarded validation test",
+        guard: "check",
+        input: {
+          type: "object",
+          properties: { key: { type: "string" } },
+          required: ["key"],
+          additionalProperties: false,
+        },
+        errors: { EXPECTED_FAILURE: "Policy failure" },
+      },
+    },
   } as const satisfies Manifest;
-  let checked = 0, executed = 0;
-  const app = new AnwaApp(schema).bind({
-    "test.run": {
-      run: async () => {executed++; return reply(ok(null));},
-      onDenied: () => []
-    }
-  }, {guards: {check: async () => {checked++; return {allowed: true};}}});
-  const invalid = await app.follow({ref: "test.run", input:{key:123}});
+  let checked = 0,
+    executed = 0;
+  const app = new AnwaApp(schema).bind(
+    {
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: () => [],
+      },
+    },
+    {
+      guards: {
+        check: async () => {
+          checked++;
+          return { allowed: true };
+        },
+      },
+    },
+  );
+  const invalid = await app.follow({ ref: "test.run", input: { key: 123 } });
   assert.equal(checked, 0);
   assert.equal(executed, 0);
   if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
     assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
-  const success = await app.interact("test.run", {key:"valid"});
-  assert.equal(success.outcome.kind,"settled");
-  assert.equal(checked,1);
-  assert.equal(executed,1);
+  const success = await app.interact("test.run", { key: "valid" });
+  assert.equal(success.outcome.kind, "settled");
+  assert.equal(checked, 1);
+  assert.equal(executed, 1);
 });
 
 test("Undeclared Guard errors are opaque and never execute the protected run", async () => {
-  const doc = {anwa:"0.2", entrypoints:["test.run"],
-    interactions:{"test.run": {kind:"action",description:"Guard check",
-      guard:"check",errors:{EXPECTED_FAILURE:"Expected"}}}
+  const doc = {
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guard check",
+        guard: "check",
+        errors: { EXPECTED_FAILURE: "Expected" },
+      },
+    },
   } as const satisfies Manifest;
   let executed = 0;
-  const app = new AnwaApp(doc).bind({"test.run": {
-    run: async () => {executed++; return reply(ok(null));},
-    onDenied: () => []
-  }}, {guards: {check: async () => (
-    // Intentional runtime-contract violation to verify enforcement.
-    {allowed:false, error:{code:"SECRET_FAILURE"}} as any
-  )}});
-  const response=await app.interact("test.run");
-  assert.equal(executed,0);
-  if(response.outcome.kind==="settled"&&!response.outcome.result.ok)
-    assert.equal(response.outcome.result.error.code,"UNEXPECTED_ERROR");
-  assert.deepEqual(response.context,{next:[]});
+  const app = new AnwaApp(doc).bind(
+    {
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: () => [],
+      },
+    },
+    {
+      guards: {
+        check: async () =>
+          // Intentional runtime-contract violation to verify enforcement.
+          ({ allowed: false, error: { code: "SECRET_FAILURE" } }) as any,
+      },
+    },
+  );
+  const response = await app.interact("test.run");
+  assert.equal(executed, 0);
+  if (response.outcome.kind === "settled" && !response.outcome.result.ok)
+    assert.equal(response.outcome.result.error.code, "UNEXPECTED_ERROR");
+  assert.deepEqual(response.context, { next: [] });
 });
 
 test("Missing denial callback is rejected instead of silently bypassing policy", () => {
