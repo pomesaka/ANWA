@@ -67,7 +67,9 @@
       "errors": {
         "AUTH_REQUIRED": "A verified caller is required.",
         "INVALID_TITLE": "Title must be nonblank and at most 120 characters."
-      }
+      },
+      "hasSideEffects": true,
+      "idempotent": false
     },
     "task.list": {
       "kind": "query",
@@ -170,7 +172,9 @@
         "TASK_NOT_FOUND": "Task is not found for this caller.",
         "VERSION_CONFLICT": "The task version does not match expectedVersion.",
         "INVALID_TITLE": "Title must be nonblank and at most 120 characters."
-      }
+      },
+      "hasSideEffects": true,
+      "idempotent": false
     },
     "task.complete": {
       "kind": "action",
@@ -211,7 +215,9 @@
         "TASK_NOT_FOUND": "Task is not found for this caller.",
         "VERSION_CONFLICT": "The task version does not match expectedVersion.",
         "ALREADY_COMPLETED": "Task is already complete."
-      }
+      },
+      "hasSideEffects": true,
+      "idempotent": false
     },
     "task.delete": {
       "kind": "action",
@@ -252,7 +258,9 @@
         "AUTH_REQUIRED": "A verified caller is required.",
         "TASK_NOT_FOUND": "Task is not found for this caller.",
         "VERSION_CONFLICT": "The task version does not match expectedVersion."
-      }
+      },
+      "hasSideEffects": true,
+      "idempotent": false
     }
   }
 }
