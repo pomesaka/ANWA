@@ -1,76 +1,46 @@
-# Order cancellation — Handler-owned Context (ANWA v0.2)
+# Order cancellation — automatically enforced Guard, per-Interaction Context
 
-> Experimental example based on [the executable Orders demo](../../demo/orders/index.ts). The domain contains orders and shipments, but **ANWA Core does not define Things**.
+> Experimental ANWA v0.2 example. See [the executable implementation](../../demo/orders/index.ts) for exact behavior. ANWA does not model Things or decide the order lifecycle.
 
-## Schema
+## Declared contract
 
-An `anwa.json` Interaction declaration describes `order.cancel` independently of any domain entity parent:
+The public JSON [Orders schema](../../demo/orders/anwa.json) declares a standalone `order.cancel` Action with input `{orderId, reason}`, output `{status}`, exhaustive expected error codes (`NOT_FOUND`, `ORDER_ALREADY_SHIPPED`, `ALREADY_CANCELLED`, `ORDER_STATE_CHANGED`), and the named Guard `canCancel`.
 
-```json
-{
-  "kind": "action",
-  "description": "Cancel an order when permitted.",
-  "input": {
-    "type": "object",
-    "properties": {
-      "orderId": { "type": "string" },
-      "reason": { "type": "string" }
-    },
-    "required": ["orderId", "reason"],
-    "additionalProperties": false
-  },
-  "output": {
-    "type": "object",
-    "properties": { "status": { "type": "string" } },
-    "required": ["status"]
-  },
-  "errors": {
-    "NOT_FOUND": "The order was not found.",
-    "ORDER_ALREADY_SHIPPED": "Cancellation is unavailable after shipping.",
-    "ALREADY_CANCELLED": "The order has already been cancelled.",
-    "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
-  },
-  "guard": "canCancel",
-  "hasSideEffects": true,
-  "idempotent": false
-}
-```
+The author-maintained JSON is used to generate [a typed contract](../../demo/orders/contract.generated.ts) with `bun run codegen`. This literal contract constrains the types of the Handler's input, successful output, error codes, and Guard arguments.
 
-This is an excerpt of one definition, not a complete manifest. See [demo/orders/anwa.json](../../demo/orders/anwa.json) for the actual schema and other Interactions.
-
-## Handler and Context
-
-The **same Interaction Handler owns both its execution result and its follow-up candidates**. There is no global Context callback.
+## Handler, Guard and Context
 
 ```ts
-const app = new AnwaApp(schema);
-app.bind({
-  "order.cancel": async ({ input }) => {
-    const decision = await app.assess("order.cancel", input);
-    if (!decision.allowed) {
-      const next = decision.error.code === "ORDER_ALREADY_SHIPPED"
-        ? [{
-            ref: "shipment.track",
-            input: { shipmentId: await getShipmentId(input.orderId) },
-            guidance: { level: "recommended" }
-          }]
-        : [];
-      return reply({ ok: false, error: decision.error }, next);
+const app = new AnwaApp(schema).bind({
+  "order.cancel": {
+    // Runtime calls this only after the declared Guard allows invocation.
+    run: async ({input}) => {
+      const cancelled = await cancelConditionally(input.orderId, input.reason);
+      return reply(ok({status:cancelled.status}), [
+        {ref:"order.get", input:{orderId:input.orderId},
+          guidance:{level:"recommended"}}
+      ]);
+    },
+    // Called only on denial. It cannot replace the Guard error outcome.
+    onDenied: async ({input, error}) => {
+      if (error.code !== "ORDER_ALREADY_SHIPPED") return [];
+      return [{
+        ref:"shipment.track",
+        input:{shipmentId:await shipmentIdFor(input.orderId)},
+        guidance:{level:"recommended"}
+      }];
     }
-    const order = await cancelConditionally(input.orderId, input.reason);
-    return reply(ok({ status: order.status }), [
-      { ref: "order.get", input: { orderId: input.orderId },
-        guidance: { level: "recommended" } }
-    ]);
   }
 }, {
-  guards: { canCancel: async ({ input }) => canCancelOrder(input.orderId) }
+  guards:{canCancel: async ({input}) => checkCancellation(input.orderId)}
 });
 ```
 
-The code is illustrative; the real, runnable Handler is in [demo/orders/index.ts](../../demo/orders/index.ts). The named Guard is **bound by ANWA but explicitly called by the Handler**. The application still enforces authorization and atomic updates. A delayed or stale Guard check is not a transaction.
+These functions are examples of application code, not ANWA-provided business functions.
 
-A shipping-related domain failure might return:
+The Runtime performs input validation, then checks `canCancel` **before** calling `run`. If denied, the Runtime returns the declared error as Outcome and gets the next candidates from `onDenied`. This prevents accidental omission of the declared Guard in the Handler.
+
+A blocked cancellation can return:
 
 ```json
 {
@@ -88,6 +58,6 @@ A shipping-related domain failure might return:
 }
 ```
 
-This is **another Interaction**, not a retry. A retry (when warranted) would reference the **same** Interaction with `guidance.kind: "retry"`. The consuming agent chooses whether to follow a candidate based on the user's delegated goal.
+The recommendation is an available alternative, **not** a retry or a command. The agent chooses whether to follow it. ANWA does not infer a business workflow, ensure authorization, or make the Guard and data mutation atomic: the Handler must still use appropriate persistence checks.
 
-[TypeScript architecture](../architecture.md) · [ANWA v0.2 spec](../../spec/anwa-0.2.md)
+[Architecture](../architecture.md) · [Contract](../../spec/anwa-0.2.md)
