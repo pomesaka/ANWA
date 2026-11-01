@@ -339,7 +339,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   }
 
   /** Runtime enforces the named Guard before run; onDenied only builds this Interaction's Context. */
-  async interact<R extends ExecutableRefs<M>>(
+  async interact<R extends Refs<M> & ExecutableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [input?: unknown]
@@ -426,7 +426,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     }
   }
 
-  observe<R extends ObservableRefs<M>>(
+  observe<R extends Refs<M> & ObservableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [input?: unknown, options?: { cursor?: number }]
