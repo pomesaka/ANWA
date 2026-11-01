@@ -1,0 +1,31 @@
+name: One-off Go code generation
+on:
+  push:
+    branches: [feat/go-reference-runtime]
+permissions:
+  contents: write
+jobs:
+  codegen:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/go-reference-runtime
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache: false
+      - name: Generate typed interface
+        working-directory: go
+        run: go run ./cmd/anwa-codegen -in ../demo/calculator/anwa.json -out examples/calculator/contract.gen.go -package main
+      - name: Format and commit generated code
+        run: |
+          gofmt -w go/codegen/*.go go/cmd/anwa-codegen/*.go go/examples/calculator/*.go
+          rm .github/workflows/go-codegen-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go/codegen go/cmd/anwa-codegen go/examples/calculator .github/workflows/go-codegen-once.yml
+          git commit -m "chore(go): check in generated typed calculator contract"
+          git push origin HEAD:feat/go-reference-runtime
