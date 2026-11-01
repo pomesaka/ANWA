@@ -26,4 +26,6 @@ Ordinary Handlers return `reply(result, next)`; guarded Actions expose `run` and
 
 Orders uses in-memory Maps rather than transactions; Reports uses short-lived async work rather than durable jobs. These are examples of expressive power, not ANWA-mandated application architectures.
 
+Orders now demonstrates Caller-aware access: `order.get`, `order.cancel`, and `shipment.track` are guarded, while Calculator and Reports explicitly opt into public access for their demo data. The `caller` parameter is supplied by a simulated trusted Adapter; no authentication provider exists here.
+
 [v0.2 contract](../spec/anwa-0.2.md) · [README](../README.md)
