@@ -16,7 +16,8 @@
     "format": "bun fmt src demo test tools",
     "format:check": "bun fmt --check src demo test tools",
     "typecheck": "bun check",
-    "lint:check": "bunx oxlint src demo test tools"
+    "lint:check": "bunx oxlint src demo test tools",
+    "codegen": "bun tools/anwa.ts generate-manifest demo/calculator/anwa.json demo/calculator/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/orders/anwa.json demo/orders/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/reports/anwa.json demo/reports/contract.generated.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
