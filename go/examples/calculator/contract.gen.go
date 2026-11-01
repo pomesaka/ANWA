@@ -68,7 +68,7 @@ func (r CalculatorDivideOK) toANWA() anwa.Response     { return anwa.Reply(anwa.
 type CalculatorDivideErrorCode string
 
 const (
-	CalculatorDivideErrorDIVIDEBYZERO CalculatorDivideErrorCode = "DIVIDE_BY_ZERO"
+	CalculatorDivideErrorDivideByZero CalculatorDivideErrorCode = "DIVIDE_BY_ZERO"
 )
 
 type CalculatorDivideFailure struct {
