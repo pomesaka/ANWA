@@ -224,21 +224,23 @@
     "Context": {
       "type": "object",
       "required": [
-        "links",
-        "affordances"
+        "next"
       ],
+      "additionalProperties": false,
       "properties": {
-        "links": {
+        "next": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/LinkRef"
-          }
-        },
-        "affordances": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AffordanceRef"
-          }
+            "oneOf": [
+              {
+                "$ref": "#/$defs/NextInteraction"
+              },
+              {
+                "$ref": "#/$defs/NextDiscovery"
+              }
+            ]
+          },
+          "description": "Application-provided candidate follow-ups on success, domain failure and accepted work. [] is valid. Neither a ranking nor a command."
         }
       }
     },
@@ -283,14 +285,12 @@
                   "type": "string"
                 },
                 "details": {},
-                "retry": {
-                  "type": "object"
-                },
                 "effects": {
                   "type": "string"
                 }
               },
-              "additionalProperties": true
+              "additionalProperties": false,
+              "description": "Expected domain error: code, optional details, per-attempt effects. Retry guidance belongs only in context.next[].guidance."
             }
           }
         }
@@ -378,6 +378,122 @@
         }
       ],
       "description": "Property/Event interactions cannot declare Action-only hasSideEffects or idempotent in this experimental profile."
+    },
+    "Guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "retry",
+          "description": "Marks a proposed repeat of the same Interaction; does not guarantee same input or safety."
+        },
+        "level": {
+          "enum": [
+            "required",
+            "recommended",
+            "available"
+          ],
+          "description": "Application-supplied importance of the candidate, advisory relative to user's goal; required is not an instruction to override the user."
+        }
+      },
+      "minProperties": 1
+    },
+    "ExecutionTiming": {
+      "type": "object",
+      "required": [
+        "after"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "type": "string",
+          "pattern": "^P(?=.*\\d)(?:\\d+D)?(?:T(?:(?:\\d+)H)?(?:(?:\\d+)M)?(?:(?:\\d+(?:\\.\\d+)?)S)?)?$",
+          "description": "Positive ISO 8601 duration after receiving this response; an advisory earliest wait, not a timer the runtime enforces."
+        }
+      }
+    },
+    "Applicability": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "available",
+            "blocked",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "NextInteraction": {
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/InteractionRef"
+        },
+        "guidance": {
+          "$ref": "#/$defs/Guidance"
+        },
+        "when": {
+          "$ref": "#/$defs/ExecutionTiming"
+        },
+        "applicability": {
+          "$ref": "#/$defs/Applicability"
+        }
+      },
+      "description": "Candidate interaction, including retry when guidance.kind=retry. A reference is advisory, not authorization."
+    },
+    "NextDiscovery": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "discover"
+        },
+        "ref": {
+          "$ref": "#/$defs/ThingRef"
+        },
+        "guidance": {
+          "$ref": "#/$defs/Guidance"
+        },
+        "when": {
+          "$ref": "#/$defs/ExecutionTiming"
+        },
+        "applicability": {
+          "$ref": "#/$defs/Applicability"
+        }
+      },
+      "allOf": [
+        {
+          "not": {
+            "properties": {
+              "guidance": {
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "guidance"
+            ]
+          }
+        }
+      ],
+      "description": "Candidate discovery of a related Thing, not an Action. Retrying an invocation is represented by NextInteraction."
     }
   }
 }
