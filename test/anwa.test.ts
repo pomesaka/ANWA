@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createCalculator } from "../demo/calculator/index.ts";
 import { createOrders } from "../demo/orders/index.ts";
 import { createReports } from "../demo/reports/index.ts";
+const alice = { caller: { subject: "alice" } } as const;
 
 test("Interaction catalog and Discovery have no Thing", () => {
   const app = createCalculator();
@@ -51,13 +52,17 @@ test("Orders use standalone Interactions; each handler selects next Interactions
   const app = createOrders();
   assert.equal(Object.hasOwn(app.catalog(), "things"), false);
   assert.equal(
-    Object.hasOwn(app.describe("order.cancel"), "subjectType"),
+    Object.hasOwn(app.describe("order.cancel", alice), "subjectType"),
     false,
   );
-  const result = await app.interact("order.cancel", {
-    orderId: "pending",
-    reason: "Changed mind",
-  });
+  const result = await app.interact(
+    "order.cancel",
+    {
+      orderId: "pending",
+      reason: "Changed mind",
+    },
+    alice,
+  );
   assert.equal(result.outcome.kind, "settled");
   if (result.outcome.kind === "settled" && result.outcome.result.ok)
     assert.deepEqual(result.outcome.result.value, { status: "cancelled" });
@@ -65,7 +70,11 @@ test("Orders use standalone Interactions; each handler selects next Interactions
     result.context.next.find((x) => x.ref === "order.get")?.input,
     { orderId: "pending" },
   );
-  const confirmed = await app.interact("order.get", { orderId: "pending" });
+  const confirmed = await app.interact(
+    "order.get",
+    { orderId: "pending" },
+    alice,
+  );
   if (confirmed.outcome.kind === "settled" && confirmed.outcome.result.ok)
     assert.equal(
       (confirmed.outcome.result.value as { status: string }).status,
@@ -75,10 +84,14 @@ test("Orders use standalone Interactions; each handler selects next Interactions
 
 test("Shipped-order failure offers tracking without a central context resolver", async () => {
   const app = createOrders();
-  const failed = await app.interact("order.cancel", {
-    orderId: "shipped",
-    reason: "Changed mind",
-  });
+  const failed = await app.interact(
+    "order.cancel",
+    {
+      orderId: "shipped",
+      reason: "Changed mind",
+    },
+    alice,
+  );
   assert.equal(failed.outcome.kind, "settled");
   if (failed.outcome.kind === "settled" && !failed.outcome.result.ok)
     assert.equal(failed.outcome.result.error.code, "ORDER_ALREADY_SHIPPED");
@@ -86,7 +99,7 @@ test("Shipped-order failure offers tracking without a central context resolver",
   assert.ok(next);
   assert.deepEqual(next.input, { shipmentId: "shipped-ship" });
   assert.equal(next.guidance?.level, "recommended");
-  const tracking = await app.follow(next);
+  const tracking = await app.follow(next, alice);
   if (tracking.outcome.kind === "settled" && tracking.outcome.result.ok)
     assert.equal(tracking.outcome.result.value, "delivered");
   assert.equal(

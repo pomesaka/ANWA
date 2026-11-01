@@ -187,11 +187,9 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
     }
     if (
       value.guard !== undefined &&
-      (value.kind !== "action" ||
-        typeof value.guard !== "string" ||
-        !value.guard)
+      (typeof value.guard !== "string" || !value.guard)
     )
-      issue(path + ".guard", "Action-only named guard");
+      issue(path + ".guard", "Expected nonempty named Guard");
     for (const direction of ["input", "output"])
       if (value[direction] !== undefined)
         validateData(value[direction], path + "." + direction);

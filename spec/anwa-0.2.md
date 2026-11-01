@@ -146,6 +146,16 @@ An Action may return an accepted execution reference:
 
 The execution identifier is an opaque handle. `execution.status`, `execution.result` and `execution.updates` are **ordinary standalone Interactions**, not members of an Execution resource. The application implements their lifecycle and any storage or concurrency guarantees. Observation is independent of durable execution.
 
+## Authentication and access controls (experimental runtime)
+
+Authentication is **not** an ANWA Guard. A trusted transport Adapter authenticates the caller, then supplies `RequestContext.caller` to the in-process runtime. `input` remains untrusted application data. The reference does not validate credentials or prevent someone calling the in-process API directly with a fabricated caller; do not expose this entrypoint over a network without an authenticating adapter.
+
+Named Guards may protect **query**, **action**, and **event** Interactions. Runtime evaluates a Guard before dispatch. Queries/Actions use a `{run,onDenied}` binding; the latter supplies only `Context.next` after a denial. An Event is guarded before its async iterator starts, and failures surface as `ObservationDenied` rather than an Interaction Result.
+
+**Default-deny:** an Interaction without a Guard must be explicitly listed in the bind options `public`, otherwise binding rejects it. Guarded Interaction descriptions are hidden from Discovery unless an application-defined `discoverable({ref,caller})` policy permits disclosure. `catalog` and `discover` take the trusted request context; filtered `Context.next` respects coarse discoverability as well. Discovery has no resource-level input and is **not** proof of authorization.
+
+[Detailed authentication and authorization semantics](../docs/authentication-authorization.md).
+
 ## Tooling, demos and limitations
 
 - [TypeScript reference runtime](../src/anwa.ts)

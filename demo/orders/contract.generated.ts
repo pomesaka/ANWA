@@ -34,7 +34,11 @@ export const schema = {
       },
       errors: {
         NOT_FOUND: "The order could not be found.",
+        AUTH_REQUIRED: "A verified caller is required for this interaction.",
+        PERMISSION_DENIED:
+          "The caller does not have permission for this resource.",
       },
+      guard: "canReadOrder",
     },
     "order.cancel": {
       kind: "action",
@@ -72,6 +76,9 @@ export const schema = {
         ALREADY_CANCELLED: "The order has already been cancelled.",
         ORDER_STATE_CHANGED:
           "The order changed while cancellation was being attempted.",
+        AUTH_REQUIRED: "A verified caller is required for this interaction.",
+        PERMISSION_DENIED:
+          "The caller does not have permission for this resource.",
       },
       hasSideEffects: true,
       idempotent: false,
@@ -96,7 +103,11 @@ export const schema = {
       },
       errors: {
         NOT_FOUND: "The shipment could not be found.",
+        AUTH_REQUIRED: "A verified caller is required for this interaction.",
+        PERMISSION_DENIED:
+          "The caller does not have permission for this resource.",
       },
+      guard: "canTrackShipment",
     },
   },
 } as const satisfies Manifest;

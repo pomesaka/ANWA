@@ -102,7 +102,8 @@
         },
         "guard": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Optional named Guard for any query, action, or event. The Runtime checks it before running or subscribing; actual authentication is supplied separately by the Adapter."
         },
         "hasSideEffects": {
           "type": "boolean"
@@ -128,11 +129,6 @@
           "then": {
             "not": {
               "anyOf": [
-                {
-                  "required": [
-                    "guard"
-                  ]
-                },
                 {
                   "required": [
                     "hasSideEffects"

@@ -6,6 +6,7 @@ import type {
   AcceptedResponse,
   SettledResponse,
   NextInteraction,
+  VerifiedCaller,
 } from "./anwa.ts";
 
 export type Refs<M extends Manifest> = Extract<keyof M["interactions"], string>;
@@ -80,6 +81,7 @@ export type ArgsFor<M extends Manifest, R extends Refs<M>> = {
   ref: R;
   input: InputOf<Operation<M, R>>;
   app: AnwaApp<M>;
+  caller: VerifiedCaller | null;
 };
 export type GuardArgsFor<M extends Manifest, N extends string> = {
   [R in Refs<M>]: Operation<M, R> extends { guard: N } ? ArgsFor<M, R> : never;
@@ -120,7 +122,13 @@ export type OnDeniedFor<M extends Manifest, R extends Refs<M>> = (
 
 export type BindingsFor<M extends Manifest> = {
   [R in Refs<M>]: Operation<M, R> extends { kind: "event" }
-    ? (args: ArgsFor<M, R> & { cursor?: number }) => AsyncIterable<unknown>
+    ? Operation<M, R> extends { guard: string }
+      ? {
+          run: (
+            args: ArgsFor<M, R> & { cursor?: number },
+          ) => AsyncIterable<unknown>;
+        }
+      : (args: ArgsFor<M, R> & { cursor?: number }) => AsyncIterable<unknown>
     : Operation<M, R> extends { guard: string }
       ? { run: HandlerFor<M, R>; onDenied: OnDeniedFor<M, R> }
       : HandlerFor<M, R>;

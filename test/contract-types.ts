@@ -36,6 +36,8 @@ export type CheckErrors = Assert<
     | "NOT_FOUND"
     | "ALREADY_CANCELLED"
     | "ORDER_STATE_CHANGED"
+    | "AUTH_REQUIRED"
+    | "PERMISSION_DENIED"
   >
 >;
 export type CheckGuardInput = Assert<Equal<GuardInput, CancelInput>>;
