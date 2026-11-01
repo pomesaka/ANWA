@@ -4,7 +4,7 @@
 
 > A schema-first framework concept for web applications that AI agents can discover, understand, and interact with — without requiring a predefined human-facing UI.
 
-**Status: Interaction-first experimental v0.2 specification + executable demos on `main`.** A dependency-free in-process reference adapter exists; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
+**Status: Interaction-first experimental v0.2 specification + executable demos on `main`.** In-process TypeScript and Go reference adapters exist; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
 
 ## Why ANWA?
 
@@ -57,7 +57,7 @@ Authentication is delegated to a trusted Adapter that supplies verified caller i
 
 ## Executable v0.2 interaction-first contract lab
 
-The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [schema tooling](src/schema-tools.ts) and [four runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
+The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [Go reference adapter](go/README.md), [schema tooling](src/schema-tools.ts) and [four runnable TypeScript demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
 
 ```bash
 # Bun ^1.4.4
@@ -75,6 +75,16 @@ The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), 
 The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and `SavedQuery` schemas through local `$defs` / `$ref`. Codegen expands these into the same literal TypeScript contract as the previously repeated inline definitions; supported references are local, acyclic, and data-only.
 
 **v0.2 is a breaking experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for historical design context.
+
+### Go reference adapter
+
+The experimental v0.2 manifest can also be consumed by an in-process [Go module](go/README.md) with no third-party dependencies. It includes JSON contract validation (including local `$defs` / `$ref`), standalone Interaction handlers, Guard-enforced invocation and Discovery, Outcome + Context, accepted Actions and Event observation. The Go calculator example uses the same public `anwa.json` as the TypeScript demo. Go tests read all four existing manifests, including Advanced Todo. Go does **not** yet generate strongly typed Handler signatures from a manifest and is not a network server or an implementation of the Todo business logic.
+
+```bash
+cd go
+ go test ./...
+ go run ./examples/calculator
+```
 
 ## Agent-first schema and contract tooling
 
@@ -128,6 +138,7 @@ ANWA is **WoT-informed, not currently WoT-compliant**. GraphQL, REST, RPC, MCP a
 | Agent-first semantic design contract | [Agent-native schema](spec/agent-native-schema.md) |
 | Generation and validation | [Schema authoring and tooling](docs/schema-authoring.md) |
 | Working demos and tests | [Demo guide](demo/README.md) |
+| Go implementation guide and example | [Go reference adapter](go/README.md) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
 
 ### Research notes
