@@ -8,7 +8,7 @@
 2. Should discovery work from both a domain object and a natural-language intent?
 3. How precisely can Semantics be represented without building a whole new ontology?
 4. Do Relation and Affordance need distinct graph edge types?
-5. Is an Affordance a suggestion, an availability assertion, or both? How is its freshness represented?
+5. WoT already defines Interaction Affordance. Should ANWA separately model contextual availability, applicability and recommendations? How is freshness represented?
 6. Which information is global/static, and which depends on a user, resource instance, policy, or time?
 
 ## Interface boundaries
@@ -21,7 +21,7 @@
 
 ## Correctness and trust
 
-12. What happens when explanations disagree with actual implementation behavior?
+12. How should ANWA reconcile TD 1.1 additionalResponses, HTTP Problem Details (WoT Profiles draft), and runtime exceptions? What happens when explanations disagree with actual implementation behavior?
 13. How do we prevent the agent from treating untrusted descriptions as instructions?
 14. How are authorization, approval, preconditions, and retries enforced independently of hints?
 15. How should a stale affordance, race condition, or non-idempotent operation be handled?
