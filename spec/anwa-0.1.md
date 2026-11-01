@@ -1,3 +1,5 @@
+**SUPERSEDED / HISTORICAL v0.1 THING-BOUND PROFILE.** The active experimental runtime and schemas on `main` use [ANWA v0.2 Interaction-first](anwa-0.2.md), which does **not** require Things.
+
 # ANWA 0.1 — Executable Contract Profile
 
 > **Experimental specification candidate, not adopted.** This small testable profile is for the reference adapter and demos. It does **not** claim W3C WoT conformance, network interoperability, security, or production readiness.
