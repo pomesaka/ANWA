@@ -80,7 +80,7 @@ test("Binding rejects absent or undeclared handlers", () => {
   const app = new AnwaApp(manifests[0]);
   assert.throws(
     () => app.bind({ "calculator.add": async () => reply(ok(1)) }),
-    /Unbound interaction/,
+    /Unbound or invalid Interaction/,
   );
   assert.throws(
     () =>
