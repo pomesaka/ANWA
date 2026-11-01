@@ -10,7 +10,6 @@ const DATA_TYPES = new Set(["string", "number", "integer", "boolean", "object", 
 const SCHEMA_KEYS = new Set(["type", "enum", "properties", "required", "items", "additionalProperties", "description"]);
 // Optional semantic identifiers and effect declarations are application-authored hints.
 // They do not prove permission, applicability, idempotency or absence of side effects.
-const EFFECT_KINDS = new Set(["domain-state", "external-system"]);
 function semanticTypesValid(value) {
   return Array.isArray(value) && value.length > 0 &&
     value.every(x => typeof x === "string" && /^(?:https?:\/\/|urn:)[^\s]+$/.test(x)) &&
@@ -93,15 +92,14 @@ export function validateManifest(manifest) {
         const at = path + "." + bucket + "." + name;
         if (!IDENTIFIER.test(name)) issue(at, "Interaction name must be an identifier");
         if (!record(op)) { issue(at, "Expected interaction object"); continue; }
-        keys(op, ["description", "semanticTypes", "effectKinds", "input", "output", "guard", "errors"], at);
+        keys(op, ["description", "semanticTypes", "hasSideEffects", "idempotent", "input", "output", "guard", "errors"], at);
         if (op.semanticTypes !== undefined && !semanticTypesValid(op.semanticTypes)) {
           issue(at + ".semanticTypes", "Expected nonempty unique absolute HTTP(S) or URN identifiers");
         }
-        if (op.effectKinds !== undefined) {
-          if (bucket !== "actions" || !Array.isArray(op.effectKinds) ||
-              op.effectKinds.some(x => !EFFECT_KINDS.has(x)) ||
-              new Set(op.effectKinds).size !== op.effectKinds.length) {
-            issue(at + ".effectKinds", "Action effectKinds must be unique values from domain-state, external-system");
+        for (const field of ["hasSideEffects", "idempotent"]) {
+          if (op[field] !== undefined &&
+              (bucket !== "actions" || typeof op[field] !== "boolean")) {
+            issue(at + "." + field, "Action-only optional boolean; omission means unknown");
           }
         }
         description(op.description, at + ".description");
