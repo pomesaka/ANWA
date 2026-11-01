@@ -17,16 +17,16 @@ The walkthrough creates a workspace, invites a collaborator, creates a project, 
 
 ## Implemented functionality
 
-| Area | Interactions | Behaviors |
-| --- | --- | --- |
-| Workspaces and memberships | `workspace.create`, `workspace.list`, `workspace.invite`, `workspace.members`, `workspace.dashboard` | Owner/editor/viewer roles, caller isolation, project and task metrics |
-| Projects | `project.create`, `project.list`, `project.update` | Project grouping, archiving, version checks |
-| Task lifecycle | `task.create`, `task.get`, `task.list`, `task.update`, `task.complete`, `task.reopen`, `task.archive`, `task.restore` | Subtasks, priorities, tags, assignees, notes, deadlines, recurrence, version checks, reversible archiving |
-| Task dependencies | `task.dependency.add`, `task.dependency.remove` | DAG cycle detection, computed blocked status, completion prerequisites |
-| Operations and planning | `task.bulkUpdate`, `task.search`, `task.board`, `task.plan` | Prevalidated in-memory bulk changes, filters/sort/pagination, kanban, priority/urgency planning |
-| Collaboration | `task.comment` | Attributed comments visible to members |
-| Saved searches | `view.save`, `view.list`, `view.run` | Reusable, workspace-scoped query criteria |
-| Audit | `activity.events` | Guarded, cursor-based finite replay via AsyncIterable |
+| Area                       | Interactions                                                                                                          | Behaviors                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Workspaces and memberships | `workspace.create`, `workspace.list`, `workspace.invite`, `workspace.members`, `workspace.dashboard`                  | Owner/editor/viewer roles, caller isolation, project and task metrics                                     |
+| Projects                   | `project.create`, `project.list`, `project.update`                                                                    | Project grouping, archiving, version checks                                                               |
+| Task lifecycle             | `task.create`, `task.get`, `task.list`, `task.update`, `task.complete`, `task.reopen`, `task.archive`, `task.restore` | Subtasks, priorities, tags, assignees, notes, deadlines, recurrence, version checks, reversible archiving |
+| Task dependencies          | `task.dependency.add`, `task.dependency.remove`                                                                       | DAG cycle detection, computed blocked status, completion prerequisites                                    |
+| Operations and planning    | `task.bulkUpdate`, `task.search`, `task.board`, `task.plan`                                                           | Prevalidated in-memory bulk changes, filters/sort/pagination, kanban, priority/urgency planning           |
+| Collaboration              | `task.comment`                                                                                                        | Attributed comments visible to members                                                                    |
+| Saved searches             | `view.save`, `view.list`, `view.run`                                                                                  | Reusable, workspace-scoped query criteria                                                                 |
+| Audit                      | `activity.events`                                                                                                     | Guarded, cursor-based finite replay via AsyncIterable                                                     |
 
 The published JSON manifest is [anwa.json](anwa.json). [contract.generated.ts](contract.generated.ts) is derived from that file and checked in CI. Each Handler in [index.ts](index.ts) is typed by the manifest and delegates app logic to [logic.ts](logic.ts), using an ordinary [in-memory model](model.ts).
 

@@ -21,9 +21,7 @@
             "description": "Concise title"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "additionalProperties": false
       },
       "output": {
@@ -42,11 +40,7 @@
               },
               "role": {
                 "type": "string",
-                "enum": [
-                  "owner",
-                  "editor",
-                  "viewer"
-                ],
+                "enum": ["owner", "editor", "viewer"],
                 "description": "Membership role"
               },
               "members": {
@@ -54,18 +48,11 @@
                 "description": "Member count"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "role",
-              "members"
-            ],
+            "required": ["id", "name", "role", "members"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "workspace"
-        ],
+        "required": ["workspace"],
         "additionalProperties": false
       },
       "errors": {
@@ -98,11 +85,7 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": [
-                    "owner",
-                    "editor",
-                    "viewer"
-                  ],
+                  "enum": ["owner", "editor", "viewer"],
                   "description": "Membership role"
                 },
                 "members": {
@@ -110,19 +93,12 @@
                   "description": "Member count"
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "role",
-                "members"
-              ],
+              "required": ["id", "name", "role", "members"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "workspaces"
-        ],
+        "required": ["workspaces"],
         "additionalProperties": false
       },
       "errors": {
@@ -147,18 +123,11 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "editor",
-              "viewer"
-            ],
+            "enum": ["editor", "viewer"],
             "description": "Role"
           }
         },
-        "required": [
-          "workspaceId",
-          "subject",
-          "role"
-        ],
+        "required": ["workspaceId", "subject", "role"],
         "additionalProperties": false
       },
       "output": {
@@ -173,23 +142,15 @@
               },
               "role": {
                 "type": "string",
-                "enum": [
-                  "editor",
-                  "viewer"
-                ],
+                "enum": ["editor", "viewer"],
                 "description": "Role"
               }
             },
-            "required": [
-              "subject",
-              "role"
-            ],
+            "required": ["subject", "role"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "member"
-        ],
+        "required": ["member"],
         "additionalProperties": false
       },
       "errors": {
@@ -213,9 +174,7 @@
             "description": "Workspace identifier"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -232,25 +191,16 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": [
-                    "owner",
-                    "editor",
-                    "viewer"
-                  ],
+                  "enum": ["owner", "editor", "viewer"],
                   "description": "Role"
                 }
               },
-              "required": [
-                "subject",
-                "role"
-              ],
+              "required": ["subject", "role"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "members"
-        ],
+        "required": ["members"],
         "additionalProperties": false
       },
       "errors": {
@@ -270,9 +220,7 @@
             "description": "Workspace identifier"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -314,12 +262,7 @@
                 "description": "Done"
               }
             },
-            "required": [
-              "todo",
-              "in_progress",
-              "blocked",
-              "done"
-            ],
+            "required": ["todo", "in_progress", "blocked", "done"],
             "additionalProperties": false
           },
           "byProject": {
@@ -344,12 +287,7 @@
                   "description": "Completed"
                 }
               },
-              "required": [
-                "projectId",
-                "name",
-                "total",
-                "done"
-              ],
+              "required": ["projectId", "name", "total", "done"],
               "additionalProperties": false
             }
           }
@@ -389,10 +327,7 @@
             "description": "Description"
           }
         },
-        "required": [
-          "workspaceId",
-          "name"
-        ],
+        "required": ["workspaceId", "name"],
         "additionalProperties": false
       },
       "output": {
@@ -426,19 +361,11 @@
                 "description": "Version"
               }
             },
-            "required": [
-              "id",
-              "workspaceId",
-              "name",
-              "archived",
-              "version"
-            ],
+            "required": ["id", "workspaceId", "name", "archived", "version"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "project"
-        ],
+        "required": ["project"],
         "additionalProperties": false
       },
       "errors": {
@@ -465,9 +392,7 @@
             "description": "Include archived"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -503,20 +428,12 @@
                   "description": "Version"
                 }
               },
-              "required": [
-                "id",
-                "workspaceId",
-                "name",
-                "archived",
-                "version"
-              ],
+              "required": ["id", "workspaceId", "name", "archived", "version"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "projects"
-        ],
+        "required": ["projects"],
         "additionalProperties": false
       },
       "errors": {
@@ -556,11 +473,7 @@
             "description": "Archived"
           }
         },
-        "required": [
-          "workspaceId",
-          "projectId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "projectId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -594,19 +507,11 @@
                 "description": "Version"
               }
             },
-            "required": [
-              "id",
-              "workspaceId",
-              "name",
-              "archived",
-              "version"
-            ],
+            "required": ["id", "workspaceId", "name", "archived", "version"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "project"
-        ],
+        "required": ["project"],
         "additionalProperties": false
       },
       "errors": {
@@ -648,12 +553,7 @@
           },
           "priority": {
             "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "urgent"
-            ],
+            "enum": ["low", "medium", "high", "urgent"],
             "description": "Task priority"
           },
           "dueAt": {
@@ -680,11 +580,7 @@
             "description": "Interval days"
           }
         },
-        "required": [
-          "workspaceId",
-          "projectId",
-          "title"
-        ],
+        "required": ["workspaceId", "projectId", "title"],
         "additionalProperties": false
       },
       "output": {
@@ -711,22 +607,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -807,11 +693,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -832,9 +714,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -863,10 +743,7 @@
             "description": "Task identifier"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId"
-        ],
+        "required": ["workspaceId", "taskId"],
         "additionalProperties": false
       },
       "output": {
@@ -893,22 +770,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -989,11 +856,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -1014,9 +877,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -1057,9 +918,7 @@
             "description": "Offset"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -1088,22 +947,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -1184,11 +1033,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -1223,12 +1068,7 @@
             "description": "Limit"
           }
         },
-        "required": [
-          "items",
-          "total",
-          "offset",
-          "limit"
-        ],
+        "required": ["items", "total", "offset", "limit"],
         "additionalProperties": false
       },
       "errors": {
@@ -1269,20 +1109,12 @@
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress"
-                ],
+                "enum": ["todo", "in_progress"],
                 "description": "Mutable status"
               },
               "dueAt": {
@@ -1313,12 +1145,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "expectedVersion",
-          "patch"
-        ],
+        "required": ["workspaceId", "taskId", "expectedVersion", "patch"],
         "additionalProperties": false
       },
       "output": {
@@ -1345,22 +1172,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -1441,11 +1258,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -1466,9 +1279,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -1502,11 +1313,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -1533,22 +1340,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -1629,11 +1426,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -1658,9 +1451,7 @@
             "description": "Task identifier"
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -1695,11 +1486,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -1726,22 +1513,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -1822,11 +1599,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -1847,9 +1620,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -1883,11 +1654,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -1914,22 +1681,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -2010,11 +1767,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -2035,9 +1788,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -2070,11 +1821,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -2101,22 +1848,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -2197,11 +1934,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -2222,9 +1955,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -2261,12 +1992,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "dependsOnId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "dependsOnId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -2293,22 +2019,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -2389,11 +2105,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -2414,9 +2126,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -2455,12 +2165,7 @@
             "description": "Version"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "dependsOnId",
-          "expectedVersion"
-        ],
+        "required": ["workspaceId", "taskId", "dependsOnId", "expectedVersion"],
         "additionalProperties": false
       },
       "output": {
@@ -2487,22 +2192,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -2583,11 +2278,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -2608,9 +2299,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -2653,20 +2342,12 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "todo",
-                        "in_progress"
-                      ],
+                      "enum": ["todo", "in_progress"],
                       "description": "Active state"
                     },
                     "priority": {
                       "type": "string",
-                      "enum": [
-                        "low",
-                        "medium",
-                        "high",
-                        "urgent"
-                      ],
+                      "enum": ["low", "medium", "high", "urgent"],
                       "description": "Task priority"
                     },
                     "dueAt": {
@@ -2693,20 +2374,13 @@
                   "additionalProperties": false
                 }
               },
-              "required": [
-                "taskId",
-                "expectedVersion",
-                "patch"
-              ],
+              "required": ["taskId", "expectedVersion", "patch"],
               "additionalProperties": false
             },
             "description": "Updates"
           }
         },
-        "required": [
-          "workspaceId",
-          "updates"
-        ],
+        "required": ["workspaceId", "updates"],
         "additionalProperties": false
       },
       "output": {
@@ -2735,22 +2409,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -2831,11 +2495,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -2862,10 +2522,7 @@
             "description": "Count"
           }
         },
-        "required": [
-          "items",
-          "count"
-        ],
+        "required": ["items", "count"],
         "additionalProperties": false
       },
       "errors": {
@@ -2901,22 +2558,12 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "todo",
-              "in_progress",
-              "blocked",
-              "done"
-            ],
+            "enum": ["todo", "in_progress", "blocked", "done"],
             "description": "Current or computed effective status"
           },
           "priority": {
             "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "urgent"
-            ],
+            "enum": ["low", "medium", "high", "urgent"],
             "description": "Task priority"
           },
           "tag": {
@@ -2941,13 +2588,7 @@
           },
           "sortBy": {
             "type": "string",
-            "enum": [
-              "dueAt",
-              "priority",
-              "createdAt",
-              "updatedAt",
-              "title"
-            ],
+            "enum": ["dueAt", "priority", "createdAt", "updatedAt", "title"],
             "description": "Sort order"
           },
           "descending": {
@@ -2963,9 +2604,7 @@
             "description": "Pagination offset"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -2994,22 +2633,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3090,11 +2719,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3129,12 +2754,7 @@
             "description": "Limit"
           }
         },
-        "required": [
-          "items",
-          "total",
-          "offset",
-          "limit"
-        ],
+        "required": ["items", "total", "offset", "limit"],
         "additionalProperties": false
       },
       "errors": {
@@ -3159,9 +2779,7 @@
             "description": "Project identifier"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -3190,22 +2808,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3286,11 +2894,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3334,22 +2938,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3430,11 +3024,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3478,22 +3068,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3574,11 +3154,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3622,22 +3198,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3718,11 +3284,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3744,12 +3306,7 @@
             }
           }
         },
-        "required": [
-          "todo",
-          "in_progress",
-          "blocked",
-          "done"
-        ],
+        "required": ["todo", "in_progress", "blocked", "done"],
         "additionalProperties": false
       },
       "errors": {
@@ -3777,9 +3334,7 @@
             "description": "Count"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -3808,22 +3363,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -3904,11 +3449,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -3934,10 +3475,7 @@
             "description": "Blocked count"
           }
         },
-        "required": [
-          "items",
-          "blocked"
-        ],
+        "required": ["items", "blocked"],
         "additionalProperties": false
       },
       "errors": {
@@ -3966,11 +3504,7 @@
             "description": "Comment body"
           }
         },
-        "required": [
-          "workspaceId",
-          "taskId",
-          "body"
-        ],
+        "required": ["workspaceId", "taskId", "body"],
         "additionalProperties": false
       },
       "output": {
@@ -3997,22 +3531,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tags": {
@@ -4093,11 +3617,7 @@
                       "description": "Time"
                     }
                   },
-                  "required": [
-                    "author",
-                    "body",
-                    "at"
-                  ],
+                  "required": ["author", "body", "at"],
                   "additionalProperties": false
                 },
                 "description": "Comments"
@@ -4118,9 +3638,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "task"
-        ],
+        "required": ["task"],
         "additionalProperties": false
       },
       "errors": {
@@ -4161,22 +3679,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "blocked",
-                  "done"
-                ],
+                "enum": ["todo", "in_progress", "blocked", "done"],
                 "description": "Current or computed effective status"
               },
               "priority": {
                 "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "urgent"
-                ],
+                "enum": ["low", "medium", "high", "urgent"],
                 "description": "Task priority"
               },
               "tag": {
@@ -4215,11 +3723,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "workspaceId",
-          "name",
-          "query"
-        ],
+        "required": ["workspaceId", "name", "query"],
         "additionalProperties": false
       },
       "output": {
@@ -4249,22 +3753,12 @@
                   },
                   "status": {
                     "type": "string",
-                    "enum": [
-                      "todo",
-                      "in_progress",
-                      "blocked",
-                      "done"
-                    ],
+                    "enum": ["todo", "in_progress", "blocked", "done"],
                     "description": "Current or computed effective status"
                   },
                   "priority": {
                     "type": "string",
-                    "enum": [
-                      "low",
-                      "medium",
-                      "high",
-                      "urgent"
-                    ],
+                    "enum": ["low", "medium", "high", "urgent"],
                     "description": "Task priority"
                   },
                   "tag": {
@@ -4307,18 +3801,11 @@
                 "description": "Creator"
               }
             },
-            "required": [
-              "id",
-              "name",
-              "query",
-              "creator"
-            ],
+            "required": ["id", "name", "query", "creator"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "view"
-        ],
+        "required": ["view"],
         "additionalProperties": false
       },
       "errors": {
@@ -4341,9 +3828,7 @@
             "description": "Workspace identifier"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "output": {
@@ -4375,22 +3860,12 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "todo",
-                        "in_progress",
-                        "blocked",
-                        "done"
-                      ],
+                      "enum": ["todo", "in_progress", "blocked", "done"],
                       "description": "Current or computed effective status"
                     },
                     "priority": {
                       "type": "string",
-                      "enum": [
-                        "low",
-                        "medium",
-                        "high",
-                        "urgent"
-                      ],
+                      "enum": ["low", "medium", "high", "urgent"],
                       "description": "Task priority"
                     },
                     "tag": {
@@ -4433,19 +3908,12 @@
                   "description": "Creator"
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "query",
-                "creator"
-              ],
+              "required": ["id", "name", "query", "creator"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "views"
-        ],
+        "required": ["views"],
         "additionalProperties": false
       },
       "errors": {
@@ -4477,10 +3945,7 @@
             "description": "Offset"
           }
         },
-        "required": [
-          "workspaceId",
-          "viewId"
-        ],
+        "required": ["workspaceId", "viewId"],
         "additionalProperties": false
       },
       "output": {
@@ -4509,22 +3974,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "blocked",
-                    "done"
-                  ],
+                  "enum": ["todo", "in_progress", "blocked", "done"],
                   "description": "Current or computed effective status"
                 },
                 "priority": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high",
-                    "urgent"
-                  ],
+                  "enum": ["low", "medium", "high", "urgent"],
                   "description": "Task priority"
                 },
                 "tags": {
@@ -4605,11 +4060,7 @@
                         "description": "Time"
                       }
                     },
-                    "required": [
-                      "author",
-                      "body",
-                      "at"
-                    ],
+                    "required": ["author", "body", "at"],
                     "additionalProperties": false
                   },
                   "description": "Comments"
@@ -4644,12 +4095,7 @@
             "description": "Limit"
           }
         },
-        "required": [
-          "items",
-          "total",
-          "offset",
-          "limit"
-        ],
+        "required": ["items", "total", "offset", "limit"],
         "additionalProperties": false
       },
       "errors": {
@@ -4671,9 +4117,7 @@
             "description": "Workspace identifier"
           }
         },
-        "required": [
-          "workspaceId"
-        ],
+        "required": ["workspaceId"],
         "additionalProperties": false
       },
       "errors": {
