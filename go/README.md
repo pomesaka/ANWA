@@ -1,79 +1,100 @@
-# ANWA Go reference adapter (experimental v0.2)
+# ANWA Go — schema-first, interface-first reference adapter
 
-This directory is a standalone, standard-library-only Go module:
+This Go 1.23+ module uses **one public `anwa.json`** for Go and TypeScript.
+The standard-library-only generator produces Go request/output types and a
+`ServerInterface` that application authors must implement. This is modeled
+on `oapi-codegen`'s strict-server pattern, **not** an HTTP server generator.
+
+## Generate and implement
+
+From the `go/` directory:
 
 ```bash
-cd go
+go run ./cmd/anwa-codegen \
+  -in ../demo/calculator/anwa.json \
+  -out examples/calculator/contract.gen.go \
+  -package main
+go run ./examples/calculator
 go test ./...
 go vet ./...
-go run ./examples/calculator
 ```
 
-Go 1.23+ is required. The calculator example loads the **same**
-[`demo/calculator/anwa.json`](../demo/calculator/anwa.json) as the Bun demo.
-The four existing ANWA manifests (including the 27-Interaction Todo with
-`$defs.Task`) are checked by Go tests. Go does **not** need the generated
-TypeScript `contract.generated.ts` files.
-
-## Author a Go application
-
-The public JSON contract remains the source of truth. Bind one Go handler for
-each declared Interaction and mark all unguarded Interactions explicitly public:
+The checked-in [calculator implementation](examples/calculator/main.go)
+satisfies the generated `ServerInterface` at **compile time**:
 
 ```go
-manifest, err := anwa.ParseManifest(data) // []byte of anwa.json
-if err != nil { return err }
+type CalculatorServer struct{}
+var _ ServerInterface = (*CalculatorServer)(nil)
+
+func (*CalculatorServer) CalculatorAdd(
+    ctx context.Context,
+    request CalculatorAddRequest,
+) (CalculatorAddResponse, error) {
+    return CalculatorAddOK{
+        Value: CalculatorAddOutput(request.Input.A + request.Input.B),
+    }, nil
+}
+```
+
+A generated `Handlers(server ServerInterface)` adapter connects that
+implementation to ANWA's runtime. The application never writes the
+`map[string]anwa.Handler` registry by hand:
+
+```go
 app, err := anwa.New(manifest, anwa.Config{
-    Public: []string{"calculator.add"},
-    Handlers: map[string]anwa.Handler{
-        "calculator.add": {
-            Run: func(ctx context.Context, args anwa.Args) (anwa.Response, error) {
-                var input struct { A, B float64 }
-                if err := args.DecodeInput(&input); err != nil {
-                    return anwa.Response{}, err
-                }
-                return anwa.Reply(anwa.OK(input.A + input.B)), nil
-            },
-        },
-    },
+    Public: []string{"calculator.add", "calculator.divide"},
+    Handlers: Handlers(&CalculatorServer{}),
 })
 ```
 
-Use `app.Catalog(request)`, `app.Discover(ref, request)`,
-`app.Interact(ctx, ref, input, request)`, `app.Follow(ctx, next, request)`
-and `app.Observe(ctx, ref, input, cursor, request)`. See the runnable
-[calculator](examples/calculator/main.go).
+If the author omits a declared Interaction method, changes a method's
+signature, or returns the wrong generated response family, Go compilation
+fails. The generated operation-specific `OK`, `Failure`, and `Accepted`
+response types encode the expected ANWA `Outcome + Context` envelope.
 
-For a guarded Query or Action, declare its guard name and possible error
-codes in `anwa.json`, bind a `Config.Guards[name]` function and supply
-both `Handler.Run` and `Handler.OnDenied`. The Guard runs before business
-logic and denial never invokes `Run`. Event bindings instead use
-`Handler.Observe`, which returns `<-chan any`; the caller should cancel its
-`context.Context` to stop a long-lived stream. Guarded discoveries remain
-hidden unless `Config.Discoverable` allows disclosure. There is no
-application-global context resolver.
+## Generated contract and runtime responsibilities
 
-The Go runtime validates the documented payload subset, expected error codes
-and context candidates. Local, acyclic `$defs` / `$ref` resolve directly
-from the authoring manifest. Go `Args.DecodeInput` is an **ergonomic decode
-helper**, not a generated compile-time Handler type; unlike the TypeScript
-implementation, Go bindings are not statically inferred from the JSON schema.
+| Generated from the manifest | Still enforced at runtime |
+| --- | --- |
+| Input and output Go types | Input/output JSON-schema subset validation |
+| `ServerInterface` for all Interactions | Default-deny binding and named Guards |
+| Declared error-code constants | Error code and effects checks |
+| Success / declared failure / accepted response variants | `context.next` validation and discoverability filtering |
+| Handler adapter and guarded `OnDenied` methods | Verified caller boundary and denial-before-run |
 
-## Security and scope
+Guard functions and Discovery policies are deliberately separate, app-owned
+dependencies supplied through `anwa.Config`. A generated guarded method
+also requires a corresponding `<Interaction>OnDenied` method; Event methods
+return `<-chan any` and are protected before observation starts.
 
-- `RequestContext.Caller` must come from a **trusted authenticating adapter**
-  and must never be taken from agent-supplied `input`. Go does **not**
-  verify credentials, establish a network transport or provide auth itself.
-- Guard preflight does **not** replace application-side transactional and
-  per-resource authorization checks. Next candidates are suggestions, not
-  authorization tokens; `Follow` always checks again.
-- Accepted Action results return an opaque execution ID; the application
-  must implement persistence, status and retries. Event observation is a
-  Go channel rather than a built-in wire protocol or durable job service.
-- This is not a published package version, stable API, full JSON Schema
-  engine, interoperability certification, or a complete Go translation of
-  the advanced Todo business logic.
+The Go generator supports the v0.2 payload subset with local, noncyclic
+`$defs` and `$ref`. It validates and generates Go syntax for all four
+existing ANWA manifests, including the 27-Interaction Todo. The calculator
+is the runnable example of a completed Go implementation.
 
-[Main specification](../spec/anwa-0.2.md) ·
-[Authentication boundary](../docs/authentication-authorization.md) ·
-[Repository README](../README.md)
+Generated files should be committed. CI checks the committed calculator
+contract against re-generation with:
+
+```bash
+go run ./cmd/anwa-codegen \
+  -in ../demo/calculator/anwa.json \
+  -out examples/calculator/contract.gen.go \
+  -package main -check
+```
+
+## Explicit boundaries
+
+- This is a transport-independent, experimental **Go reference runtime**.
+  It does not authenticate callers, host HTTP routes, provide durable jobs,
+  or replace atomic application authorization.
+- Go enforces typed method signatures, required model fields, and the declared
+  success type. JSON Schema enum constraints, semantic rules, untrusted data,
+  guard decisions, and allowed next references **still require runtime checks**.
+- This does not port Todo's business logic to Go or certify interoperability
+  with every JSON Schema or ANWA implementation. Event payloads remain
+  application-defined `any` values.
+- Code generation only covers the explicitly supported v0.2 schema subset;
+  it is not a general-purpose OpenAPI code generator or an adopted standard.
+
+[ANWA v0.2](../spec/anwa-0.2.md) · [Go Calculator](examples/calculator/main.go) ·
+[Authentication boundary](../docs/authentication-authorization.md)
