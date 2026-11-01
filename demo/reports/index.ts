@@ -1,16 +1,12 @@
-import { readFileSync } from "node:fs";
 import {
   AnwaApp,
   accepted,
   fail,
   ok,
   reply,
-  type Manifest,
 } from "../../src/anwa.ts";
 
-const schema = JSON.parse(
-  readFileSync(new URL("./anwa.json", import.meta.url), "utf8"),
-) as Manifest;
+import { schema } from "./contract.generated.ts";
 const sleep = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 type ReportEvent =
@@ -23,7 +19,7 @@ interface ReportJob {
   text: string;
 }
 
-export function createReports(): AnwaApp {
+export function createReports(): AnwaApp<typeof schema> {
   const jobs = new Map<string, ReportJob>();
   let nextId = 1;
 
