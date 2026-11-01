@@ -129,5 +129,9 @@ export function createReports(): AnwaApp<typeof schema> {
           await sleep(2);
         }
       })(),
+  }, {
+    // This stateless demo intentionally exposes its generated execution handles publicly.
+    // Production reports should use per-user Guards and durable access checks.
+    public: ["report.generate", "execution.status", "execution.result", "execution.updates"],
   });
 }
