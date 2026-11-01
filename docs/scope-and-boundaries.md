@@ -20,7 +20,7 @@ A framework can *allow* an app to do something without *performing it automatica
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| **ANWA specification** | Optional/composable primitives and contracts to describe an agent-facing application: discoverable descriptions, references, invocation contracts, semantic outcomes, related links / affordance hints, optional observation | Business entity boundaries, state-machine topology, which actions exist, which hints to publish, product workflows, business policy |
+| **ANWA specification** | Public first-class Interactions, their Discovery/Invocation semantics, typed Outcome + contextual `next` and optional observation | Business entity/Thing boundaries, state-machine topology, which actions exist, next candidates or business policy |
 | **ANWA framework/runtime** | Schema parsing/validation, binding declarations to implementations, exposing declared contracts, carrying/serializing supplied outcomes and context, enabling adapters and extension points (specific guarantees TBD) | Inventing a business workflow, discovering the true intent behind arbitrary code, enforcing domain invariants it has not been configured to enforce, promising durable jobs or safe retries by default |
 | **Application developer** | Thing/resource granularity, schema contents, action/guard/resolver logic, state model if needed, data ownership and persistence, selected links and next-action hints, auth policy, concurrency rules, runtime deployment | Redefining ANWA's common interoperability semantics when choosing to use them |
 | **Underlying platforms/protocols** | Database transactions, queueing, network delivery, transport-level status, storage and durability according to chosen implementation | Domain-level guidance; uniform ANWA response semantics unless mapped by an adapter |
@@ -76,7 +76,7 @@ For each proposed feature, write down:
 
 ## Current ANWA thesis
 
-ANWA is a **schema-first, protocol-agnostic framework concept** for making user-authored application semantics, interactions and their outcomes legible and navigable to AI agents. Application developers describe what their app exposes and implement its behavior; ANWA supplies common mechanisms to publish and interact with that model, including Result + contextual links/affordance hints.
+ANWA is an **Interaction-first, schema-first, protocol-agnostic framework concept**. Implementers declare standalone Interactions and their meanings, inputs and outcomes. The runtime provides `Outcome + context.next` with app-selected candidates. Things are optional application metadata, not required parents of Interactions.
 
 This statement does **not** decide how a particular application is structured or require state machines, named guards, links or streaming for every use case.
 
