@@ -23,8 +23,8 @@ const minimal = (): Manifest => ({
   interactions: {
     "test.run": {
       kind: "action",
-        hasSideEffects: true,
-        idempotent: false,
+      hasSideEffects: true,
+      idempotent: false,
       description: "Test a domain operation",
       errors: { EXPECTED_FAILURE: "Declared failure" },
     },
@@ -37,7 +37,9 @@ test("Action effect declarations are required and never inferred", () => {
 
   for (const field of ["hasSideEffects", "idempotent"] as const) {
     const missing = structuredClone(withBoth);
-    delete (missing.interactions["test.run"] as unknown as Record<string, unknown>)[field];
+    delete (
+      missing.interactions["test.run"] as unknown as Record<string, unknown>
+    )[field];
     const issues = validateManifest(missing);
     assert.ok(
       issues.some((x) => x.path.endsWith("." + field)),
@@ -47,8 +49,12 @@ test("Action effect declarations are required and never inferred", () => {
   }
 
   const explicitFalse = structuredClone(withBoth);
-  (explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>).hasSideEffects = false;
-  (explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>).idempotent = false;
+  (
+    explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>
+  ).hasSideEffects = false;
+  (
+    explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>
+  ).idempotent = false;
   assert.deepEqual(validateManifest(explicitFalse), []);
 
   const illegalQuery = {
