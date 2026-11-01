@@ -88,10 +88,31 @@ go run ./cmd/anwa-codegen \
   -package main -check
 ```
 
+## Minimal HTTP server adapter
+
+`go/httpbinding.New(app, opts)` returns an ordinary `http.Handler` that
+can be registered on an existing `http.ServeMux` (or compatible router).
+It introduces **no HTTP dependency** into the Go Core or the generated
+`ServerInterface`.
+
+```bash
+cd go
+go run ./examples/calculator -listen 127.0.0.1:8080
+# From another shell:
+curl -fsS -X POST http://127.0.0.1:8080/anwa/invoke \
+  -H 'Content-Type: application/json' \
+  -d '{"ref":"calculator.add","input":{"a":2,"b":3}}'
+```
+
+The application is responsible for authenticating HTTP requests and passing
+verified caller identities through the adapter's `Authenticate` callback.
+Queries/Actions and Discovery are exposed; Event streaming is pending a
+separate binding design. See [HTTP Binding 0.1](../docs/http-binding.md).
+
 ## Explicit boundaries
 
 - This is a transport-independent, experimental **Go reference runtime**.
-  It does not authenticate callers, host HTTP routes, provide durable jobs,
+  It does not authenticate callers or provide durable jobs,
   or replace atomic application authorization.
 - Every Action must explicitly declare `hasSideEffects` and `idempotent` booleans in `anwa.json`; omitted flags fail validation. These are author-declared semantics, **not** automatic retry or duplicate-detection guarantees.
 - Go enforces typed method signatures, required model fields, and the declared
