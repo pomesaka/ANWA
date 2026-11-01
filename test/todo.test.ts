@@ -208,7 +208,7 @@ test("Task hierarchy, tags, updates, search, board, comments and planner", async
       alice,
     ),
   ).task;
-  assert.equal(comment.comments[0].author, "alice");
+  assert.equal(comment.comments?.[0].author, "alice");
   const search = value(
     await app.interact(
       "task.search",
