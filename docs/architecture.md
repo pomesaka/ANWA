@@ -48,6 +48,6 @@ The functions above are illustrative application code. A named Guard is **bound 
 
 ## Implementation
 
-The reference is written in **TypeScript** and runs under **Bun ^1.4.4**. CI checks `bun fmt --check`, `bun lint`, `bun check`, manifest validation, `bun test`, and all demos. It is not a production network framework; no transport, authentication, durable job engine, distributed transaction or full JSON Schema validation is provided.
+The reference is written in **TypeScript** and runs under **Bun ^1.4.4**. CI checks `bun fmt --check`, `bunx oxlint`, `bun check`, manifest validation, `bun test`, and all demos. It is not a production network framework; no transport, authentication, durable job engine, distributed transaction or full JSON Schema validation is provided.
 
 [README](../README.md) · [Demos](../demo/README.md) · [Error/next semantics](error-recovery-navigation.md)
