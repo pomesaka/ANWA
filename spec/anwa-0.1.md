@@ -23,11 +23,14 @@ The `anwa.json` manifest contains:
 | `properties` / `actions` / `events` | Optional maps | Interaction name → description |
 | `links` | Optional map | Declared relation description and target Thing type |
 | `semanticTypes` | Optional on Thing/interaction | Nonempty array of unique absolute HTTP(S) URI or URN identifiers of application-chosen meaning; no JSON-LD conformance implied |
-| `effectKinds` | Optional on Action only | Unique array of `domain-state` / `external-system`; `[]` explicitly asserts neither, omission means unknown |
+| `hasSideEffects` | Optional boolean on Action only | `true`: may cause business-observable side effects; `false`: declares none; omission: unknown |
+| `idempotent` | Optional boolean on Action only | Repeated same-input invocation has the same intended business-observable effects as one invocation; omission: unknown |
 
 A declared interaction requires a `description`. Optional `input` and `output` are **JSON Schema 2020-12** documents describing typed payloads. Absent `input` means no input. Absent `output` means no declared successful output shape. A named `guard` reference and `errors` may be declared, **but are not core requirements**. When an interaction can return expected domain failures, its `errors` map **must exhaustively enumerate their codes**. Missing `errors` means the interaction has no declared domain failures; it does not allow arbitrary error codes. Runtime-provided `INVALID_INPUT` and `UNEXPECTED_ERROR` are reserved, not listed in application schemas.
 
 See [JSON Schema for the ANWA manifest and reusable response types](anwa-0.1.schema.json) and the [agent-native schema design contract](agent-native-schema.md). The reference tooling validates ANWA-specific manifest structure, references, documented interactions, error codes, and a **constrained JSON Schema subset** (`type`, `enum`, `description`, `required`, `properties`, `items` and `additionalProperties:false`). Unsupported input/output keywords are rejected by the manifest validator rather than silently accepted. **Full JSON Schema 2020-12 validation is not implemented.** See [Schema authoring and generated interfaces](../docs/schema-authoring.md).
+
+ANWA's `hasSideEffects` is not an alias for WoT TD 1.1 `safe` (which concerns internal resource state); an adapter must map their semantics deliberately. Unlike WoT TD field defaults, **ANWA omitting either flag means unknown**. See [Agent-native schema design](agent-native-schema.md).
 
 ## 3. Reference semantics
 
@@ -112,7 +115,7 @@ A domain failure uses exactly the same outer shape:
 - A Link is `{rel:string,target:ThingRef}`. The relation's meaning is application-defined; global registration is not assumed.
 - An affordance reference is `{ref:InteractionRef}`. It may optionally include an application-supplied `applicability` hint (`available` / `blocked` / `unknown`), separate from WoT's Interaction Affordance definition and from authorization.
 - **The application selects** contextual links/affordances; ANWA conveys and validates them, but does not decide which next action best satisfies a user's goal.
-- Action-level `effectKinds` are **untrusted author-declared categories of possible effects**, not guarantees; omitted values mean unknown. An outcome's `error.effects` instead relates to effects after a particular attempt.
+- Action-level `hasSideEffects` and `idempotent` are **untrusted application declarations**, not runtime-enforced guarantees. Omitted values are unknown, not `false`. An outcome's `error.effects` instead relates to effects after a particular attempt.
 - Expected domain error `code`s **must appear in that interaction's declared `errors` map**. Undeclared domain errors, handler exceptions and contract violations become opaque `UNEXPECTED_ERROR` results (`effects: unknown`), with no internal detail disclosed. `INVALID_INPUT` is a separate framework validation failure. Error `message`, `details`, `retry` and effect information are optional, application-supplied fields; retry advice is not a guarantee of safe duplication.
 - `settled/ok` means this particular interaction completed, not necessarily that the user's broader task has completed.
 - This contract applies only to **delivered application-level outcomes**. A dropped connection may yield no ANWA Result.
@@ -181,7 +184,7 @@ External API delegation/federated references are a future research direction; th
 5. Negotiation of async and observation extensions; compatibility with base clients.
 6. WoT TD 1.1 mapping (Forms, security and other mandatory fields) versus WoT-inspired vocabulary only.
 7. Runtime conformance tests, versioning, transport adapter guarantees.
-8. Evidence that optional `semanticTypes` and `effectKinds` improve unfamiliar agents' task accuracy without creating false safety confidence.
+8. Evidence that optional `semanticTypes`, `hasSideEffects` and `idempotent` improve unfamiliar agents' task accuracy without creating false safety confidence.
 
 ## Primary specifications
 
