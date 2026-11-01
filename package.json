@@ -8,6 +8,9 @@
   },
   "scripts": {
     "test": "node --test",
-    "demo": "node demo/run.mjs"
+    "demo": "node demo/run.mjs",
+    "validate": "node tools/anwa.mjs validate demo/calculator/anwa.json demo/orders/anwa.json demo/reports/anwa.json",
+    "types:orders": "node tools/anwa.mjs generate demo/orders/anwa.json demo/orders/types.generated.d.ts",
+    "inspect:orders": "node tools/anwa.mjs inspect demo/orders/anwa.json"
   }
 }
