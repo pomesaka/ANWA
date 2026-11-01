@@ -2,7 +2,8 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { AnwaApp, fail, ok, reply, type Manifest } from "../src/anwa.ts";
-import { validateManifest, generateTypes } from "../src/schema-tools.ts";
+import { validateManifest, generateTypes, generateManifestModule } from "../src/schema-tools.ts";
+import { schema as generatedTodo } from "../demo/todo/contract.generated.ts";
 
 const fixture = (path: string): Manifest =>
   JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")) as Manifest;
@@ -10,6 +11,7 @@ const manifests = [
   fixture("../demo/calculator/anwa.json"),
   fixture("../demo/orders/anwa.json"),
   fixture("../demo/reports/anwa.json"),
+  fixture("../demo/todo/anwa.json"),
 ];
 const minimal = (): Manifest => ({
   anwa: "0.2",
@@ -23,14 +25,13 @@ const minimal = (): Manifest => ({
   },
 });
 
-test("Three demo manifests validate without Thing declarations", () => {
+test("Four demo manifests validate without Thing declarations", () => {
   for (const manifest of manifests) {
     assert.deepEqual(validateManifest(manifest), []);
-    assert.deepEqual(Object.keys(manifest).sort(), [
-      "anwa",
-      "entrypoints",
-      "interactions",
-    ]);
+    assert.deepEqual(
+      Object.keys(manifest).filter((field) => field !== "$defs").sort(),
+      ["anwa", "entrypoints", "interactions"],
+    );
   }
 });
 
@@ -343,4 +344,103 @@ test("Each Handler chooses its own Context independently", async () => {
   const two = await app.interact("test.read");
   assert.equal(one.context.next[0].ref, "test.read");
   assert.equal(two.context.next[0].ref, "test.run");
+});
+
+test("Todo shared schemas compile to the same concrete contract", () => {
+  const todo = manifests[3];
+  assert.equal(todo.$defs?.Task?.type, "object");
+  assert.equal(todo.$defs?.Project?.type, "object");
+  assert.equal(todo.$defs?.SavedQuery?.type, "object");
+  const generated = generateManifestModule(todo);
+  assert.equal(generated.includes('"$ref"'), false);
+  assert.equal(generated.includes('"$defs"'), false);
+  const literal = generated
+    .split("export const schema = ")[1]
+    .split(" as const satisfies Manifest;")[0];
+  assert.deepEqual(JSON.parse(literal), generatedTodo);
+});
+
+test("Local definitions validate inputs and outputs even without codegen", async () => {
+  const doc = {
+    anwa: "0.2",
+    entrypoints: ["test.echo"],
+    $defs: {
+      Word: { type: "string" },
+      Container: {
+        type: "object",
+        properties: { label: { $ref: "#/$defs/Word" } },
+        required: ["label"],
+        additionalProperties: false,
+      },
+    },
+    interactions: {
+      "test.echo": {
+        kind: "query",
+        description: "Echo a shared payload",
+        input: { $ref: "#/$defs/Container" },
+        output: { $ref: "#/$defs/Container" },
+      },
+    },
+  } as const satisfies Manifest;
+  assert.deepEqual(validateManifest(doc), []);
+  const app = new AnwaApp(doc).bind(
+    {
+      "test.echo": async ({ input }) => reply(ok(input)),
+    },
+    { public: ["test.echo"] },
+  );
+  const invalid = await app.follow({ ref: "test.echo", input: { label: 42 } });
+  assert.equal(invalid.outcome.kind, "settled");
+  if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
+    assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
+  const valid = await app.follow({ ref: "test.echo", input: { label: "works" } });
+  if (valid.outcome.kind !== "settled" || !valid.outcome.result.ok)
+    throw Error("Expected valid shared schema");
+  assert.deepEqual(valid.outcome.result.value, { label: "works" });
+  const invalidOutput = new AnwaApp(doc).bind(
+    {
+      "test.echo": async () => reply(ok({ label: 42 } as any)),
+    },
+    { public: ["test.echo"] },
+  );
+  const broken = await invalidOutput.follow({ ref: "test.echo", input: { label: "ok" } });
+  if (broken.outcome.kind !== "settled" || broken.outcome.result.ok)
+    throw Error("Expected rejected output");
+  assert.equal(broken.outcome.result.error.code, "UNEXPECTED_ERROR");
+  assert.match(generateTypes(doc), /TestEchoInput = \{ "label": string;/);
+});
+
+test("Local schema refs reject unknown, mixed and cyclic definitions", () => {
+  const base = {
+    anwa: "0.2",
+    entrypoints: ["test.read"],
+    interactions: {
+      "test.read": {
+        kind: "query",
+        description: "Read",
+        output: { $ref: "#/$defs/Shared" },
+      },
+    },
+  } as const;
+  const missing = validateManifest(base);
+  assert.ok(missing.some((item) => item.path.endsWith(".$ref")));
+  const mixed = validateManifest({
+    ...base,
+    $defs: { Shared: { type: "string" } },
+    interactions: {
+      "test.read": {
+        ...base.interactions["test.read"],
+        output: { $ref: "#/$defs/Shared", type: "string" },
+      },
+    },
+  });
+  assert.ok(mixed.some((item) => item.message.includes("only schema keyword")));
+  const cyclic = validateManifest({
+    ...base,
+    $defs: {
+      Shared: { $ref: "#/$defs/Other" },
+      Other: { $ref: "#/$defs/Shared" },
+    },
+  });
+  assert.ok(cyclic.some((item) => item.message.includes("Cyclic")));
 });
