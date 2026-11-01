@@ -190,7 +190,12 @@ function checkPayload(
   definitions: Readonly<Record<string, DataSchema>> = {},
 ): string | null {
   if (schema.$ref)
-    return checkPayload(definitions[schema.$ref.slice(8)], value, path, definitions);
+    return checkPayload(
+      definitions[schema.$ref.slice(8)],
+      value,
+      path,
+      definitions,
+    );
   if (schema.enum && !schema.enum.some((item) => Object.is(item, value)))
     return path + " not in enum";
   const valid =
@@ -216,14 +221,24 @@ function checkPayload(
         if (schema.additionalProperties === false)
           return path + "." + field + " not allowed";
       } else {
-        const error = checkPayload(fieldSchema, child, path + "." + field, definitions);
+        const error = checkPayload(
+          fieldSchema,
+          child,
+          path + "." + field,
+          definitions,
+        );
         if (error) return error;
       }
     }
   }
   if (schema.type === "array" && schema.items) {
     for (const [index, item] of (value as unknown[]).entries()) {
-      const error = checkPayload(schema.items, item, path + "[" + index + "]", definitions);
+      const error = checkPayload(
+        schema.items,
+        item,
+        path + "[" + index + "]",
+        definitions,
+      );
       if (error) return error;
     }
   }
@@ -424,7 +439,8 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       const { spec } = this.resolve(next.ref);
       if (
         own(next, "input") &&
-        (!spec.input || checkPayload(spec.input, next.input, "$", this.schema.$defs))
+        (!spec.input ||
+          checkPayload(spec.input, next.input, "$", this.schema.$defs))
       )
         throw Error("Invalid bound next input");
       if (next.guidance !== undefined) {
@@ -556,7 +572,10 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         const result = outcome.result;
         if (typeof result?.ok !== "boolean") throw Error("Invalid Result");
         if (result.ok) {
-          if (spec.output && checkPayload(spec.output, result.value, "$", this.schema.$defs))
+          if (
+            spec.output &&
+            checkPayload(spec.output, result.value, "$", this.schema.$defs)
+          )
             throw Error("Invalid handler output");
         } else this.declaredError(spec, result.error);
       } else throw Error("Unknown outcome");

@@ -88,7 +88,9 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
       if (Object.keys(schema).length !== 1)
         issue(path, "$ref must be the only schema keyword");
       const ref =
-        typeof schema.$ref === "string" ? definitionRef.exec(schema.$ref) : null;
+        typeof schema.$ref === "string"
+          ? definitionRef.exec(schema.$ref)
+          : null;
       if (!ref || !has(definitions, ref[1]))
         issue(path + ".$ref", "Unknown or unsupported local schema reference");
       return;
@@ -163,7 +165,9 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
           return ref ? [ref[1]] : [];
         }
         return [
-          ...(isRecord(schema.properties) ? Object.values(schema.properties) : []),
+          ...(isRecord(schema.properties)
+            ? Object.values(schema.properties)
+            : []),
           ...(schema.items === undefined ? [] : [schema.items]),
         ].flatMap(dependencies);
       };
@@ -270,7 +274,8 @@ function typeOf(
   definitions: Readonly<Record<string, DataSchema>> = {},
 ): string {
   if (!schema) return "undefined";
-  if (schema.$ref) return typeOf(definitions[schema.$ref.slice(8)], definitions);
+  if (schema.$ref)
+    return typeOf(definitions[schema.$ref.slice(8)], definitions);
   if (schema.enum) return schema.enum.map((x) => JSON.stringify(x)).join(" | ");
   switch (schema.type) {
     case "string":
@@ -323,7 +328,13 @@ export function generateTypes(manifest: Manifest): string {
       .split(/[._:-]/)
       .map((x) => x[0].toUpperCase() + x.slice(1))
       .join("");
-    lines.push("export type " + prefix + "Input = " + typeOf(spec.input, manifest.$defs) + ";");
+    lines.push(
+      "export type " +
+        prefix +
+        "Input = " +
+        typeOf(spec.input, manifest.$defs) +
+        ";",
+    );
     lines.push(
       "export type " +
         prefix +
@@ -398,8 +409,12 @@ export function generateManifestModule(manifest: Manifest): string {
         ref,
         {
           ...spec,
-          ...(spec.input ? { input: expandDataSchema(spec.input, definitions) } : {}),
-          ...(spec.output ? { output: expandDataSchema(spec.output, definitions) } : {}),
+          ...(spec.input
+            ? { input: expandDataSchema(spec.input, definitions) }
+            : {}),
+          ...(spec.output
+            ? { output: expandDataSchema(spec.output, definitions) }
+            : {}),
         },
       ]),
     ),

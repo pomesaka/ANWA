@@ -2,7 +2,11 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { AnwaApp, fail, ok, reply, type Manifest } from "../src/anwa.ts";
-import { validateManifest, generateTypes, generateManifestModule } from "../src/schema-tools.ts";
+import {
+  validateManifest,
+  generateTypes,
+  generateManifestModule,
+} from "../src/schema-tools.ts";
 import { schema as generatedTodo } from "../demo/todo/contract.generated.ts";
 
 const fixture = (path: string): Manifest =>
@@ -29,7 +33,9 @@ test("Four demo manifests validate without Thing declarations", () => {
   for (const manifest of manifests) {
     assert.deepEqual(validateManifest(manifest), []);
     assert.deepEqual(
-      Object.keys(manifest).filter((field) => field !== "$defs").sort(),
+      Object.keys(manifest)
+        .filter((field) => field !== "$defs")
+        .sort(),
       ["anwa", "entrypoints", "interactions"],
     );
   }
@@ -393,7 +399,10 @@ test("Local definitions validate inputs and outputs even without codegen", async
   assert.equal(invalid.outcome.kind, "settled");
   if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
     assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
-  const valid = await app.follow({ ref: "test.echo", input: { label: "works" } });
+  const valid = await app.follow({
+    ref: "test.echo",
+    input: { label: "works" },
+  });
   if (valid.outcome.kind !== "settled" || !valid.outcome.result.ok)
     throw Error("Expected valid shared schema");
   assert.deepEqual(valid.outcome.result.value, { label: "works" });
@@ -403,7 +412,10 @@ test("Local definitions validate inputs and outputs even without codegen", async
     },
     { public: ["test.echo"] },
   );
-  const broken = await invalidOutput.follow({ ref: "test.echo", input: { label: "ok" } });
+  const broken = await invalidOutput.follow({
+    ref: "test.echo",
+    input: { label: "ok" },
+  });
   if (broken.outcome.kind !== "settled" || broken.outcome.result.ok)
     throw Error("Expected rejected output");
   assert.equal(broken.outcome.result.error.code, "UNEXPECTED_ERROR");
