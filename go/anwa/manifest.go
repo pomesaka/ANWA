@@ -148,8 +148,12 @@ func (m Manifest) Validate() error {
 		if strings.TrimSpace(spec.Description) == "" {
 			return fmt.Errorf("%s: description is required", ref)
 		}
-		if spec.Kind != "action" && (spec.HasSideEffects != nil || spec.Idempotent != nil) {
-			return fmt.Errorf("%s: side-effect hints are action-only", ref)
+		if spec.Kind == "action" {
+			if spec.HasSideEffects == nil || spec.Idempotent == nil {
+				return fmt.Errorf("%s: Action requires hasSideEffects and idempotent booleans", ref)
+			}
+		} else if spec.HasSideEffects != nil || spec.Idempotent != nil {
+			return fmt.Errorf("%s: side-effect declarations are action-only", ref)
 		}
 		if len(spec.SemanticTypes) > 0 {
 			seen := make(map[string]bool)
