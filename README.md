@@ -83,7 +83,7 @@ ANWA builds on decades of work in hypermedia, typed APIs, and machine-readable i
 
 The links above point to primary specifications. They represent **related work**, not ANWA dependencies or endorsements. In particular, W3C WoT and Hydra already address much of the affordance/discovery space. ANWA must establish its value through comparison, not vocabulary alone.
 
-See [Prior Art](docs/prior-art.md) for the distinctions and research questions associated with each.
+See [Prior Art](docs/prior-art.md) for the distinctions and research questions associated with each. Detailed primary-source research: [Hydra](docs/research/hydra.md) and [W3C WoT](docs/research/wot.md) (including its Discovery specification, 2026–2028 roadmap, and Eclipse node-wot).
 
 ## Documentation
 
