@@ -101,7 +101,7 @@ type DomainError = {
   details?: unknown;
 };
 
-type Result<T, E = DomainError> =
+type Result<T, E extends DomainError = DomainError> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
@@ -114,7 +114,7 @@ type AffordanceRef = {
   ref: Ref; // must point to a published interaction description when offered
 };
 
-type InteractionResponse<T, E = DomainError> = {
+type InteractionResponse<T, E extends DomainError = DomainError> = {
   outcome: { kind: "settled"; result: Result<T, E> };
   context: {
     links: LinkRef[];
