@@ -15,7 +15,7 @@
 | Exposure | Unguarded Interactions must explicitly be `public`; guarded descriptions use caller-aware Discovery policy | No blanket implicit-public behavior |
 | Navigation | `context.next` lists potential next Interactions | Retry is another candidate with `guidance.kind: "retry"` |
 | Errors | Expected domain codes exhaustively declared; unexpected errors opaque | Actual side-effect certainty belongs to the outcome |
-| Side effects | Optional Action `hasSideEffects` / `idempotent` | Declared hints, not enforcement or safe retry certification |
+| Side effects | **Required** Action `hasSideEffects` / `idempotent` booleans | App-declared semantics, not enforcement, deduplication or automatic retry certification |
 | Async | `accepted` with opaque execution ID, status/event as ordinary Interactions | No required Execution Thing or workflow engine |
 | Runtime | **Bun ^1.4.4 / TypeScript** | `bun fmt`, `bunx oxlint`, `bun check`, `bun test` and schema validation in CI |
 | Agents | Implementing and consuming agents are primary schema clients | Human editing convenience is not a design requirement |
