@@ -65,6 +65,21 @@ The demos deliberately cover different author choices: [stateless Calculator](de
 
 **v0.1 is a concrete experimental profile for discussion, not an adopted standard.** See the open [Minimal Core Draft PR #2](https://github.com/pomesaka/ANWA/pull/2) for a distinct, more abstract discussion of required vs optional fields.
 
+## Schema tooling and developer experience
+
+ANWA's experimental Schema-first workflow now includes **contract validation**, **type/interface generation** and a **readable schema view**. These tools do not generate business logic.
+
+```bash
+npm run validate       # validates demo manifests against the supported schema subset
+npm run types:orders   # generates TypeScript handler interfaces
+npm run inspect:orders # renders schema meaning, fields and domain errors as Markdown
+npm test               # validates declared errors against runtime behavior
+```
+
+For an Action that declares `errors`, **all expected domain error codes must be listed**. An undeclared domain error is transformed into the opaque `UNEXPECTED_ERROR`; `INVALID_INPUT` is reserved for framework input validation.
+
+**Readability is a separate issue from AI-friendliness.** JSON is a compact canonical exchange format but verbose to author; an inspection view and generated types help humans. We have **not benchmarked agent understanding** against OpenAPI, WoT or MCP. See [Schema authoring and validation](docs/schema-authoring.md).
+
 ## Vocabulary and relationship to WoT
 
 ANWA currently adopts the **W3C Web of Things (WoT)** vocabulary as a starting point:
@@ -97,6 +112,7 @@ ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP an
 | Comparison against existing work | [Prior art](docs/prior-art.md) |
 | Executable draft profile | [ANWA 0.1 contract](spec/anwa-0.1.md) |
 | Schema reference | [Manifest / Result JSON Schema](spec/anwa-0.1.schema.json) |
+| Generation and validation | [Schema authoring and tooling](docs/schema-authoring.md) |
 | Working demos and tests | [Demo guide](demo/README.md) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
 
@@ -128,7 +144,7 @@ These are **references, not mandatory dependencies or endorsements**. Hydra's co
 
 ## Status and contributing
 
-The repository now includes **working documents and a runnable experimental in-process prototype**. Its JSON profile is a testable proposal, not a final schema or public API. Network transports, runtime security, versioning and licensing remain unselected. The immediate goal is to test whether the framework lets developers express agent-navigable applications with less duplication and acceptable interoperability costs. **Application design choices remain with application authors**; example orders/payments are tests of expressive power, not universal ANWA requirements.
+The repository now includes **working documents and a runnable experimental in-process prototype**. Its JSON profile is a testable proposal, not a final schema or public API. Network transports, runtime security, full JSON Schema compliance, versioning and licensing remain unselected. External API delegation/federated references are an explicit future topic, not a v0.1 requirement. The immediate goal is to test whether the framework lets developers express agent-navigable applications with less duplication and acceptable interoperability costs. **Application design choices remain with application authors**; example orders/payments are tests of expressive power, not universal ANWA requirements.
 
 Corrections, competing prior art and design feedback are welcome via issues or PRs. Please distinguish **established standard behavior** from **ANWA proposals**.
 
