@@ -1,6 +1,8 @@
 # Prior art and official references
 
-> Initial landscape, 2026-11-01. Primary specifications only; no claim of comprehensive prior-art review.
+> Initial landscape, 2026-11-01. Primary specifications and official implementation documentation; no claim of comprehensive prior-art review.
+
+**Detailed notes:** [Hydra deep dive](research/hydra.md) · [W3C WoT deep dive](research/wot.md). The latter covers the WoT Discovery Recommendation, current 2026–2028 Working Group roadmap (including AI Agents/MCP), and Eclipse Thingweb node-wot.
 
 Much of the proposed behavior predates AI agents. Hypermedia in particular already asks clients to discover valid next transitions from server-provided representations. ANWA should be compared seriously against existing standards, not assume a new protocol is required.
 
