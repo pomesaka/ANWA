@@ -77,7 +77,7 @@ No independent `availableWhen: status=pending` formula is kept in the schema if 
 
 ## Outcome and contextual navigation
 
-`InteractionResponse` is a proposed **ANWA logical envelope**, not a WoT or HTTP standard:
+`InteractionResponse` is an **ANWA logical envelope**, not a WoT or HTTP standard:
 
 ```ts
 type InteractionResponse<T, E> = {
@@ -85,21 +85,30 @@ type InteractionResponse<T, E> = {
     | { kind: "settled"; result: Result<T, E> }
     | { kind: "accepted"; execution: ExecutionRef };
   context: {
-    subject: ThingRef;
-    links: LinkRef[];
-    affordances: AffordanceRef[]; // WoT-style affordance references + contextual hints
-    revision?: string;
+    next: Array<{
+      ref: InteractionRef;
+      guidance?: {
+        kind?: "retry";
+        level?: "required" | "recommended" | "available";
+      };
+      when?: { after: string }; // ISO 8601 duration
+      applicability?: { state: "available" | "blocked" | "unknown" };
+    } | {
+      kind: "discover";
+      ref: ThingRef;
+    }>;
   };
 };
 ```
 
 - `settled`: this invocation finished with a typed success or domain error.
-- `accepted`: server accepted an execution that may finish later, **not business success**.
-- Links and affordances may be empty. They are **options for the agent**, not instructions to follow.
-- WoT **Interaction Affordance** is an interaction description; ANWA **contextual applicability** (e.g. blocked because already shipped) is a separate, non-WoT concept.
-- Semantically meaningful error details (reason, retry guidance, side-effect uncertainty) are preferred to relying on HTTP status alone. The underlying transport still follows its own protocol requirements.
+- `accepted`: the server accepted an execution that may finish later, **not business success**.
+- `context.next` may be empty, and applies after success, failure or acceptance. Candidate references are **options**, not commands.
+- Retrying is another InteractionRef in `next`, optionally marked `guidance.kind: "retry"` with `when.after`; it is **not** an extra Error or Context field.
+- Description-level WoT Links are relationship metadata, distinct from navigation; use a `kind: "discover"` candidate to expose another Thing's description.
+- Affordance applicability is advisory and separate from authorization. Error `effects` reports the outcome of a specific attempt; `hasSideEffects` describes a static Action property.
 
-See [Interaction and observation](interaction-model.md) and [scope and responsibility boundaries](scope-and-boundaries.md).
+See [Interaction and observation](interaction-model.md), [error/retry/navigation semantics](error-recovery-navigation.md) and [scope and responsibility boundaries](scope-and-boundaries.md).
 
 ## Non-blocking and streaming
 
