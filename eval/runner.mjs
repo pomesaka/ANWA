@@ -140,7 +140,7 @@ export async function runCase({
       entry.observation=await perform(app, action);
     } catch(e) {
       invalidCalls++;
-      entry.observation={toolError:"The reference or operation was not usable.",diagnostic:e.message};
+      entry.observation={toolError:"The reference or operation was not usable."};
     }
     trace.push(entry);
   }
