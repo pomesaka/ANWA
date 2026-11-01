@@ -1,12 +1,12 @@
-# Schema-first authoring: validation, type generation, and readability
+# Agent-first schema contracts: generation, validation, and Discovery
 
-> **Experimental ANWA 0.1 tooling.** These are prototype guarantees, not a released standard or a claim of measured AI usability.
+> **Experimental ANWA 0.1 tooling.** These are prototype guarantees, not a released standard or a claim of measured AI usability. **Human ease of authoring is not a design objective**: the primary consumers are agents that implement applications and agents that operate them.
 
 ## Three separate concerns
 
 | Concern | Purpose | Prototype support |
 | --- | --- | --- |
-| **Description authoring** | Authors declare the public meaning and I/O contract | JSON manifests under `demo/*/anwa.json`; chosen for experimentation, not final UX |
+| **Machine-readable contract** | Authoring agents declare the public meaning and I/O contract | JSON manifests under `demo/*/anwa.json`; syntax is an exchange contract, not a human-first DSL |
 | **Interface generation** | Derive types/handler signatures from the manifest, *not* business logic | `generate` produces TypeScript `.d.ts` aliases for inputs, outputs, error-code unions and Handler signatures |
 | **Contract validation** | Detect bad/missing declarations and implementation inconsistencies | Manifest validation on load, schema validator CLI, binding checks, runtime input/output checks and strict domain error-code enforcement |
 
@@ -30,7 +30,7 @@ node tools/anwa.mjs inspect path/to/anwa.json
 
 - `validate` reports paths to invalid properties, missing required descriptions, unresolved *declared Link target types*, unknown schema keywords and reserved/invalid error codes.
 - `generate` emits **interfaces and type aliases only**, with names such as `OrderCancelActionInput`, `OrderCancelActionOutput`, `OrderCancelActionErrorCode` and `OrderCancelActionHandler`.
-- `inspect` produces a Markdown summary that exposes Thing descriptions, operations, field names/types, field-level explanations, named guards and declared domain failures without dumping huge raw JSON documents.
+- `inspect` produces a diagnostic Markdown summary of Thing descriptions, operations, fields, Guards and declared domain errors. It is **optional diagnostic tooling**, not a reason to change or simplify the core schema.
 
 **The generated declarations are currently illustrative and do not yet type-check the JavaScript demos at build time**. A TypeScript example compiling against them and TypeScript compiler integration are future acceptance tests.
 
@@ -66,19 +66,19 @@ The framework reserves `INVALID_INPUT` (request shape failure) and `UNEXPECTED_E
 
 **Never claim full JSON Schema conformance.** Unsupported payload-schema keywords are rejected for the reference subset, rather than silently ignored.
 
-## Human readability vs AI usability
+## Agent implementation vs agent consumption
 
-The current `anwa.json` format is primarily **machine-readable**, not optimized for human editing. Its deeply nested JSON Schema structures make it verbose for developers. Better authoring frontends (YAML, TypeScript DSL, editor schema hints, generated docs) can later compile to the same semantic contract.
+The current `anwa.json` format is a **machine-readable contract**. How humans edit it or whether it looks elegant is not a primary concern; another agent or code generator may author it. The generated types and schema validator serve implementing agents, while the Discovery interface serves consuming agents. Neither needs to receive the entire raw manifest in a task context.
 
-Meanwhile, **machine-readable ≠ AI-friendly**. AI usability must be demonstrated using unfamiliar applications and tasks. Important dimensions include:
+**Machine-readable ≠ empirically AI-friendly.** AI usability must be demonstrated using unfamiliar applications and tasks. Important dimensions include:
 
-1. Purpose and semantics of each operation; rich field-level descriptions rather than vague names.
+1. Purpose and semantics of each operation, with optional machine identifiers (`semanticTypes`) where a meaningful shared vocabulary exists, and field-level descriptions where useful.
 2. Clear typed input and output, including complete expected domain error categories.
 3. Minimal Discovery payload and navigable references, instead of always sending the full application manifest.
-4. Explicit context for relevant related resources and follow-up interactions when the author supplies it.
+4. Explicit context for related resources and follow-up interactions when supplied by the application, and optional author-declared Action `effectKinds` (which are not safety guarantees).
 5. Consistent evaluation of task success, wrong calls, token consumption and latency versus ordinary OpenAPI/MCP/WoT descriptions.
 
-A human-readable `inspect` command helps reviewers but is **not evidence** that the AI performs better.
+An `inspect` command and parseable JSON are **not evidence** that an unfamiliar AI performs better. See the [agent-native schema design contract](../spec/agent-native-schema.md).
 
 ## Future delegation
 
