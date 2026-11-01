@@ -17,10 +17,12 @@
             "type": "object",
             "properties": {
               "a": {
-                "type": "number"
+                "type": "number",
+                "description": "The first numeric operand."
               },
               "b": {
-                "type": "number"
+                "type": "number",
+                "description": "The second numeric operand."
               }
             },
             "required": [
@@ -30,7 +32,8 @@
             "additionalProperties": false
           },
           "output": {
-            "type": "number"
+            "type": "number",
+            "description": "Sum of a and b."
           }
         },
         "divide": {
@@ -39,10 +42,12 @@
             "type": "object",
             "properties": {
               "a": {
-                "type": "number"
+                "type": "number",
+                "description": "The first numeric operand."
               },
               "b": {
-                "type": "number"
+                "type": "number",
+                "description": "The second numeric operand."
               }
             },
             "required": [
@@ -52,7 +57,8 @@
             "additionalProperties": false
           },
           "output": {
-            "type": "number"
+            "type": "number",
+            "description": "Quotient a / b."
           },
           "errors": {
             "DIVIDE_BY_ZERO": "The divisor must be nonzero."
