@@ -1,23 +1,19 @@
-import { readFileSync } from "node:fs";
 import {
   AnwaApp,
   fail,
   ok,
   reply,
-  type Manifest,
   type NextInteraction,
 } from "../../src/anwa.ts";
 
-const schema = JSON.parse(
-  readFileSync(new URL("./anwa.json", import.meta.url), "utf8"),
-) as Manifest;
+import { schema } from "./contract.generated.ts";
 interface Order {
   id: string;
   status: "pending" | "shipped" | "cancelled";
   shipmentId: string;
 }
 
-export function createOrders(): AnwaApp {
+export function createOrders(): AnwaApp<typeof schema> {
   const orders = new Map<string, Order>([
     [
       "pending",
@@ -47,10 +43,27 @@ export function createOrders(): AnwaApp {
         return reply(ok({ id: item.id, status: item.status }), next);
       },
 
-      "order.cancel": async ({ input }) => {
-        const order = orders.get(input.orderId);
-        const decision = await app.assess("order.cancel", input);
-        if (!decision.allowed) {
+      "order.cancel": {
+        // The runtime checks canCancel before calling run.
+        run: async ({ input }) => {
+          const order = orders.get(input.orderId);
+          // Atomic state validation remains an application/storage responsibility.
+          if (!order || order.status !== "pending")
+            return reply(
+              fail("ORDER_STATE_CHANGED", "Order changed during cancellation"),
+            );
+          order.status = "cancelled";
+          return reply(ok({ status: order.status }), [
+            {
+              ref: "order.get",
+              input: { orderId: order.id },
+              guidance: { level: "recommended" },
+            },
+          ]);
+        },
+        // Only this Interaction owns the Context returned on a Guard denial.
+        onDenied: ({ input }) => {
+          const order = orders.get(input.orderId);
           const next: NextInteraction[] = order
             ? [
                 {
@@ -66,21 +79,8 @@ export function createOrders(): AnwaApp {
               input: { shipmentId: order.shipmentId },
               guidance: { level: "recommended" },
             });
-          return reply({ ok: false, error: decision.error }, next);
-        }
-        // Application-owned state transition; production storage must be atomic.
-        if (!order || order.status !== "pending")
-          return reply(
-            fail("ORDER_STATE_CHANGED", "Order changed during cancellation"),
-          );
-        order.status = "cancelled";
-        return reply(ok({ status: order.status }), [
-          {
-            ref: "order.get",
-            input: { orderId: order.id },
-            guidance: { level: "recommended" },
-          },
-        ]);
+          return next;
+        },
       },
 
       "shipment.track": async ({ input }) => {

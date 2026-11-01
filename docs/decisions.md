@@ -10,7 +10,7 @@
 | Schema | Top-level `interactions` and `entrypoints` | No `things` or `subjectType` |
 | Binding | One TypeScript Handler per Interaction | Handler owns `Outcome + Context` |
 | Context | Handler calls `reply(result, next)` | No global `context` resolver; no framework-selected business flow |
-| Guard | Optional code-backed named Guard; Handler explicitly calls `app.assess` | Real authorization/transactions remain app-owned |
+| Guard | Runtime executes declared Guard before Action `run`; deny invokes per-Interaction `onDenied` | Preflight only: true authorization and atomic storage checks remain app-owned |
 | Navigation | `context.next` lists potential next Interactions | Retry is another candidate with `guidance.kind: "retry"` |
 | Errors | Expected domain codes exhaustively declared; unexpected errors opaque | Actual side-effect certainty belongs to the outcome |
 | Side effects | Optional Action `hasSideEffects` / `idempotent` | Declared hints, not enforcement or safe retry certification |
@@ -24,6 +24,6 @@ Which Interactions exist, domain ID shapes, business state and policy, authoriza
 
 ## Remaining framework questions
 
-Full JSON Schema dialect support, statically typed binding against generated Handler types, authenticated Discovery, network adapters, cross-app delegation, error detail schemas and independent unfamiliar-agent evaluations.
+Full JSON Schema dialect support, authenticated Discovery, network adapters, cross-app delegation, error detail schemas and independent unfamiliar-agent evaluations.
 
 [ANWA v0.2 contract](../spec/anwa-0.2.md) · [TypeScript architecture](architecture.md)

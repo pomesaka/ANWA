@@ -36,7 +36,7 @@ Declare top-level **Interactions** (`query`, `action`, `event`), inputs/outputs,
 
 ### 2. Implement behavior
 
-Application authors choose domain boundaries, states, policies and follow-up candidates. Each Interaction Handler constructs its **own `Outcome + Context`**, using `reply(result, next)`; there is **no application-wide Context resolver**. An optional named guard can be explicitly evaluated by its owning handler with `app.assess(ref, input)`. Authorization and atomic state transitions remain application responsibilities.
+Application authors choose domain boundaries, states, policies and follow-up candidates. Each Interaction Handler constructs its **own `Outcome + Context`**, using `reply(result, next)`; there is **no application-wide Context resolver**. A declared named Guard is **evaluated by the Runtime before the Action handler**. On denial, the business `run` method is not called; the Interaction's own `onDenied` callback supplies `context.next`. Application authorization and atomic updates remain application responsibilities.
 
 ### 3. Serve a navigable application
 
@@ -71,11 +71,12 @@ The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), 
 
 ## Agent-first schema and contract tooling
 
-ANWA's experimental v0.2 Schema-first workflow includes **contract validation**, **type/interface generation** and a **diagnostic schema view**. These tools do not generate business logic. **Human ease of writing the manifest is not a design target**: the contract is primarily for implementing agents and consuming agents.
+ANWA's experimental v0.2 Schema-first workflow includes **contract validation**, **schema-derived Handler input/output/error types**, and a **diagnostic schema view**. These tools do not generate business logic. **Human ease of writing the manifest is not a design target**: the contract is primarily for implementing agents and consuming agents.
 
 ```bash
 bun run validate       # validates demo manifests against the supported schema subset
-bun run types:orders   # generates TypeScript handler interfaces
+bun run codegen        # generates typed manifest modules from JSON
+bun run types:orders   # generates standalone TypeScript declaration aliases
 bun run inspect:orders # renders schema meaning, fields and domain errors as Markdown
 bun test               # validates declared errors against runtime behavior
 ```
@@ -163,7 +164,7 @@ Corrections, competing prior art and design feedback are welcome via issues or P
 
 ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探索・理解・操作できるWebアプリケーション**を作るための、Schema-firstなフレームワーク構想です。
 
-実装エージェントは公開スキーマにInteractionを定義し、TypeScriptのHandlerで各操作の結果と`context.next`を返します。ANWA CoreにThingはありません。ガード・業務ルール・永続化・次に提示する操作はアプリケーション実装者が決めます。
+実装エージェントは公開スキーマにInteractionを定義し、生成した型を使うTypeScript Handlerで各操作の結果と`context.next`を返します。ANWA CoreにThingはありません。宣言したGuardはRuntimeがActionより先に評価します。業務ルール・永続化・次に提示する操作はアプリケーション実装者が決めます。
 
 WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。現在のv0.2ではInteractionをThingなしで公開・発見・実行します。Runtime・デモ・テストはBun ^1.4.4 / TypeScriptです。実験実装と動作デモはありますが、製品向けの安全性や互換性は保証していません。
 

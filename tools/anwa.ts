@@ -3,16 +3,17 @@ import { readFileSync, writeFileSync } from "node:fs";
 import {
   validateManifest,
   generateTypes,
+  generateManifestModule,
   type Manifest,
 } from "../src/schema-tools.ts";
 
 const [command, ...args] = process.argv.slice(2);
 if (
-  !["validate", "generate", "inspect"].includes(command) ||
+  !["validate", "generate", "generate-manifest", "inspect"].includes(command) ||
   args.length === 0
 ) {
   console.error(
-    "Usage: bun tools/anwa.ts validate|generate|inspect <anwa.json> [output.d.ts]",
+    "Usage: bun tools/anwa.ts validate|generate|generate-manifest|inspect <anwa.json> [output]",
   );
   process.exit(2);
 }
@@ -50,6 +51,17 @@ try {
         writeFileSync(args[1], code, "utf8");
         console.log("GENERATED " + args[1]);
       } else process.stdout.write(code);
+    } else if (command === "generate-manifest") {
+      if (!args[1])
+        throw Error("generate-manifest requires an output .ts path");
+      writeFileSync(args[1], generateManifestModule(manifest), "utf8");
+      const formatted = Bun.spawnSync({
+        cmd: ["bun", "fmt", args[1]],
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      if (formatted.exitCode !== 0) throw Error("Bun formatting failed");
+      console.log("GENERATED " + args[1]);
     } else {
       const lines = ["# ANWA " + manifest.anwa + " Interactions", ""];
       for (const [ref, spec] of Object.entries(manifest.interactions)) {

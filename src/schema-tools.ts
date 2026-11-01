@@ -4,9 +4,9 @@ export type PrimitiveType =
 export interface DataSchema {
   type: PrimitiveType;
   description?: string;
-  enum?: unknown[];
-  properties?: Record<string, DataSchema>;
-  required?: string[];
+  enum?: readonly unknown[];
+  properties?: Readonly<Record<string, DataSchema>>;
+  required?: readonly string[];
   items?: DataSchema;
   additionalProperties?: false;
 }
@@ -15,16 +15,16 @@ export interface InteractionDefinition {
   description: string;
   input?: DataSchema;
   output?: DataSchema;
-  errors?: Record<string, string>;
-  semanticTypes?: string[];
+  errors?: Readonly<Record<string, string>>;
+  semanticTypes?: readonly string[];
   guard?: string;
   hasSideEffects?: boolean;
   idempotent?: boolean;
 }
 export interface Manifest {
   anwa: "0.2";
-  entrypoints: string[];
-  interactions: Record<string, InteractionDefinition>;
+  entrypoints: readonly string[];
+  interactions: Readonly<Record<string, InteractionDefinition>>;
 }
 export interface Diagnostic {
   path: string;
@@ -306,4 +306,20 @@ export function generateTypes(manifest: Manifest): string {
     lines.push("");
   }
   return lines.join("\n") + "\n";
+}
+
+/** Generate a literal, type-checked module from the public JSON manifest.
+ * The JSON file remains the single author-maintained source. */
+export function generateManifestModule(manifest: Manifest): string {
+  const problems = validateManifest(manifest);
+  if (problems.length)
+    throw new Error(problems.map((x) => x.path + ": " + x.message).join("\n"));
+  return [
+    "// AUTO-GENERATED from anwa.json; do not edit. Run bun run codegen.",
+    'import type { Manifest } from "../../src/schema-tools.ts";',
+    "export const schema = " +
+      JSON.stringify(manifest, null, 2) +
+      " as const satisfies Manifest;",
+    "",
+  ].join("\n");
 }

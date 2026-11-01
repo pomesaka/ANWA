@@ -80,7 +80,7 @@ test("Binding rejects absent or undeclared handlers", () => {
   const app = new AnwaApp(manifests[0]);
   assert.throws(
     () => app.bind({ "calculator.add": async () => reply(ok(1)) }),
-    /Unbound interaction/,
+    /Unbound or invalid Interaction/,
   );
   assert.throws(
     () =>
@@ -93,39 +93,176 @@ test("Binding rejects absent or undeclared handlers", () => {
   );
 });
 
-test("Named guard can be assessed by the same handler that constructs Context", async () => {
-  const doc = minimal();
-  doc.interactions["test.run"].guard = "check";
-  const app = new AnwaApp(doc);
-  app.bind(
+test("Runtime enforces named guard before run and uses per-Interaction onDenied", async () => {
+  const doc = {
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guarded operation",
+        guard: "check",
+        errors: { EXPECTED_FAILURE: "Guard rejected" },
+      },
+    },
+  } as const satisfies Manifest;
+  let executed = 0;
+  let checks = 0;
+  const app = new AnwaApp(doc).bind(
     {
-      "test.run": async ({ input }) => {
-        const decision = await app.assess("test.run", input);
-        if (!decision.allowed)
-          return reply({ ok: false, error: decision.error }, [
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: ({ error }) => {
+          assert.equal(error.code, "EXPECTED_FAILURE");
+          return [
             {
               ref: "test.run",
               guidance: { kind: "retry", level: "available" },
               when: { after: "PT30S" },
             },
-          ]);
-        return reply(ok(null));
+          ];
+        },
       },
     },
     {
       guards: {
-        check: async () => ({
-          allowed: false,
-          error: { code: "EXPECTED_FAILURE", effects: "none" },
-        }),
+        check: async () => {
+          checks++;
+          return {
+            allowed: false,
+            error: { code: "EXPECTED_FAILURE", effects: "none" },
+          };
+        },
       },
     },
   );
   const result = await app.interact("test.run");
+  assert.equal(executed, 0);
+  assert.equal(checks, 1);
   assert.equal(result.outcome.kind, "settled");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
     assert.equal(result.outcome.result.error.code, "EXPECTED_FAILURE");
   assert.equal(result.context.next[0].ref, "test.run");
+});
+
+test("Invalid input never reaches the Guard or protected business run", async () => {
+  const schema = {
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guarded validation test",
+        guard: "check",
+        input: {
+          type: "object",
+          properties: { key: { type: "string" } },
+          required: ["key"],
+          additionalProperties: false,
+        },
+        errors: { EXPECTED_FAILURE: "Policy failure" },
+      },
+    },
+  } as const satisfies Manifest;
+  let checked = 0,
+    executed = 0;
+  const app = new AnwaApp(schema).bind(
+    {
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: () => [],
+      },
+    },
+    {
+      guards: {
+        check: async () => {
+          checked++;
+          return { allowed: true };
+        },
+      },
+    },
+  );
+  const invalid = await app.follow({ ref: "test.run", input: { key: 123 } });
+  assert.equal(checked, 0);
+  assert.equal(executed, 0);
+  if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
+    assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
+  const success = await app.interact("test.run", { key: "valid" });
+  assert.equal(success.outcome.kind, "settled");
+  assert.equal(checked, 1);
+  assert.equal(executed, 1);
+});
+
+test("Undeclared Guard errors are opaque and never execute the protected run", async () => {
+  const doc = {
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guard check",
+        guard: "check",
+        errors: { EXPECTED_FAILURE: "Expected" },
+      },
+    },
+  } as const satisfies Manifest;
+  let executed = 0;
+  const app = new AnwaApp(doc).bind(
+    {
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: () => [],
+      },
+    },
+    {
+      guards: {
+        check: async () =>
+          // Intentional runtime-contract violation to verify enforcement.
+          ({ allowed: false, error: { code: "SECRET_FAILURE" } }) as any,
+      },
+    },
+  );
+  const response = await app.interact("test.run");
+  assert.equal(executed, 0);
+  if (response.outcome.kind === "settled" && !response.outcome.result.ok)
+    assert.equal(response.outcome.result.error.code, "UNEXPECTED_ERROR");
+  assert.deepEqual(response.context, { next: [] });
+});
+
+test("Missing denial callback is rejected instead of silently bypassing policy", () => {
+  const doc = {
+    anwa: "0.2",
+    entrypoints: ["test.run"],
+    interactions: {
+      "test.run": {
+        kind: "action",
+        description: "Guarded action",
+        guard: "check",
+        errors: { EXPECTED_FAILURE: "Denied" },
+      },
+    },
+  } as const satisfies Manifest;
+  const app = new AnwaApp(doc);
+  assert.throws(
+    () =>
+      app.bind(
+        {
+          // @ts-expect-error deliberate invalid binding checked again at runtime
+          "test.run": { run: async () => reply(ok(null)) },
+        },
+        { guards: { check: async () => ({ allowed: true }) } },
+      ),
+    /onDenied/,
+  );
 });
 
 test("Undeclared errors are mapped to opaque framework errors", async () => {
@@ -144,7 +281,8 @@ test("Undeclared errors are mapped to opaque framework errors", async () => {
 
 test("Handler must return Outcome + Context, not just a bare Result", async () => {
   const app = new AnwaApp(minimal()).bind({
-    "test.run": async () => ok(null) as unknown as InteractionResponse,
+    "test.run": async () =>
+      ok(null) as unknown as import("../src/anwa.ts").SettledResponse,
   });
   const result = await app.interact("test.run");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
@@ -168,11 +306,14 @@ test("Invalid next candidate prevents success with malformed guidance", async ()
   }
 });
 
-test("Per-handler next result is not overwritten by a global context resolver", async () => {
-  const doc = minimal();
-  doc.interactions["test.read"] = {
-    kind: "query",
-    description: "Read something",
+test("Each Handler chooses its own Context independently", async () => {
+  const base = minimal();
+  const doc: Manifest = {
+    ...base,
+    interactions: {
+      ...base.interactions,
+      "test.read": { kind: "query", description: "Read something" },
+    },
   };
   const app = new AnwaApp(doc).bind({
     "test.run": async () =>

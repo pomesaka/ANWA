@@ -33,9 +33,13 @@ test("Calculator handlers construct their own Outcome + Context", async () => {
 });
 
 test("Input contract validation returns INVALID_INPUT", async () => {
-  const response = await createCalculator().interact("calculator.add", {
-    a: "bad",
-    b: 3,
+  // Dynamic agent input still undergoes runtime validation.
+  const response = await createCalculator().follow({
+    ref: "calculator.add",
+    input: {
+      a: "bad",
+      b: 3,
+    },
   });
   assert.equal(response.outcome.kind, "settled");
   if (response.outcome.kind === "settled" && !response.outcome.result.ok)
@@ -82,7 +86,7 @@ test("Shipped-order failure offers tracking without a central context resolver",
   assert.ok(next);
   assert.deepEqual(next.input, { shipmentId: "shipped-ship" });
   assert.equal(next.guidance?.level, "recommended");
-  const tracking = await app.interact(next.ref, next.input);
+  const tracking = await app.follow(next);
   if (tracking.outcome.kind === "settled" && tracking.outcome.result.ok)
     assert.equal(tracking.outcome.result.value, "delivered");
   assert.equal(

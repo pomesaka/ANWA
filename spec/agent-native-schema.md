@@ -39,7 +39,7 @@ This is illustrative application code. The framework checks the returned `Outcom
 
 ## Contract validation and boundaries
 
-TypeScript Handlers, generated interfaces, runtime payload validation, error-code checks and reference validation are available in the prototype. Missing or undeclared domain codes become opaque `UNEXPECTED_ERROR`. Named Guards are optional code-backed helpers and must be explicitly evaluated by their owning Handler.
+TypeScript Handlers, generated interfaces, runtime payload validation, error-code checks and reference validation are available in the prototype. Missing or undeclared domain codes become opaque `UNEXPECTED_ERROR`. Named Guards are optional code-backed helpers **evaluated by the Runtime before the associated Action**; a guarded Interaction provides its own `onDenied` callback for Context, and `run` is not invoked on denial. Schema-derived TypeScript input/output/error types are enforced at Handler binding.
 
 Full JSON Schema 2020-12, network authentication, federation/external API delegation, replay and durable execution are not yet provided.
 

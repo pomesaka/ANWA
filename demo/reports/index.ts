@@ -1,29 +1,26 @@
-import { readFileSync } from "node:fs";
 import {
   AnwaApp,
   accepted,
   fail,
   ok,
   reply,
-  type Manifest,
+  type InteractionResponse,
 } from "../../src/anwa.ts";
 
-const schema = JSON.parse(
-  readFileSync(new URL("./anwa.json", import.meta.url), "utf8"),
-) as Manifest;
+import { schema } from "./contract.generated.ts";
 const sleep = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 type ReportEvent =
   | { type: "state.changed"; sequence: number; state: string }
   | { type: "artifact.delta"; sequence: number; data: string }
-  | { type: "settled"; sequence: number; response: ReturnType<typeof reply> };
+  | { type: "settled"; sequence: number; response: InteractionResponse };
 interface ReportJob {
   status: "accepted" | "running" | "completed";
   events: ReportEvent[];
   text: string;
 }
 
-export function createReports(): AnwaApp {
+export function createReports(): AnwaApp<typeof schema> {
   const jobs = new Map<string, ReportJob>();
   let nextId = 1;
 
