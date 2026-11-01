@@ -69,8 +69,11 @@ The reference validator implements a **constrained subset** of JSON Schema Draft
 An `InteractionRef` is an **application-scoped string**, e.g. `order.cancel` or `execution.result`. It resolves directly to a top-level definition and bound handler in the connected app; it is not a globally discoverable URL or a resource-instance identifier.
 
 ```ts
-const app = new AnwaApp(manifest).bind({
-  "calculator.add": async ({ input }) => reply(ok(input.a + input.b))
+import { schema } from "../demo/calculator/contract.generated.ts";
+const app = new AnwaApp(schema).bind({
+  "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
+  "calculator.divide": async ({ input }) => input.b === 0
+    ? reply(fail("DIVIDE_BY_ZERO")) : reply(ok(input.a / input.b))
 });
 
 app.catalog();
@@ -150,9 +153,9 @@ The execution identifier is an opaque handle. `execution.status`, `execution.res
 - [Machine-readable ANWA 0.2 schema](anwa-0.2.schema.json)
 - [Calculator, Orders and Reports demos](../demo/README.md)
 
-Using **Bun ^1.4.4**, run `bun install --frozen-lockfile`, `bun run validate`, `bun run types:orders`, `bun fmt --check src demo test tools`, `bunx oxlint src demo test tools`, `bun check`, `bun test`, and `bun run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
+Using **Bun ^1.4.4**, run `bun install --frozen-lockfile`, `bun run validate`, `bun run codegen`, `bun run types:orders`, `bun fmt --check src demo test tools`, `bunx oxlint src demo test tools`, `bun check`, `bun test`, and `bun run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
 
-The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. Optional named Guards must be explicitly assessed by their own Handler; ANWA does not automatically enforce application authorization. Federation/external API delegation and protocol adapters remain future topics.
+The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. **Named Guards declared on Actions run automatically before their business handler**. A guarded binding supplies `{ run, onDenied }`: denial blocks `run`, and `onDenied` provides only the Context next candidates while the Runtime preserves the Guard error outcome. This is a preflight check, not an authorization or atomicity guarantee. Federation/external API delegation and protocol adapters remain future topics.
 
 **W3C WoT Thing Descriptions are Thing-centered. ANWA's core intentionally is not.** A future WoT adapter may represent an ANWA application through whatever compatible mapping it can support, but must not impose WoT's Thing concept on ANWA's schema or claim unsupported conformance.
 
