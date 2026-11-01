@@ -13,7 +13,7 @@ Human editability and concise JSON are not goals by themselves. The schema shoul
 
 A v0.2 manifest contains `anwa`, `entrypoints` and a top-level `interactions` map. Each Interaction is a standalone `query`, `action` or `event`. There is **no Thing abstraction in ANWA Core**, no `things` map, no `subjectType`, and no mandatory resource parent.
 
-Operations can declare typed `input` and `output`, exhaustive expected `errors`, optional semantic URI identifiers and optional Action-only `hasSideEffects` / `idempotent` booleans. Omitted Action flags mean **unknown**, not `false`; they do not certify permission or retry safety.
+Operations can declare typed `input` and `output`, exhaustive expected `errors`, optional semantic URI identifiers and **required Action-only `hasSideEffects` / `idempotent` booleans**. Missing Action flags are a schema error; even explicit flags do not certify permission, idempotency implementation or retry safety.
 
 ## Handler owns both result and continuation
 
