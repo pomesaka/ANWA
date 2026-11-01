@@ -105,3 +105,43 @@ test("unexpected handler exception and context failure share opaque error", asyn
   assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
   assert.deepEqual(result.context, { links: [], affordances: [] });
 });
+
+test("agent-oriented semantic annotations are validated and exposed, without changing business logic", async () => {
+  const doc = structuredClone(fixtures[0]);
+  doc.things.Calculator.semanticTypes = ["urn:example:calculation-service"];
+  doc.things.Calculator.actions.add.semanticTypes = ["urn:example:arithmetic-addition"];
+  assert.deepEqual(validateManifest(doc), []);
+  const app = new AnwaApp(doc).bind("Calculator", {
+    actions: {
+      add: async ({input}) => ({ok: true, value: input.a + input.b}),
+      divide: async ({input}) => ({ok: true, value: input.a / input.b})
+    }
+  });
+  const catalog = app.catalog();
+  assert.deepEqual(catalog.things[0].semanticTypes, ["urn:example:calculation-service"]);
+  const d = await app.discover(thing("Calculator", "main"));
+  const add = d.description.interactions.find(i => i.ref.name === "add");
+  assert.deepEqual(add.semanticTypes, ["urn:example:arithmetic-addition"]);
+  assert.deepEqual(add.effectKinds, []);
+  assert.equal((await app.interact(refFor(thing("Calculator", "main"), "add"), {a: 2, b: 2}))
+    .outcome.result.value, 4);
+});
+
+function refFor(thingRef, name) {
+  return interaction(thingRef, "action", name);
+}
+
+test("semantic and effect declarations have precise scope and conservative defaults", () => {
+  const doc = structuredClone(fixtures[1]);
+  assert.deepEqual(doc.things.Order.actions.cancel.effectKinds, ["domain-state"]);
+  doc.things.Order.properties.summary.effectKinds = [];
+  doc.things.Order.actions.cancel.semanticTypes = ["relative-not-a-uri"];
+  const paths = validateManifest(doc).map(d => d.path);
+  assert.ok(paths.some(p => p.includes("summary.effectKinds")));
+  assert.ok(paths.some(p => p.includes("cancel.semanticTypes")));
+  delete doc.things.Order.properties.summary.effectKinds;
+  delete doc.things.Order.actions.cancel.semanticTypes;
+  delete doc.things.Order.actions.cancel.effectKinds;
+  assert.deepEqual(validateManifest(doc), []);
+  // Absent effectKinds means UNKNOWN, not read-only or no-effects.
+});
