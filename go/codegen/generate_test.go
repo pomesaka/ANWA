@@ -68,7 +68,7 @@ func TestAllExistingManifestsCanGenerateStrictGo(t *testing.T) {
 
 func TestRejectGoNameCollisions(t *testing.T) {
 	manifest := anwa.Manifest{
-		ANWA: "0.2",
+		ANWA:        "0.2",
 		EntryPoints: []string{"a-b"},
 		Interactions: map[string]anwa.Interaction{
 			"a-b": {Kind: "query", Description: "First"},
