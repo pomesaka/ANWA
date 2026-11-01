@@ -116,10 +116,12 @@
           "description": "Optional named Guard for any query, action, or event. The Runtime checks it before running or subscribing; actual authentication is supplied separately by the Adapter."
         },
         "hasSideEffects": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Required for Actions: whether the operation can change application state or cause externally observable effects; declaration only, not enforcement."
         },
         "idempotent": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Required for Actions: whether repeated identical invocations have the same intended effects as one invocation; does not guarantee identical responses or safe network retries."
         }
       },
       "allOf": [
@@ -127,9 +129,7 @@
           "if": {
             "properties": {
               "kind": {
-                "not": {
-                  "const": "action"
-                }
+                "const": "action"
               }
             },
             "required": [
@@ -137,6 +137,12 @@
             ]
           },
           "then": {
+            "required": [
+              "hasSideEffects",
+              "idempotent"
+            ]
+          },
+          "else": {
             "not": {
               "anyOf": [
                 {

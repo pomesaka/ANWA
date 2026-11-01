@@ -1,0 +1,266 @@
+{
+  "anwa": "0.2",
+  "entrypoints": [
+    "task.list",
+    "task.create"
+  ],
+  "$defs": {
+    "Task": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Task title"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Completion flag"
+        },
+        "version": {
+          "type": "integer",
+          "description": "Optimistic concurrency version"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "completed",
+        "version"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "interactions": {
+    "task.create": {
+      "kind": "action",
+      "description": "Create a task owned by the verified caller.",
+      "guard": "requireCaller",
+      "input": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Nonblank title, at most 120 characters"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/$defs/Task"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required.",
+        "INVALID_TITLE": "Title must be nonblank and at most 120 characters."
+      },
+      "hasSideEffects": true,
+      "idempotent": false
+    },
+    "task.list": {
+      "kind": "query",
+      "description": "List only tasks owned by the verified caller.",
+      "guard": "requireCaller",
+      "output": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Task"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required."
+      }
+    },
+    "task.get": {
+      "kind": "query",
+      "description": "Fetch a caller-owned task by ID.",
+      "guard": "requireCaller",
+      "input": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID"
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/$defs/Task"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required.",
+        "TASK_NOT_FOUND": "Task is not found for this caller."
+      }
+    },
+    "task.rename": {
+      "kind": "action",
+      "description": "Rename a caller-owned task using optimistic version checking.",
+      "guard": "requireCaller",
+      "input": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "description": "Version read previously"
+          },
+          "title": {
+            "type": "string",
+            "description": "Nonblank title, at most 120 characters"
+          }
+        },
+        "required": [
+          "taskId",
+          "expectedVersion",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/$defs/Task"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required.",
+        "TASK_NOT_FOUND": "Task is not found for this caller.",
+        "VERSION_CONFLICT": "The task version does not match expectedVersion.",
+        "INVALID_TITLE": "Title must be nonblank and at most 120 characters."
+      },
+      "hasSideEffects": true,
+      "idempotent": false
+    },
+    "task.complete": {
+      "kind": "action",
+      "description": "Complete a caller-owned task using optimistic version checking.",
+      "guard": "requireCaller",
+      "input": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "description": "Version read previously"
+          }
+        },
+        "required": [
+          "taskId",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/$defs/Task"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required.",
+        "TASK_NOT_FOUND": "Task is not found for this caller.",
+        "VERSION_CONFLICT": "The task version does not match expectedVersion.",
+        "ALREADY_COMPLETED": "Task is already complete."
+      },
+      "hasSideEffects": true,
+      "idempotent": false
+    },
+    "task.delete": {
+      "kind": "action",
+      "description": "Delete a caller-owned task using optimistic version checking.",
+      "guard": "requireCaller",
+      "input": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Task ID"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "description": "Version read previously"
+          }
+        },
+        "required": [
+          "taskId",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "deletedId": {
+            "type": "string",
+            "description": "Deleted task ID"
+          }
+        },
+        "required": [
+          "deletedId"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "AUTH_REQUIRED": "A verified caller is required.",
+        "TASK_NOT_FOUND": "Task is not found for this caller.",
+        "VERSION_CONFLICT": "The task version does not match expectedVersion."
+      },
+      "hasSideEffects": true,
+      "idempotent": false
+    }
+  }
+}

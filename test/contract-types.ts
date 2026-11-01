@@ -9,6 +9,7 @@ import type {
 } from "../src/contracts.ts";
 import { schema as orders } from "../demo/orders/contract.generated.ts";
 import { schema as calculator } from "../demo/calculator/contract.generated.ts";
+import type { InteractionDefinition } from "../src/schema-tools.ts";
 
 type Cancel = (typeof orders)["interactions"]["order.cancel"];
 type CancelInput = InputOf<Cancel>;
@@ -68,3 +69,18 @@ void app.interact("calculator.unknown", { a: 1, b: 2 });
 void app.bind({
   "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
 });
+
+const explicitPureAction: InteractionDefinition = {
+  kind: "action",
+  description: "A side-effect-free action",
+  hasSideEffects: false,
+  idempotent: true,
+};
+void explicitPureAction;
+
+// @ts-expect-error Actions must declare both effect and idempotency booleans
+const missingActionFlags: InteractionDefinition = {
+  kind: "action",
+  description: "Should be rejected at compile time",
+};
+void missingActionFlags;
