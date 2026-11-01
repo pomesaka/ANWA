@@ -15,6 +15,7 @@ bunx oxlint src demo test tools
 bun check
 bun test
 bun run demo
+bun run demo:todo
 ```
 
 The repository uses the **Bun 1.4.4 built-in formatter** and **Oxlint 1.90.0 invoked through Bun**. The pinned Bun 1.4.4 executable does not expose `bun lint` as a functioning built-in CLI; using the external linter avoids misleading pass results.
