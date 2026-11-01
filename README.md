@@ -32,7 +32,7 @@ flowchart TB
 
 Declare top-level **Interactions** (`query`, `action`, `event`), inputs/outputs, expected errors and optional guards. **No `things` or `subjectType` field exists in the active schema**; domain identifiers are ordinary typed input/output values.
 
-**The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
+**The optional root `$defs` map allows shared payload shapes such as `Task` to be referenced by multiple standalone Interactions with `$ref`; this does **not** introduce Thing or shared resource identity. The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
 
 ### 2. Implement behavior
 
@@ -71,6 +71,8 @@ bun run demo:todo
 ```
 
 The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, [async Reports](demo/reports/) with opaque execution IDs, and [Advanced Todo](demo/todo/) with 27 guarded Interactions spanning collaborative workspaces, project/task planning, dependency graphs and audit events. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
+
+The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and `SavedQuery` schemas through local `$defs` / `$ref`. Codegen expands these into the same literal TypeScript contract as the previously repeated inline definitions; supported references are local, acyclic, and data-only.
 
 **v0.2 is a breaking experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for historical design context.
 
