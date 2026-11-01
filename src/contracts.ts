@@ -123,8 +123,12 @@ export type OnDeniedFor<M extends Manifest, R extends Refs<M>> = (
 export type BindingsFor<M extends Manifest> = {
   [R in Refs<M>]: Operation<M, R> extends { kind: "event" }
     ? Operation<M, R> extends { guard: string }
-      ? { run: (args: ArgsFor<M, R> & {cursor?: number}) => AsyncIterable<unknown> }
-      : (args: ArgsFor<M, R> & {cursor?: number}) => AsyncIterable<unknown>
+      ? {
+          run: (
+            args: ArgsFor<M, R> & { cursor?: number },
+          ) => AsyncIterable<unknown>;
+        }
+      : (args: ArgsFor<M, R> & { cursor?: number }) => AsyncIterable<unknown>
     : Operation<M, R> extends { guard: string }
       ? { run: HandlerFor<M, R>; onDenied: OnDeniedFor<M, R> }
       : HandlerFor<M, R>;

@@ -24,86 +24,48 @@ export function createReports(): AnwaApp<typeof schema> {
   const jobs = new Map<string, ReportJob>();
   let nextId = 1;
 
-  return new AnwaApp(schema).bind({
-    "report.generate": async ({ input }) => {
-      const executionId = String(nextId++);
-      const job: ReportJob = { status: "accepted", events: [], text: "" };
-      jobs.set(executionId, job);
-      // Ephemeral local work: no cross-process durability or replay guarantee.
-      void (async () => {
-        await sleep(5);
-        job.status = "running";
-        job.events.push({
-          type: "state.changed",
-          sequence: 1,
-          state: job.status,
-        });
-        for (const chunk of [
-          "Report: " + input.topic + "\n",
-          "Summary: generated in two parts.\n",
-        ]) {
+  return new AnwaApp(schema).bind(
+    {
+      "report.generate": async ({ input }) => {
+        const executionId = String(nextId++);
+        const job: ReportJob = { status: "accepted", events: [], text: "" };
+        jobs.set(executionId, job);
+        // Ephemeral local work: no cross-process durability or replay guarantee.
+        void (async () => {
           await sleep(5);
-          job.text += chunk;
+          job.status = "running";
           job.events.push({
-            type: "artifact.delta",
-            sequence: job.events.length + 1,
-            data: chunk,
+            type: "state.changed",
+            sequence: 1,
+            state: job.status,
           });
-        }
-        job.status = "completed";
-        job.events.push({
-          type: "settled",
-          sequence: job.events.length + 1,
-          response: reply(ok(job.text), [
-            {
-              ref: "execution.result",
-              input: { executionId },
-              guidance: { level: "recommended" },
-            },
-          ]),
-        });
-      })();
+          for (const chunk of [
+            "Report: " + input.topic + "\n",
+            "Summary: generated in two parts.\n",
+          ]) {
+            await sleep(5);
+            job.text += chunk;
+            job.events.push({
+              type: "artifact.delta",
+              sequence: job.events.length + 1,
+              data: chunk,
+            });
+          }
+          job.status = "completed";
+          job.events.push({
+            type: "settled",
+            sequence: job.events.length + 1,
+            response: reply(ok(job.text), [
+              {
+                ref: "execution.result",
+                input: { executionId },
+                guidance: { level: "recommended" },
+              },
+            ]),
+          });
+        })();
 
-      return reply(accepted(executionId), [
-        {
-          ref: "execution.status",
-          input: { executionId },
-          guidance: { level: "available" },
-        },
-        {
-          ref: "execution.updates",
-          input: { executionId },
-          guidance: { level: "recommended" },
-        },
-      ]);
-    },
-
-    "execution.status": async ({ input }) => {
-      const job = jobs.get(input.executionId);
-      if (!job) return reply(fail("NOT_FOUND", "Unknown execution"));
-      return reply(ok(job.status), [
-        {
-          ref: "execution.updates",
-          input: { executionId: input.executionId },
-          guidance: { level: "available" },
-        },
-      ]);
-    },
-
-    "execution.result": async ({ input }) => {
-      const executionId: string = input.executionId;
-      const job = jobs.get(executionId);
-      if (!job) return reply(fail("NOT_FOUND", "Unknown execution"));
-      if (job.status === "completed") return reply(ok(job.text));
-      return reply(
-        fail("NOT_READY", "Execution still running", { effects: "none" }),
-        [
-          {
-            ref: "execution.result",
-            input: { executionId },
-            guidance: { kind: "retry", level: "recommended" },
-            when: { after: "PT0.05S" },
-          },
+        return reply(accepted(executionId), [
           {
             ref: "execution.status",
             input: { executionId },
@@ -112,26 +74,72 @@ export function createReports(): AnwaApp<typeof schema> {
           {
             ref: "execution.updates",
             input: { executionId },
+            guidance: { level: "recommended" },
+          },
+        ]);
+      },
+
+      "execution.status": async ({ input }) => {
+        const job = jobs.get(input.executionId);
+        if (!job) return reply(fail("NOT_FOUND", "Unknown execution"));
+        return reply(ok(job.status), [
+          {
+            ref: "execution.updates",
+            input: { executionId: input.executionId },
             guidance: { level: "available" },
           },
-        ],
-      );
-    },
+        ]);
+      },
 
-    "execution.updates": ({ input, cursor = 0 }) =>
-      (async function* (): AsyncGenerator<ReportEvent> {
-        const job = jobs.get(input.executionId);
-        if (!job) throw Error("Unknown execution");
-        let index = cursor;
-        while (true) {
-          while (index < job.events.length) yield job.events[index++];
-          if (job.status === "completed") return;
-          await sleep(2);
-        }
-      })(),
-  }, {
-    // This stateless demo intentionally exposes its generated execution handles publicly.
-    // Production reports should use per-user Guards and durable access checks.
-    public: ["report.generate", "execution.status", "execution.result", "execution.updates"],
-  });
+      "execution.result": async ({ input }) => {
+        const executionId: string = input.executionId;
+        const job = jobs.get(executionId);
+        if (!job) return reply(fail("NOT_FOUND", "Unknown execution"));
+        if (job.status === "completed") return reply(ok(job.text));
+        return reply(
+          fail("NOT_READY", "Execution still running", { effects: "none" }),
+          [
+            {
+              ref: "execution.result",
+              input: { executionId },
+              guidance: { kind: "retry", level: "recommended" },
+              when: { after: "PT0.05S" },
+            },
+            {
+              ref: "execution.status",
+              input: { executionId },
+              guidance: { level: "available" },
+            },
+            {
+              ref: "execution.updates",
+              input: { executionId },
+              guidance: { level: "available" },
+            },
+          ],
+        );
+      },
+
+      "execution.updates": ({ input, cursor = 0 }) =>
+        (async function* (): AsyncGenerator<ReportEvent> {
+          const job = jobs.get(input.executionId);
+          if (!job) throw Error("Unknown execution");
+          let index = cursor;
+          while (true) {
+            while (index < job.events.length) yield job.events[index++];
+            if (job.status === "completed") return;
+            await sleep(2);
+          }
+        })(),
+    },
+    {
+      // This stateless demo intentionally exposes its generated execution handles publicly.
+      // Production reports should use per-user Guards and durable access checks.
+      public: [
+        "report.generate",
+        "execution.status",
+        "execution.result",
+        "execution.updates",
+      ],
+    },
+  );
 }

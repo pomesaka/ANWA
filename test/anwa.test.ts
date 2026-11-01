@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createCalculator } from "../demo/calculator/index.ts";
 import { createOrders } from "../demo/orders/index.ts";
 import { createReports } from "../demo/reports/index.ts";
-const alice = {caller: {subject: "alice"}} as const;
+const alice = { caller: { subject: "alice" } } as const;
 
 test("Interaction catalog and Discovery have no Thing", () => {
   const app = createCalculator();
@@ -55,10 +55,14 @@ test("Orders use standalone Interactions; each handler selects next Interactions
     Object.hasOwn(app.describe("order.cancel", alice), "subjectType"),
     false,
   );
-  const result = await app.interact("order.cancel", {
-    orderId: "pending",
-    reason: "Changed mind",
-  }, alice);
+  const result = await app.interact(
+    "order.cancel",
+    {
+      orderId: "pending",
+      reason: "Changed mind",
+    },
+    alice,
+  );
   assert.equal(result.outcome.kind, "settled");
   if (result.outcome.kind === "settled" && result.outcome.result.ok)
     assert.deepEqual(result.outcome.result.value, { status: "cancelled" });
@@ -66,7 +70,11 @@ test("Orders use standalone Interactions; each handler selects next Interactions
     result.context.next.find((x) => x.ref === "order.get")?.input,
     { orderId: "pending" },
   );
-  const confirmed = await app.interact("order.get", { orderId: "pending" }, alice);
+  const confirmed = await app.interact(
+    "order.get",
+    { orderId: "pending" },
+    alice,
+  );
   if (confirmed.outcome.kind === "settled" && confirmed.outcome.result.ok)
     assert.equal(
       (confirmed.outcome.result.value as { status: string }).status,
@@ -76,10 +84,14 @@ test("Orders use standalone Interactions; each handler selects next Interactions
 
 test("Shipped-order failure offers tracking without a central context resolver", async () => {
   const app = createOrders();
-  const failed = await app.interact("order.cancel", {
-    orderId: "shipped",
-    reason: "Changed mind",
-  }, alice);
+  const failed = await app.interact(
+    "order.cancel",
+    {
+      orderId: "shipped",
+      reason: "Changed mind",
+    },
+    alice,
+  );
   assert.equal(failed.outcome.kind, "settled");
   if (failed.outcome.kind === "settled" && !failed.outcome.result.ok)
     assert.equal(failed.outcome.result.error.code, "ORDER_ALREADY_SHIPPED");
