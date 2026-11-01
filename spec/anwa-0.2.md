@@ -1,37 +1,45 @@
 # ANWA 0.2 — Interaction-first experimental contract
 
-> **Status:** Experimental implementation profile, not a standard or compatibility guarantee. This is the active contract on main. [v0.1](anwa-0.1.md) is superseded. ANWA is WoT-*inspired*, not WoT TD-conformant.
+> **Status:** Experimental, not an adopted standard or compatibility guarantee. This is the active ANWA profile. The earlier [v0.1 Thing-bound profile](anwa-0.1.md) is retained for historical reference only.
 
-## Central principle
+## Core model
 
-**An Interaction is the primary published and invocable unit. A Thing is optional.** Application authors decide whether their domain even contains Things, how to identify instances, and which related operations to expose. No Interaction needs a parent Thing.
+**Interaction is ANWA's sole first-class public capability.** No Thing, ThingRef, `things` map, `subjectType`, mandatory service object, or entity-instance hierarchy is part of this core.
 
-ANWA defines **Description → Binding → Discovery → Interaction** as logical responsibilities, not as a required transport topology or network protocol. Protocol adapters (REST, MCP, WoT, GraphQL) are separate concerns.
+Application authors may have rich domain models internally. ANWA represents them through the input/output types, semantic descriptions, declared errors and runtime results of the Interactions they publish. ANWA does not choose how business objects are modeled, identified, stored or related.
 
-## Manifest
+The four logical framework responsibilities remain:
 
-An application exposes an \`anwa.json\` document with:
+1. **Description:** declare Interactions and their meaning, type signatures, errors and optional metadata.
+2. **Binding:** connect declared InteractionRefs to implementation handlers and optional named guards.
+3. **Discovery:** list and describe Interactions without requiring an owning resource.
+4. **Interaction:** invoke or observe Interactions and return `Outcome + Context`.
 
-| Field | Required | Meaning |
+These responsibilities are not four mandatory network protocols. The current reference runtime is an in-process adapter.
+
+## Public manifest
+
+The experimental manifest contains exactly three top-level fields:
+
+| Field | Status | Meaning |
 | --- | --- | --- |
-| \`anwa: "0.2"\` | Yes | Breaking experimental profile version |
-| \`interactions\` | Yes | Map of **global, app-scoped InteractionRefs** to definitions |
-| \`entrypoints\` | Yes | Nonempty array of declared InteractionRefs offered as starting points |
-| \`things\` | No | Optional Thing/domain metadata. No interaction is nested under or required to belong to a Thing |
+| `anwa: "0.2"` | Required | Experimental contract profile |
+| `interactions` | Required nonempty map | App-scoped `InteractionRef → InteractionDefinition` |
+| `entrypoints` | Required nonempty list | References to declared Interactions offered to a connecting agent |
 
-Each Interaction definition has \`kind\` (\`query\`, \`action\`, or \`event\`) and \`description\`, optionally \`input\`, \`output\`, \`errors\`, \`semanticTypes\`, \`subjectType\`, and (Action only) \`guard\`, \`hasSideEffects\`, \`idempotent\`.
+The supported Interaction kinds are:
 
-- \`query\`: obtains information and returns a typed \`Result\`. This is **ANWA's own generic term**, not a WoT PropertyAffordance.
-- \`action\`: invokes an operation. It may have side effects and return either \`Result\` or \`accepted\`.
-- \`event\`: an optional observation interface, which the in-process adapter exposes as an \`AsyncIterable\`.
-- \`subjectType\`: optional reference to declared Thing **metadata**; this never forces a particular Thing instance or argument shape.
-- \`input\`/\`output\`: payload types in the subset of JSON Schema supported by the reference adapter. For example, a dynamic order ID is ordinary input, **not** a required ThingRef.
-- \`errors\`: exhaustively declared expected domain failure codes. Unknown codes and implementation failures map to opaque \`UNEXPECTED_ERROR\`.
-- \`hasSideEffects\`/\`idempotent\`: optional, independent Action booleans. Absence is **unknown**, not false. They are not authorization or retry guarantees.
+- **`query`** — read or retrieve typed information. This is an ANWA term, not WoT's Thing-bound PropertyAffordance.
+- **`action`** — invoke an operation, with optional side-effect and idempotency declarations.
+- **`event`** — observe an app-defined stream of events, with optional input.
 
-### Minimal Thing-free application
+Every Interaction has a `kind` and a meaningful `description`. It may also declare an `input`, `output`, exhaustive expected `errors`, and optional `semanticTypes`. Actions alone may additionally declare named `guard`, `hasSideEffects`, and `idempotent`. Omitted side-effect and idempotency values are **unknown**, not `false`.
 
-\`\`\`json
+The reference validator implements a **constrained subset** of JSON Schema Draft 2020-12 for data types, not full specification conformance.
+
+### Example — no domain object required
+
+```json
 {
   "anwa": "0.2",
   "entrypoints": ["calculator.add"],
@@ -54,39 +62,41 @@ Each Interaction definition has \`kind\` (\`query\`, \`action\`, or \`event\`) a
     }
   }
 }
-\`\`\`
+```
 
-The optional Thing metadata does **not** appear in this manifest.
+## InteractionRef, Discovery and Binding
 
-## References and resolution
+An `InteractionRef` is an **application-scoped string**, e.g. `order.cancel` or `execution.result`. It resolves directly to a top-level definition and bound handler in the connected app; it is not a globally discoverable URL or a resource-instance identifier.
 
-An \`InteractionRef\` is an app-scoped **string** key, e.g., \`"report.generate"\`, \`"execution.result"\`, \`"shipment.track"\`. It is not a URL, ThingRef, or promise of cross-API delegation.
-
-\`\`\`js
+```js
 const app = new AnwaApp(manifest).bind({
-  "calculator.add": async ({input}) => ok(input.a + input.b)
+  "calculator.add": async ({ input }) => ok(input.a + input.b)
 });
-const catalog = app.catalog();
-const { description } = await app.discover("calculator.add");
-const response = await app.interact("calculator.add", {a: 2, b: 3});
-\`\`\`
 
-\`catalog()\` returns Interaction summaries plus entrypoints and optional Thing metadata.
-\`discover(ref)\` resolves one declared/bound Interaction definition; it returns \`{description, context}\`.
-\`interact(ref,input?)\` resolves an Action or Query and invokes the bound handler.
-\`observe(ref,input?,options?)\` subscribes to an Event.
+app.catalog();
+await app.discover("calculator.add");
+await app.interact("calculator.add", { a: 2, b: 3 });
+```
 
-The runtime does **not** force one Thing per business entity, a particular ID scheme, database, action URL, or API aggregation structure. It **does** require every advertised Interaction to have a bound Handler in the current experimental adapter.
+- `catalog()` returns version, entrypoint InteractionRefs and a summary of published Interactions.
+- `discover(ref)` resolves and returns an Interaction's description with runtime `context`.
+- `interact(ref,input?)` validates the supported input schema and runs a Query or Action.
+- `observe(ref,input?,options?)` subscribes to an Event's application-provided `AsyncIterable`.
 
-## Outcome and Context
+An order ID, a report ID, a payment ID or an execution ID is just app-declared typed **input or output data**. The core does not prescribe domain identity, a special resource reference type or a mapping from IDs to API routes.
 
-Every delivered application-level Result has \`outcome\` and \`context\`. Domain failure and success use the same envelope. \`context.next\` is a list of **application-provided candidate next Interactions**, not mandatory instructions.
+## Outcome and contextual next Interactions
 
-\`\`\`json
+Every **delivered application-level** result contains an `outcome` and a `context`. A result can be settled success, settled domain failure, or (when supported) accepted async execution.
+
+```json
 {
   "outcome": {
     "kind": "settled",
-    "result": { "ok": false, "error": { "code": "NOT_READY", "effects": "none" } }
+    "result": {
+      "ok": false,
+      "error": { "code": "NOT_READY", "effects": "none" }
+    }
   },
   "context": {
     "next": [{
@@ -97,23 +107,28 @@ Every delivered application-level Result has \`outcome\` and \`context\`. Domain
     }]
   }
 }
-\`\`\`
+```
 
-A \`next\` candidate has:
-- \`ref\`: required reference to **a declared Interaction**.
-- \`input\`: optional application-supplied input values, validated when present. It makes a dynamically identified execution actionable without a Thing.
-- \`guidance.kind: "retry"\`: optional. When present, \`ref\` **must** be the same Interaction that produced this response.
-- \`guidance.level\`: optional \`required\` / \`recommended\` / \`available\`; \`required\` means an application-defined prerequisite to a chosen continuation, **not** authority over the user.
-- \`when.after\`: optional ISO 8601 duration. The runtime does not schedule anything.
-- \`applicability\`: optional advisory \`available\` / \`blocked\` / \`unknown\`.
+`context.next` is **one list** of follow-up Interaction candidates; it can be empty. A candidate contains:
 
-\`context.next: []\` is valid. The framework never synthesizes business decisions or blindly retries. If a candidate omits input but the target Interaction requires it, the client must supply an input satisfying its declared schema.
+| Field | Meaning |
+| --- | --- |
+| `ref` | Reference to a published Interaction |
+| `input` | Optional bound inputs selected by the app; type-checked when supplied |
+| `guidance.kind: "retry"` | Candidate repeats the **same InteractionRef** that produced the result |
+| `guidance.level` | Optional `required`, `recommended`, or `available` |
+| `when.after` | Optional ISO 8601 delay relative to response receipt; advisory only |
+| `applicability` | Optional `available`, `blocked`, or `unknown`; not authorization |
 
-Actual effect certainty of a failed invocation belongs to \`error.effects\` (\`none\`, \`occurred\`, \`unknown\`) — it is different from static \`hasSideEffects\` and \`idempotent\`.
+`required` is app-authored prerequisite information for a **chosen continuation**, never a command to override the user. ANWA does not select a business workflow or blindly retry an action. There is **no separate** `error.retry`, `context.retry`, `context.links`, or `context.affordances` list.
 
-## Asynchronous work, without an Execution Thing
+Domain errors are defined per Interaction with exhaustive codes. Undeclared application errors become `UNEXPECTED_ERROR`. `error.effects`, when known, describes what happened during **this attempt** (`none`, `occurred`, `unknown`), separate from the Action's static `hasSideEffects`.
 
-\`\`\`json
+## Asynchronous work — no special resource model
+
+An Action may return an accepted execution reference:
+
+```json
 {
   "outcome": { "kind": "accepted", "execution": { "id": "42" } },
   "context": {
@@ -124,31 +139,26 @@ Actual effect certainty of a failed invocation belongs to \`error.effects\` (\`n
     }]
   }
 }
-\`\`\`
+```
 
-\`ExecutionRef\` is a **logical execution identifier**, not a ThingRef. An implementation may store it however it chooses. The client can follow the next Interaction by invoking \`execution.status\` with the provided input. A streaming Event may similarly take \`executionId\` as input. An application *may* additionally model an execution as a Thing, but ANWA does not require it.
+The execution identifier is an opaque handle. `execution.status`, `execution.result` and `execution.updates` are **ordinary standalone Interactions**, not members of an Execution resource. The application implements their lifecycle and any storage or concurrency guarantees. Observation is independent of durable execution.
 
-Streaming is observation, not durable execution. There are no guarantees of persistence, replay, exactly-once delivery, auth or remote availability from the in-process adapter.
+## Tooling, demos and limitations
 
-## Implementation and tooling
+- [Reference runtime](../src/anwa.mjs)
+- [Schema validator / generated types](../src/schema-tools.mjs)
+- [Machine-readable ANWA 0.2 schema](anwa-0.2.schema.json)
+- [Calculator, Orders and Reports demos](../demo/README.md)
 
-- \`src/anwa-v02.mjs\`: executable Interaction-first reference adapter.
-- \`src/schema-v02.mjs\`: schema checks and generated TypeScript input/output/Handler type aliases.
-- \`spec/anwa-0.2.schema.json\`: machine-readable manifest + Result/Context types.
-- \`tools/anwa.mjs\`: \`validate\`, \`generate\`, \`inspect\` based on 0.2.
-- \`demo/calculator\`, \`demo/orders\`, \`demo/reports\`: examples with standalone Interactions.
-- \`npm test\`, \`npm run validate\`, \`npm run types:orders\`, \`npm run demo\` in GitHub Actions.
+Run `npm run validate`, `npm run types:orders`, `npm test`, and `npm run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
 
-**The payload validator implements a subset of JSON Schema 2020-12**, not the full standard. The adapter is an experimental in-memory implementation, not a deployed web service. AI usability has not been measured by a blind independent agent.
+The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. Federation/external API delegation and protocol adapters remain future topics.
 
-## What remains open
+**W3C WoT Thing Descriptions are Thing-centered. ANWA's core intentionally is not.** A future WoT adapter may represent an ANWA application through whatever compatible mapping it can support, but must not impose WoT's Thing concept on ANWA's schema or claim unsupported conformance.
 
-Network binding, federated/external API delegation, authorization, schema dialect completeness, typed domain error detail schemas, policy exposure, asynchronous durability and standard conformance. The model does not assume that a natural-language description or a side-effect flag is authoritative.
+## Primary references
 
-## Primary specification references
+- [W3C WoT Thing Description 1.1](https://www.w3.org/TR/wot-thing-description11/)
+- [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)
 
-- [W3C WoT Thing Description 1.1](https://www.w3.org/TR/wot-thing-description11/) — Thing-bound Property/Action/Event Affordances. Interaction-first ANWA concepts do not claim TD 1.1 conformance.
-- [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12).
-- [RFC 8288 Web Linking](https://www.rfc-editor.org/info/rfc8288) — a source for relationship semantics, not a required ANWA Context shape.
-
-[README](../README.md) · [Demo guide](../demo/README.md) · [Prior v0.1 contract](anwa-0.1.md)
+[README](../README.md) · [Architecture](../docs/architecture.md) · [Earlier v0.1 profile](anwa-0.1.md)
