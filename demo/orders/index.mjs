@@ -20,9 +20,7 @@ export function createOrders() {
         const order = orders.get(target.id);
         if (!order) return { allowed: false, error: { code: "NOT_FOUND" } };
         if (order.status === "shipped") return {
-          allowed: false, error: {
-            code: "ORDER_ALREADY_SHIPPED", retry: { mode: "never" }
-          }
+          allowed: false, error: { code: "ORDER_ALREADY_SHIPPED", effects: "none" }
         };
         if (order.status === "cancelled") return {
           allowed: false, error: { code: "ALREADY_CANCELLED" }
@@ -46,24 +44,29 @@ export function createOrders() {
         return ok({ status: order.status });
       }
     },
-    context: async ({ thing: target }) => {
+    context: async ({ thing: target, phase, outcome }) => {
       const order = orders.get(target.id);
-      if (!order) return { links: [], affordances: [] };
+      if (!order) return { next: [] };
       const shipment = thing("Shipment", order.shipmentId);
       const decision = await app.assess(target, "cancel");
-      return {
-        links: [{ rel: "shipment", target: shipment }],
-        affordances: [
-          { ref: interaction(target, "property", "summary") },
-          {
-            ref: interaction(target, "action", "cancel"),
-            applicability: decision.allowed
-              ? { state: "available" }
-              : { state: "blocked", reason: decision.error.code }
-          },
-          { ref: interaction(shipment, "property", "tracking") }
-        ]
-      };
+      const next = [
+        { ref: interaction(target, "property", "summary"),
+          guidance: { level: "available" } },
+        { ref: interaction(shipment, "property", "tracking"),
+          guidance: { level: order.status === "shipped" ? "recommended" : "available" } }
+      ];
+      // Discovery can describe a blocked candidate without granting permission.
+      // A failed invocation does not recommend the blocked cancellation again.
+      if (phase === "discovery" || decision.allowed) {
+        next.push({
+          ref: interaction(target, "action", "cancel"),
+          guidance: { level: "available" },
+          applicability: decision.allowed
+            ? { state: "available" }
+            : { state: "blocked", reason: decision.error.code }
+        });
+      }
+      return { next };
     }
   });
 
