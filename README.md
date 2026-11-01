@@ -59,7 +59,7 @@ The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/an
 # Bun ^1.4.4
 bun install --frozen-lockfile
 bun fmt --check src demo test tools
-bun lint src demo test tools
+bunx oxlint src demo test tools
 bun check
 bun test
 bun run demo
