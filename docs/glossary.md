@@ -76,14 +76,14 @@ These terms help discuss ANWA's goals, but are **not normative WoT terms** and s
 
 | Term | Working meaning | Responsibility boundary |
 | --- | --- | --- |
-| **Public schema / ANWA Schema** | OpenAPI-like machine-readable declaration of the chosen Things, interactions, input/output and relevant Links; optional states/transitions, errors and guard references | Describes what an app author opts to expose, **not** executable business logic; exact syntax TBD |
+| **Public schema / ANWA Schema** | Machine-readable top-level Interaction declarations with input/output/errors, plus optional Thing metadata | Defines what the application exposes, **not** executable business logic; current v0.2 is experimental |
 | **Implementation / Handler / Resolver** | Ordinary application code implementing Actions, Property reads, Link resolution and effects | Actual business logic and access checks |
 | **State / Transition** | Named domain state and a potentially valid change under a specified trigger | Declared possible transitions do not automatically guarantee atomic enforcement |
 | **Guard / Guard reference** | Named check referenced by the schema; evaluated by application code | May return structured allow/deny and reason; not a YAML predicate language |
 | **Guard decision** | Runtime result of evaluating a guard, potentially including a reason and navigational hints | Must be policy-filtered, can become stale, does not eliminate server-side revalidation |
 | **Interaction Response** | Proposed ANWA application-level envelope with Outcome and Context | **Not** a WoT standard response type and not yet a fixed wire format |
 | **Outcome / Result** | Settled operation success or domain failure; an accepted execution may instead be returned | `ok` indicates the invocation outcome, not necessarily achievement of a larger business goal |
-| **Interaction Context** | Application-supplied `next` candidates: an InteractionRef or discoverable ThingRef, with optional guidance, wait time and applicability | Required `next` list may be empty; candidates are not privileged agent instructions |
+| **Interaction Context** | Application-supplied `next` entries referencing top-level InteractionRef strings, optionally with bound input, guidance, wait time and applicability | Required `next` list may be empty; candidates are not privileged instructions |
 | **Contextual applicability** | `available / blocked / unknown` hint for a particular caller, Thing and moment | **Distinct** from a WoT Interaction Affordance and from authorization |
 | **Next-interaction guidance** | Optional `guidance.kind: retry`, importance `required/recommended/available`, and `when.after` ISO 8601 duration on a `context.next` entry | Retry is the same interaction offered again, not a separate error retry property; hints are advisory |
 | **Execution** | Identifiable instance of an in-progress or completed invocation, with its own lifecycle | Not the same as business domain state; may be modeled as a Thing |
