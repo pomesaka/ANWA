@@ -2,7 +2,8 @@
 export type PrimitiveType =
   "object" | "array" | "string" | "number" | "integer" | "boolean" | "null";
 export interface DataSchema {
-  type: PrimitiveType;
+  type?: PrimitiveType;
+  $ref?: string;
   description?: string;
   enum?: readonly unknown[];
   properties?: Readonly<Record<string, DataSchema>>;
@@ -23,6 +24,7 @@ export interface InteractionDefinition {
 }
 export interface Manifest {
   anwa: "0.2";
+  $defs?: Readonly<Record<string, DataSchema>>;
   entrypoints: readonly string[];
   interactions: Readonly<Record<string, InteractionDefinition>>;
 }
@@ -55,9 +57,13 @@ const payloadFields = new Set([
   "additionalProperties",
 ]);
 const reserved = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
+const definitionName = /^[A-Za-z_$][\w$]*$/;
+const definitionRef = /^#\/\$defs\/([A-Za-z_$][\w$]*)$/;
 
 export function validateManifest(manifest: unknown): Diagnostic[] {
   const issues: Diagnostic[] = [];
+  const definitions =
+    isRecord(manifest) && isRecord(manifest.$defs) ? manifest.$defs : {};
   const issue = (path: string, message: string): void => {
     issues.push({ path, message });
   };
@@ -76,6 +82,15 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
   const validateData = (schema: unknown, path: string): void => {
     if (!isRecord(schema)) {
       issue(path, "Expected payload schema");
+      return;
+    }
+    if (has(schema, "$ref")) {
+      if (Object.keys(schema).length !== 1)
+        issue(path, "$ref must be the only schema keyword");
+      const ref =
+        typeof schema.$ref === "string" ? definitionRef.exec(schema.$ref) : null;
+      if (!ref || !has(definitions, ref[1]))
+        issue(path + ".$ref", "Unknown or unsupported local schema reference");
       return;
     }
     for (const key of Object.keys(schema))
@@ -132,7 +147,43 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
 
   if (!isRecord(manifest))
     return [{ path: "$", message: "Expected manifest object" }];
-  checkFields(manifest, ["anwa", "entrypoints", "interactions"], "$");
+  checkFields(manifest, ["anwa", "$defs", "entrypoints", "interactions"], "$");
+  if (manifest.$defs !== undefined) {
+    if (!isRecord(manifest.$defs)) issue("$.$defs", "Expected definition map");
+    else {
+      for (const [name, schema] of Object.entries(definitions)) {
+        if (!definitionName.test(name))
+          issue("$.$defs." + name, "Invalid definition name");
+        validateData(schema, "$.$defs." + name);
+      }
+      const dependencies = (schema: unknown): string[] => {
+        if (!isRecord(schema)) return [];
+        if (typeof schema.$ref === "string") {
+          const ref = definitionRef.exec(schema.$ref);
+          return ref ? [ref[1]] : [];
+        }
+        return [
+          ...(isRecord(schema.properties) ? Object.values(schema.properties) : []),
+          ...(schema.items === undefined ? [] : [schema.items]),
+        ].flatMap(dependencies);
+      };
+      const visiting = new Set<string>();
+      const visited = new Set<string>();
+      const visit = (name: string): void => {
+        if (visiting.has(name)) {
+          issue("$.$defs." + name, "Cyclic schema reference");
+          return;
+        }
+        if (visited.has(name)) return;
+        visiting.add(name);
+        for (const dependency of dependencies(definitions[name]))
+          if (has(definitions, dependency)) visit(dependency);
+        visiting.delete(name);
+        visited.add(name);
+      };
+      for (const name of Object.keys(definitions)) visit(name);
+    }
+  }
   if (manifest.anwa !== "0.2") issue("$.anwa", "Expected ANWA 0.2");
   if (
     !isRecord(manifest.interactions) ||
@@ -214,8 +265,12 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
   return issues;
 }
 
-function typeOf(schema?: DataSchema): string {
+function typeOf(
+  schema?: DataSchema,
+  definitions: Readonly<Record<string, DataSchema>> = {},
+): string {
   if (!schema) return "undefined";
+  if (schema.$ref) return typeOf(definitions[schema.$ref.slice(8)], definitions);
   if (schema.enum) return schema.enum.map((x) => JSON.stringify(x)).join(" | ");
   switch (schema.type) {
     case "string":
@@ -228,7 +283,7 @@ function typeOf(schema?: DataSchema): string {
     case "null":
       return "null";
     case "array":
-      return "Array<" + typeOf(schema.items) + ">";
+      return "Array<" + typeOf(schema.items, definitions) + ">";
     case "object": {
       const fields = Object.entries(schema.properties ?? {});
       const required = new Set(schema.required ?? []);
@@ -239,7 +294,7 @@ function typeOf(schema?: DataSchema): string {
                 ([name, value]) =>
                   JSON.stringify(name) +
                   (required.has(name) ? ": " : "?: ") +
-                  typeOf(value) +
+                  typeOf(value, definitions) +
                   ";",
               )
               .join(" ") +
@@ -268,12 +323,12 @@ export function generateTypes(manifest: Manifest): string {
       .split(/[._:-]/)
       .map((x) => x[0].toUpperCase() + x.slice(1))
       .join("");
-    lines.push("export type " + prefix + "Input = " + typeOf(spec.input) + ";");
+    lines.push("export type " + prefix + "Input = " + typeOf(spec.input, manifest.$defs) + ";");
     lines.push(
       "export type " +
         prefix +
         "Output = " +
-        (spec.output ? typeOf(spec.output) : "null") +
+        (spec.output ? typeOf(spec.output, manifest.$defs) : "null") +
         ";",
     );
     lines.push(
@@ -306,17 +361,54 @@ export function generateTypes(manifest: Manifest): string {
   return lines.join("\n") + "\n";
 }
 
+/** Compile reusable local schemas into standalone literal schemas for type inference. */
+function expandDataSchema(
+  schema: DataSchema,
+  definitions: Readonly<Record<string, DataSchema>>,
+): DataSchema {
+  if (schema.$ref)
+    return expandDataSchema(definitions[schema.$ref.slice(8)], definitions);
+  if (schema.type === "object" && schema.properties)
+    return {
+      ...schema,
+      properties: Object.fromEntries(
+        Object.entries(schema.properties).map(([key, value]) => [
+          key,
+          expandDataSchema(value, definitions),
+        ]),
+      ),
+    };
+  if (schema.type === "array" && schema.items)
+    return { ...schema, items: expandDataSchema(schema.items, definitions) };
+  return schema;
+}
+
 /** Generate a literal, type-checked module from the public JSON manifest.
  * The JSON file remains the single author-maintained source. */
 export function generateManifestModule(manifest: Manifest): string {
   const problems = validateManifest(manifest);
   if (problems.length)
     throw new Error(problems.map((x) => x.path + ": " + x.message).join("\n"));
+  const definitions = manifest.$defs ?? {};
+  const expanded: Manifest = {
+    anwa: manifest.anwa,
+    entrypoints: manifest.entrypoints,
+    interactions: Object.fromEntries(
+      Object.entries(manifest.interactions).map(([ref, spec]) => [
+        ref,
+        {
+          ...spec,
+          ...(spec.input ? { input: expandDataSchema(spec.input, definitions) } : {}),
+          ...(spec.output ? { output: expandDataSchema(spec.output, definitions) } : {}),
+        },
+      ]),
+    ),
+  };
   return [
     "// AUTO-GENERATED from anwa.json; do not edit. Run bun run codegen.",
     'import type { Manifest } from "../../src/schema-tools.ts";',
     "export const schema = " +
-      JSON.stringify(manifest, null, 2) +
+      JSON.stringify(expanded, null, 2) +
       " as const satisfies Manifest;",
     "",
   ].join("\n");
