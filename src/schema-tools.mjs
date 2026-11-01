@@ -7,7 +7,7 @@ const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const ERROR_CODE = /^[A-Z][A-Z0-9_]*$/;
 const RESERVED = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
 const DATA_TYPES = new Set(["string", "number", "integer", "boolean", "object", "array", "null"]);
-const SCHEMA_KEYS = new Set(["type", "enum", "properties", "required", "items", "additionalProperties"]);
+const SCHEMA_KEYS = new Set(["type", "enum", "properties", "required", "items", "additionalProperties", "description"]);
 
 export function validateManifest(manifest) {
   const errors = [];
@@ -27,6 +27,7 @@ export function validateManifest(manifest) {
       if (!SCHEMA_KEYS.has(key)) issue(path + "." + key, "Unsupported JSON Schema keyword in v0.1 reference runtime");
     }
     if (!DATA_TYPES.has(schema.type)) issue(path + ".type", "Expected a supported type");
+    if (schema.description !== undefined) description(schema.description, path + ".description");
     if (schema.enum !== undefined && (!Array.isArray(schema.enum) || !schema.enum.length)) {
       issue(path + ".enum", "Expected nonempty array");
     }
