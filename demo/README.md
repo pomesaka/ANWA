@@ -7,7 +7,7 @@ bun install --frozen-lockfile
 bun run validate
 bun run types:orders
 bun fmt --check src demo test tools
-bun lint src demo test tools
+bunx oxlint src demo test tools
 bun check
 bun test
 bun run demo
