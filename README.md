@@ -45,7 +45,7 @@ Two **logical** interfaces—not necessarily two wire protocols:
 | Interface | Responsibility |
 | --- | --- |
 | **Discovery** | Expose author-declared Thing descriptions, semantics, Links and Property/Action/Event Interaction Affordances, with optional state/caller-specific applicability hints |
-| **Interaction** | Allow applications to read, invoke and observe; carry **Outcome + Context** (possibly empty/restricted links and next-interaction references) on delivered domain results |
+| **Interaction** | Read, invoke and observe; return **Outcome + Context**, with a single `context.next` list of available next interactions/discovery targets and optional guidance/timing |
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
 
@@ -76,7 +76,7 @@ npm run inspect:orders # renders schema meaning, fields and domain errors as Mar
 npm test               # validates declared errors against runtime behavior
 ```
 
-For an Action that declares `errors`, **all expected domain error codes must be listed**. An undeclared domain error is transformed into the opaque `UNEXPECTED_ERROR`; `INVALID_INPUT` is reserved for framework input validation.
+For an Action that declares `errors`, **all expected domain error codes must be listed**. An undeclared domain error becomes opaque `UNEXPECTED_ERROR`; `INVALID_INPUT` is framework input validation. **Retries and other follow-up interactions use one `context.next` list**: `guidance.kind: "retry"`, optional `guidance.level`, and optional `when.after`. There is no separate `error.retry`.
 
 **Machine-readable is not the same as AI-effective.** Optional semantic identifiers and Action effect categories are exposed through Discovery, but are untrusted declarations rather than guarantees. We have **not benchmarked agent task performance** against OpenAPI, WoT or MCP. See [Agent-native schema contract](spec/agent-native-schema.md) and [contract validation](docs/schema-authoring.md).
 
@@ -107,7 +107,7 @@ ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP an
 | Schema-first architecture | [Architecture](docs/architecture.md) |
 | Step-by-step schema + code example | [Order cancellation](docs/examples/order-cancellation.md) |
 | Result, async execution, streaming | [Interaction model](docs/interaction-model.md) |
-| Errors, retry guidance and next-interaction navigation | [Error recovery and navigation](docs/error-recovery-navigation.md) |
+| Errors, retry guidance and next-interaction navigation (`context.next`) | [Error recovery and navigation](docs/error-recovery-navigation.md) |
 | Established and proposed terminology | [Glossary](docs/glossary.md) |
 | Risks, next tests, unresolved design | [Open questions](docs/open-questions.md) |
 | Comparison against existing work | [Prior art](docs/prior-art.md) |
