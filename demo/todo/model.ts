@@ -163,13 +163,17 @@ export class TodoState {
         : task.status;
   }
   snapshot(task: Task): TaskView {
-    return {
+    // JSON has no undefined fields; optional values must be omitted, not emitted as undefined.
+    const raw = {
       ...task,
       status: this.effectiveStatus(task),
       tags: [...task.tags],
       dependencies: [...task.dependencies],
       comments: task.comments.map((c) => ({ ...c })),
     };
+    return Object.fromEntries(
+      Object.entries(raw).filter(([, value]) => value !== undefined),
+    ) as unknown as TaskView;
   }
   touch(task: Task): void {
     task.version++;
