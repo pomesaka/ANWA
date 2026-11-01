@@ -1,23 +1,19 @@
-import { readFileSync } from "node:fs";
 import {
   AnwaApp,
   fail,
   ok,
   reply,
-  type Manifest,
   type NextInteraction,
 } from "../../src/anwa.ts";
 
-const schema = JSON.parse(
-  readFileSync(new URL("./anwa.json", import.meta.url), "utf8"),
-) as Manifest;
+import { schema } from "./contract.generated.ts";
 interface Order {
   id: string;
   status: "pending" | "shipped" | "cancelled";
   shipmentId: string;
 }
 
-export function createOrders(): AnwaApp {
+export function createOrders(): AnwaApp<typeof schema> {
   const orders = new Map<string, Order>([
     [
       "pending",
