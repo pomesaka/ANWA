@@ -1,38 +1,32 @@
-# Interaction-first schema tooling
+# ANWA v0.2 — TypeScript schema tooling
 
-> Active v0.2 toolchain. The machine schema is the single public contract; implementation remains ordinary code.
+> Experimental, Interaction-first. The public manifest is the source of truth for agent-generated implementations and agent consumers.
 
-## The two agent roles
-
-**Implementing agents** create a manifest, bind its declared Interactions to handlers, and run validation/type generation. **Consuming agents** discover individual Interaction definitions, use the declared input/output/error types, invoke a ref, and inspect `Outcome + Context.next`.
-
-There is no requirement that a human write the schema or that Interactions belong to Things.
-
-## Commands
+## Tools (Bun ^1.4.4)
 
 ```bash
-npm run validate
-npm run types:orders
-npm run inspect:orders
-npm test
-npm run demo
+bun install --frozen-lockfile
+bun run validate
+bun run types:orders
+bun run inspect:orders
+bun fmt --check src demo test tools
+bunx oxlint src demo test tools
+bun check
+bun test
+bun run demo
 ```
 
-The validator checks top-level Interaction names, entrypoints, allowed kinds, supported payload-schema keywords, error code declarations and optional Thing metadata references. It does not yet implement full JSON Schema 2020-12.
+The repository uses the **Bun 1.4.4 built-in formatter** and **Oxlint 1.90.0 invoked through Bun**. The pinned Bun 1.4.4 executable does not expose `bun lint` as a functioning built-in CLI; using the external linter avoids misleading pass results.
 
-`generate` creates TypeScript aliases such as `OrderCancelInput`, `OrderCancelOutput`, `OrderCancelErrorCode` and `OrderCancelHandler`, keyed by the InteractionRef, **not by a Thing**.
+- **Validation:** top-level Interaction names/entrypoints, allowed kinds, machine-readable errors, payload type subset, and referenced Context candidates.
+- **Type generation:** `OrderCancelInput`, `OrderCancelOutput`, `OrderCancelErrorCode` and `OrderCancelHandler` from standalone InteractionRefs.
+- **Runtime checking:** incoming inputs, handler success output, domain error codes and `context.next` references/optional inputs.
+- **Type checking:** `bun check` with strict TypeScript configuration, plus Bun tests.
 
-`inspect` emits a diagnostic list of the declared Interactions and their input/output fields. The human-facing presentation is incidental, not a schema design objective.
+Every Handler constructs **its own Outcome and Context** with `reply(result, next)`. There is no global Context callback. An optional named Guard is evaluated explicitly by the owning Handler using `app.assess(ref, input)`; the framework does not automatically enforce business authorization.
 
-## Runtime enforcement
+No Thing, ThingRef, `things`, or `subjectType` is part of the current manifest.
 
-- Bind every declared Interaction to a handler (or Event source); optional Action guards are resolved by name.
-- Validate request shape and declared success output against the supported subset.
-- Reject undeclared expected domain errors as opaque `UNEXPECTED_ERROR`.
-- Check `context.next` candidates reference a declared/bound Interaction, and validate bound input when provided.
-- A `guidance.kind:"retry"` candidate must reference the source Interaction.
-- Dynamic business state, authorization and actual side effects remain application/infrastructure concerns.
+The reference supports a limited JSON Schema dialect and is not a production network service. Generated types do not prove the business behavior is correct.
 
-These checks do not prove that agents understand the schema or that an operation is safe. There is no production network adapter, durable task engine or cross-app reference resolution.
-
-[Main schema](../spec/anwa-0.2.schema.json) · [Contract](../spec/anwa-0.2.md) · [Demos](../demo/README.md)
+[v0.2 specification](../spec/anwa-0.2.md) · [Reference runtime](../src/anwa.ts) · [Demos](../demo/README.md)
