@@ -28,7 +28,7 @@ The walkthrough creates a workspace, invites a collaborator, creates a project, 
 | Saved searches             | `view.save`, `view.list`, `view.run`                                                                                  | Reusable, workspace-scoped query criteria                                                                 |
 | Audit                      | `activity.events`                                                                                                     | Guarded, cursor-based finite replay via AsyncIterable                                                     |
 
-The published JSON manifest is [anwa.json](anwa.json). [contract.generated.ts](contract.generated.ts) is derived from that file and checked in CI. Each Handler in [index.ts](index.ts) is typed by the manifest and delegates app logic to [logic.ts](logic.ts), using an ordinary [in-memory model](model.ts).
+The published JSON manifest is [anwa.json](anwa.json). Its `$defs.Task`, `$defs.Project`, and `$defs.SavedQuery` are reusable **payload descriptions**, not Things: 27 separate Interactions keep their own refs, guards, inputs and outputs. The authoring manifest uses local `$ref` for repeated shapes; codegen expands those references into the unchanged literal [contract.generated.ts](contract.generated.ts), which CI checks for drift. Each Handler in [index.ts](index.ts) is typed by the manifest and delegates app logic to [logic.ts](logic.ts), using an ordinary [in-memory model](model.ts).
 
 ## ANWA-specific behavior exercised
 
