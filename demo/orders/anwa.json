@@ -1,0 +1,89 @@
+{
+  "anwa": "0.1",
+  "entrypoints": [
+    {
+      "type": "Order",
+      "id": "pending"
+    },
+    {
+      "type": "Order",
+      "id": "shipped"
+    }
+  ],
+  "things": {
+    "Order": {
+      "title": "Purchase order",
+      "description": "An order with application-defined status and cancellation policy.",
+      "properties": {
+        "summary": {
+          "description": "Read the current order summary.",
+          "output": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "id"
+            ]
+          }
+        }
+      },
+      "actions": {
+        "cancel": {
+          "description": "Request cancellation of an order.",
+          "guard": "canCancel",
+          "input": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ]
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "errors": {
+            "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
+            "NOT_FOUND": "The order was not found."
+          }
+        }
+      },
+      "links": {
+        "shipment": {
+          "description": "Related shipment information",
+          "target": "Shipment"
+        }
+      }
+    },
+    "Shipment": {
+      "title": "Shipment",
+      "description": "Shipment tracking data associated with an order.",
+      "properties": {
+        "tracking": {
+          "description": "Read the current shipment status.",
+          "output": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
