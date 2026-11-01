@@ -70,6 +70,26 @@ These terms help discuss ANWA's goals, but are **not normative WoT terms** and s
 | **Execution contract** | Proposed collection of effects, preconditions, approval, replay/idempotency and failure expectations | Related to DataSchema, ActionAffordance and AdditionalExpectedResponse; not a WoT-defined object |
 | **Presentation** | Optional UI generated or provided to humans | Not the primary interaction model; WoT may link to UI via `Link` |
 
+## 4a. ANWA working terminology — schema and runtime
+
+**The following terms are ANWA design vocabulary, not W3C WoT-defined constructs.** They describe our current schema-first development model, but their exact interfaces have not been standardized.
+
+| Term | Working meaning | Responsibility boundary |
+| --- | --- | --- |
+| **Public schema / ANWA Schema** | OpenAPI-like machine-readable declaration of exposed Things, interactions, input/output, possible states/transitions, errors, named Guards and Links | Describes a contract, **not** executable business logic; exact syntax TBD |
+| **Implementation / Handler / Resolver** | Ordinary application code implementing Actions, Property reads, Link resolution and effects | Actual business logic and access checks |
+| **State / Transition** | Named domain state and a potentially valid change under a specified trigger | Declared possible transitions do not automatically guarantee atomic enforcement |
+| **Guard / Guard reference** | Named check referenced by the schema; evaluated by application code | May return structured allow/deny and reason; not a YAML predicate language |
+| **Guard decision** | Runtime result of evaluating a guard, potentially including a reason and navigational hints | Must be policy-filtered, can become stale, does not eliminate server-side revalidation |
+| **Interaction Response** | Proposed ANWA application-level envelope with Outcome and Context | **Not** a WoT standard response type and not yet a fixed wire format |
+| **Outcome / Result** | Settled operation success or domain failure; an accepted execution may instead be returned | `ok` indicates the invocation outcome, not necessarily achievement of a larger business goal |
+| **Interaction Context** | Subject, typed Links and next-interaction references, with optional revision/freshness metadata | May be empty or restricted; not a privileged agent instruction |
+| **Contextual applicability** | `available / blocked / unknown` hint for a particular caller, Thing and moment | **Distinct** from a WoT Interaction Affordance and from authorization |
+| **Execution** | Identifiable instance of an in-progress or completed invocation, with its own lifecycle | Not the same as business domain state; may be modeled as a Thing |
+| **Interaction Event / Observation** | State changes, progress reports, or artifact deltas sent to consumers | Streaming is not itself durable execution or an authoritative state store |
+
+For a concrete end-to-end example, see [Order cancellation](examples/order-cancellation.md). The working conceptual model is in [Architecture](architecture.md) and [Interaction model](interaction-model.md).
+
 ### Correction to earlier ANWA usage
 
 We previously defined **Affordance** as a *context-dependent available action*. That was **narrower than WoT's actual Interaction Affordance**: a WoT Affordance describes an **offered interaction**, not a standardized per-user `availableNow` authorization judgment.
@@ -81,6 +101,11 @@ Use **Interaction Affordance** for the WoT concept, **contextual availability / 
 A previously used generic **Capability** may map to *reading a Property*, *invoking an Action*, or *subscribing to an Event*. It should not silently be reduced to WoT Action.
 
 ## 5. What remains open
+
+The **schema-first workflow and code-implemented Guard** are current design directions, not a decision about the precise schema syntax. In particular, declarative states/transitions are *descriptions of the contract* and cannot generally replace the handler's transactional logic.
+
+See [Current decision status](decisions.md).
+
 
 - Should each business entity be a Thing, or should a service expose many entities as Properties, Actions and Links on a smaller set of Things?
 - How should TDs evolve with user permissions and per-instance state, without leaking privileged metadata?
