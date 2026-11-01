@@ -11,17 +11,29 @@ export interface DataSchema {
   items?: DataSchema;
   additionalProperties?: false;
 }
-export interface InteractionDefinition {
-  kind: "query" | "action" | "event";
+interface InteractionBase {
   description: string;
   input?: DataSchema;
   output?: DataSchema;
   errors?: Readonly<Record<string, string>>;
   semanticTypes?: readonly string[];
   guard?: string;
-  hasSideEffects?: boolean;
-  idempotent?: boolean;
 }
+
+/** Action effect declarations are required, never silently inferred. */
+export type InteractionDefinition = InteractionBase &
+  (
+    | {
+        kind: "action";
+        hasSideEffects: boolean;
+        idempotent: boolean;
+      }
+    | {
+        kind: "query" | "event";
+        hasSideEffects?: never;
+        idempotent?: never;
+      }
+  );
 export interface Manifest {
   anwa: "0.2";
   $defs?: Readonly<Record<string, DataSchema>>;
@@ -234,11 +246,12 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
         issue(path + ".semanticTypes", "Expected unique URI/URN array");
     }
     for (const field of ["hasSideEffects", "idempotent"]) {
-      if (
-        value[field] !== undefined &&
-        (value.kind !== "action" || typeof value[field] !== "boolean")
-      )
-        issue(path + "." + field, "Action-only optional boolean");
+      if (value.kind === "action") {
+        if (typeof value[field] !== "boolean")
+          issue(path + "." + field, "Action requires an explicit boolean");
+      } else if (value[field] !== undefined) {
+        issue(path + "." + field, "Action-only field");
+      }
     }
     if (
       value.guard !== undefined &&
