@@ -22,7 +22,7 @@ A framework can *allow* an app to do something without *performing it automatica
 | --- | --- | --- |
 | **ANWA specification** | Public first-class Interactions, their Discovery/Invocation semantics, typed Outcome + contextual `next` and optional observation | Business entity/Thing boundaries, state-machine topology, which actions exist, next candidates or business policy |
 | **ANWA framework/runtime** | Schema parsing/validation, binding declarations to implementations, exposing declared contracts, carrying/serializing supplied outcomes and context, enabling adapters and extension points (specific guarantees TBD) | Inventing a business workflow, discovering the true intent behind arbitrary code, enforcing domain invariants it has not been configured to enforce, promising durable jobs or safe retries by default |
-| **Application developer** | Thing/resource granularity, schema contents, action/guard/resolver logic, state model if needed, data ownership and persistence, selected links and next-action hints, auth policy, concurrency rules, runtime deployment | Redefining ANWA's common interoperability semantics when choosing to use them |
+| **Application developer** | Domain entity and ID design, public Interaction declarations, Handler/Guard code, state model, persistence, chosen next candidates, authorization, concurrency and deployment | Redefining the common ANWA contract while using it |
 | **Underlying platforms/protocols** | Database transactions, queueing, network delivery, transport-level status, storage and durability according to chosen implementation | Domain-level guidance; uniform ANWA response semantics unless mapped by an adapter |
 | **Agent/client** | User's delegated goal, which candidate to inspect/invoke next, presentation to humans where appropriate | Treating untrusted service text as privileged instructions or bypassing the service's authorization |
 
@@ -32,7 +32,7 @@ The framework's exact validation/enforcement features are not yet specified. **D
 
 | Example use case | Should ANWA provide a way? | Who decides what actually happens? |
 | --- | --- | --- |
-| Order is a Thing, versus OrderService is a Thing | Both styles should be representable where practical; **ANWA does not prescribe Thing granularity** | Application developer |
+| An order is modeled per record or via a service API | Both can be exposed through standalone Interactions and ordinary typed IDs; **ANWA has no Thing abstraction** | Application developer |
 | A cancellation has a guard involving a shipping provider | A named guard and a structured result should be expressible; implementation may be ordinary code | Application developer |
 | An interaction yields relevant shipment links and next actions | Result Context should be able to carry such references and explanations | Application developer supplies/selects them; framework transports/exposes them |
 | A domain defines `draft → pending → paid` | State/transition metadata may be expressible if useful, but **not mandatory for every app** | Application developer |
@@ -76,7 +76,7 @@ For each proposed feature, write down:
 
 ## Current ANWA thesis
 
-ANWA is an **Interaction-first, schema-first, protocol-agnostic framework concept**. Implementers declare standalone Interactions and their meanings, inputs and outcomes. The runtime provides `Outcome + context.next` with app-selected candidates. Things are optional application metadata, not required parents of Interactions.
+ANWA is an **Interaction-first, schema-first, protocol-agnostic framework concept**. Implementers declare standalone Interactions and their meanings, inputs and outcomes. Each bound Handler returns `Outcome + context.next` with its own candidate continuations. **Thing is not an ANWA Core concept.**
 
 This statement does **not** decide how a particular application is structured or require state machines, named guards, links or streaming for every use case.
 
