@@ -1,0 +1,64 @@
+{
+  "anwa": "0.1",
+  "entrypoints": [
+    {
+      "type": "Calculator",
+      "id": "main"
+    }
+  ],
+  "things": {
+    "Calculator": {
+      "title": "Calculator",
+      "description": "A stateless arithmetic service with no guards or state machine.",
+      "actions": {
+        "add": {
+          "description": "Add two numbers.",
+          "input": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "number"
+              },
+              "b": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "a",
+              "b"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "number"
+          }
+        },
+        "divide": {
+          "description": "Divide a by b; division by zero is a typed domain failure.",
+          "input": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "number"
+              },
+              "b": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "a",
+              "b"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "number"
+          },
+          "errors": {
+            "DIVIDE_BY_ZERO": "The divisor must be nonzero."
+          }
+        }
+      }
+    }
+  }
+}
