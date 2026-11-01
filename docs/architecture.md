@@ -51,6 +51,14 @@ This preflight **does not** replace application authorization, atomic state tran
 
 An unguarded Interaction simply returns `reply(ok(value), next)` or `reply(fail(code), next)`. There is **no app-level Context callback**. The Runtime does not choose the next business step.
 
+## Authentication and authorization
+
+A trusted transport Adapter authenticates the caller and passes `{caller:{subject,claims?}}` as a **separate RequestContext**, never as public Interaction input. The reference does not authenticate or cryptographically verify this object; network adapters must guarantee its provenance.
+
+Named Guards now protect **Queries, Actions and Events**. Binding is default-deny: unguarded Interactions require an explicit `public` allowlist. Queries/Actions use `{run,onDenied}` and Event subscriptions use guarded `{run}`. `catalog(request)` and `discover(ref,request)` filter descriptions using a coarse `discoverable` policy; actual per-resource decisions remain in the Guard at invocation.
+
+[Authentication and authorization details](authentication-authorization.md).
+
 ## Schema-derived TypeScript types
 
 The author-maintained `anwa.json` is the source of truth. `bun run codegen` produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
