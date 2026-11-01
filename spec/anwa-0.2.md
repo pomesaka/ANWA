@@ -79,7 +79,7 @@ await app.interact("calculator.add", { a: 2, b: 3 });
 ```
 
 - `catalog()` returns version, entrypoint InteractionRefs and a summary of published Interactions.
-- `discover(ref)` resolves and returns an Interaction's description with runtime `context`.
+- `discover(ref)` resolves a published Interaction description and returns an empty navigation Context in this in-process profile.
 - `interact(ref,input?)` validates the supported input schema and runs a Query or Action.
 - `observe(ref,input?,options?)` subscribes to an Event's application-provided `AsyncIterable`.
 
@@ -87,7 +87,7 @@ An order ID, a report ID, a payment ID or an execution ID is just app-declared t
 
 ## Outcome and contextual next Interactions
 
-Every **delivered application-level** result contains an `outcome` and a `context`. A result can be settled success, settled domain failure, or (when supported) accepted async execution.
+Every **delivered application-level** result contains an `outcome` and a `context`. The **owning Interaction Handler constructs both** via `reply(result, next)`; no application-wide `context` resolver exists. A result can be settled success, settled domain failure, or accepted async execution. A bare `ok(...)` without `reply(...)` is a contract violation.
 
 ```json
 {
@@ -145,14 +145,14 @@ The execution identifier is an opaque handle. `execution.status`, `execution.res
 
 ## Tooling, demos and limitations
 
-- [Reference runtime](../src/anwa.mjs)
-- [Schema validator / generated types](../src/schema-tools.mjs)
+- [TypeScript reference runtime](../src/anwa.ts)
+- [TypeScript schema validator / generated types](../src/schema-tools.ts)
 - [Machine-readable ANWA 0.2 schema](anwa-0.2.schema.json)
 - [Calculator, Orders and Reports demos](../demo/README.md)
 
-Run `npm run validate`, `npm run types:orders`, `npm test`, and `npm run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
+Using **Bun ^1.4.4**, run `bun install --frozen-lockfile`, `bun run validate`, `bun run types:orders`, `bun fmt --check src demo test tools`, `bunx oxlint src demo test tools`, `bun check`, `bun test`, and `bun run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
 
-The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. Federation/external API delegation and protocol adapters remain future topics.
+The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. Optional named Guards must be explicitly assessed by their own Handler; ANWA does not automatically enforce application authorization. Federation/external API delegation and protocol adapters remain future topics.
 
 **W3C WoT Thing Descriptions are Thing-centered. ANWA's core intentionally is not.** A future WoT adapter may represent an ANWA application through whatever compatible mapping it can support, but must not impose WoT's Thing concept on ANWA's schema or claim unsupported conformance.
 
