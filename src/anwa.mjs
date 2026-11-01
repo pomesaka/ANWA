@@ -73,8 +73,7 @@ export class AnwaApp {
       entrypoints:[...this.schema.entrypoints],
       interactions:Object.entries(this.schema.interactions).map(([ref,spec])=>({
         ref,kind:spec.kind,description:spec.description
-      })),
-      ...(this.schema.things?{things:this.schema.things}:{})
+      }))
     };
   }
   describe(ref){
