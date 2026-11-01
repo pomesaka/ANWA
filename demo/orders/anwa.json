@@ -21,16 +21,21 @@
             "type": "object",
             "properties": {
               "status": {
-                "type": "string"
+                "type": "string",
+                "description": "Current fulfillment state of this order."
               },
               "id": {
-                "type": "string"
+                "type": "string",
+                "description": "Application-assigned order identifier."
               }
             },
             "required": [
               "status",
               "id"
             ]
+          },
+          "errors": {
+            "NOT_FOUND": "The order could not be found."
           }
         }
       },
@@ -42,7 +47,8 @@
             "type": "object",
             "properties": {
               "reason": {
-                "type": "string"
+                "type": "string",
+                "description": "Human-provided explanation for requesting cancellation."
               }
             },
             "required": [
@@ -53,7 +59,8 @@
             "type": "object",
             "properties": {
               "status": {
-                "type": "string"
+                "type": "string",
+                "description": "New order status after successful cancellation."
               }
             },
             "required": [
@@ -62,7 +69,9 @@
           },
           "errors": {
             "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
-            "NOT_FOUND": "The order was not found."
+            "NOT_FOUND": "The order was not found.",
+            "ALREADY_CANCELLED": "The order has already been cancelled.",
+            "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
           }
         }
       },
@@ -80,7 +89,11 @@
         "tracking": {
           "description": "Read the current shipment status.",
           "output": {
-            "type": "string"
+            "type": "string",
+            "description": "Current tracking state."
+          },
+          "errors": {
+            "NOT_FOUND": "The shipment could not be found."
           }
         }
       }

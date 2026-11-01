@@ -17,7 +17,8 @@
             "type": "object",
             "properties": {
               "topic": {
-                "type": "string"
+                "type": "string",
+                "description": "Subject of the report to generate."
               }
             },
             "required": [
@@ -34,13 +35,22 @@
         "status": {
           "description": "Read the execution status.",
           "output": {
-            "type": "string"
+            "type": "string",
+            "description": "Current execution lifecycle state."
+          },
+          "errors": {
+            "NOT_FOUND": "The execution could not be found."
           }
         },
         "result": {
           "description": "Read the completed report or a typed NOT_READY failure.",
           "output": {
-            "type": "string"
+            "type": "string",
+            "description": "Completed report text when the execution succeeds."
+          },
+          "errors": {
+            "NOT_FOUND": "The execution could not be found.",
+            "NOT_READY": "The execution has not completed. Inspect status or wait before trying again."
           }
         }
       },

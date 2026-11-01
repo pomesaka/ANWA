@@ -94,7 +94,15 @@
           "minLength": 1
         },
         "errors": {
-          "type": "object"
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!INVALID_INPUT$|UNEXPECTED_ERROR$)[A-Z][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Exhaustive set of domain failure codes this interaction may return; runtime-generated INVALID_INPUT and UNEXPECTED_ERROR are reserved."
         }
       }
     },

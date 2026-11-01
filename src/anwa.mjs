@@ -1,3 +1,4 @@
+import { validateManifest } from "./schema-tools.mjs";
 /** Dependency-free ANWA 0.1 in-memory reference adapter; NOT production ready. */
 export const thing = (type, id) => ({ type, id: String(id) });
 export const interaction = (target, kind, name) => ({ thing: target, kind, name });
@@ -8,6 +9,10 @@ export const fail = (code, message, extra = {}) => ({
 export const accepted = execution => ({ kind: "accepted", execution });
 const emptyContext = () => ({ links: [], affordances: [] });
 const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+const RESERVED_ERRORS = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
+const unexpected = () => fail("UNEXPECTED_ERROR", "Unexpected application failure", {
+  effects: "unknown"
+});
 
 function validate(schema, value, at = "$") {
   if (!schema) return null;
@@ -51,15 +56,10 @@ function assertRef(ref) {
 
 export class AnwaApp {
   constructor(schema) {
-    if (schema?.anwa !== "0.1" || !schema.things || typeof schema.things !== "object") {
-      throw new Error("Expected ANWA 0.1 schema with things");
-    }
-    if (!Array.isArray(schema.entrypoints) || schema.entrypoints.length === 0) {
-      throw new Error("Expected at least one entrypoint");
-    }
-    for (const entry of schema.entrypoints) {
-      assertRef(entry);
-      if (!schema.things[entry.type]) throw new Error("Undeclared entrypoint type: " + entry.type);
+    const diagnostics = validateManifest(schema);
+    if (diagnostics.length) {
+      throw new Error("ANWA schema validation failed:\n" +
+        diagnostics.map(d => d.path + ": " + d.message).join("\n"));
     }
     this.schema = schema;
     this.bindings = new Map();
@@ -91,9 +91,16 @@ export class AnwaApp {
         }
       }
     }
-    for (const action of Object.values(model.actions ?? {})) {
-      if (action.guard && typeof guards[action.guard] !== "function") {
-        throw new Error("Missing guard implementation: " + type + "." + action.guard);
+    for (const [kind, bucket] of [["properties", model.properties], ["actions", model.actions], ["events", model.events]]) {
+      for (const [name, spec] of Object.entries(bucket ?? {})) {
+        for (const code of Object.keys(spec.errors ?? {})) {
+          if (RESERVED_ERRORS.has(code)) {
+            throw new Error("Reserved framework error code: " + type + "." + name + "." + code);
+          }
+        }
+        if (kind === "actions" && spec.guard && typeof guards[spec.guard] !== "function") {
+          throw new Error("Missing guard implementation: " + type + "." + spec.guard);
+        }
       }
     }
     if (typeof context !== "function") throw new Error("context must be a function");
@@ -123,10 +130,18 @@ export class AnwaApp {
           ref: interaction(target, kind, name),
           description: spec.description,
           ...(spec.input ? { input: spec.input } : {}),
-          ...(spec.output ? { output: spec.output } : {})
+          ...(spec.output ? { output: spec.output } : {}),
+          ...(spec.errors ? { errors: spec.errors } : {})
         }))),
       links: model.links ?? {}
     };
+  }
+
+  #assertDeclaredError(spec, error) {
+    if (typeof error?.code !== "string" || !error.code ||
+        RESERVED_ERRORS.has(error.code) || !own(spec.errors ?? {}, error.code)) {
+      throw new Error("Undeclared or invalid application error");
+    }
   }
 
   async assess(target, actionName) {
@@ -136,6 +151,7 @@ export class AnwaApp {
     if (typeof decision?.allowed !== "boolean" || (!decision.allowed && !decision.error?.code)) {
       throw new Error("Invalid guard decision for " + target.type + "." + actionName);
     }
+    if (!decision.allowed) this.#assertDeclaredError(spec, decision.error);
     return decision;
   }
 
@@ -186,20 +202,29 @@ export class AnwaApp {
               const bad = validate(spec.output, result.value);
               if (bad) throw new Error("Output contract violated: " + bad);
             }
+            if (!result.ok) this.#assertDeclaredError(spec, result.error);
             outcome = { kind: "settled", result };
           } else {
             throw new Error("Handler returned invalid Result");
           }
         }
       } catch {
-        // Application exceptions should not expose internal details to untrusted clients.
-        outcome = { kind: "settled", result: fail("INTERNAL_ERROR", "The interaction failed unexpectedly") };
+        // Undeclared domain errors and unexpected exceptions share one opaque framework error.
+        outcome = { kind: "settled", result: unexpected() };
       }
     }
-    const raw = await binding.context({
-      thing: ref.thing, interaction: ref, outcome, phase: "result", app: this
-    });
-    return { outcome, context: this.#context(raw) };
+    try {
+      const raw = await binding.context({
+        thing: ref.thing, interaction: ref, outcome, phase: "result", app: this
+      });
+      return { outcome, context: this.#context(raw) };
+    } catch {
+      // Handler side effects may already have occurred; do not imply a safe retry.
+      return {
+        outcome: { kind: "settled", result: unexpected() },
+        context: emptyContext()
+      };
+    }
   }
 
   observe(ref, options = {}) {

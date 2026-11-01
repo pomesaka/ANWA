@@ -24,6 +24,15 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 | How much does ANWA actually validate, expose or guarantee? | Distinguish representable, runtime-supported, automatically-derived and conformant behavior |
 | How does **extensibility** work without turning every domain concern into a new core field? | Avoid prematurely standardizing use-case-specific policy |
 
+## Newly bounded decisions
+
+- **Domain error completeness:** expected domain codes must be declared; undeclared codes become `UNEXPECTED_ERROR`. Actual auditing and source error mapping still need design.
+- **Schema-first tooling:** generate types/interfaces and validate schema + bound implementations; business logic remains authored code.
+- **External API delegation:** desirable future capability, not part of the current app-scoped Ref profile.
+- **AI readability:** the existing format is machine-readable but agent performance is not yet empirically measured; investigate compact Discovery and semantic field descriptions.
+
+[Schema authoring notes](schema-authoring.md) document current validation coverage.
+
 ## P1 — Cross-cutting framework capabilities
 
 | Question ANWA owns | What not to prescribe |
