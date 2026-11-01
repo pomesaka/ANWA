@@ -43,18 +43,31 @@ export function createOrders(): AnwaApp<typeof schema> {
         return reply(ok({ id: item.id, status: item.status }), next);
       },
 
-      "order.cancel": async ({ input }) => {
-        const order = orders.get(input.orderId);
-        const decision = await app.assess("order.cancel", input);
-        if (!decision.allowed) {
+      "order.cancel": {
+        // The runtime checks canCancel before calling run.
+        run: async ({ input }) => {
+          const order = orders.get(input.orderId);
+          // Atomic state validation remains an application/storage responsibility.
+          if (!order || order.status !== "pending")
+            return reply(fail("ORDER_STATE_CHANGED", "Order changed during cancellation"));
+          order.status = "cancelled";
+          return reply(ok({ status: order.status }), [
+            {
+              ref: "order.get",
+              input: { orderId: order.id },
+              guidance: { level: "recommended" },
+            },
+          ]);
+        },
+        // Only this Interaction owns the Context returned on a Guard denial.
+        onDenied: ({ input }) => {
+          const order = orders.get(input.orderId);
           const next: NextInteraction[] = order
-            ? [
-                {
-                  ref: "order.get",
-                  input: { orderId: order.id },
-                  guidance: { level: "available" },
-                },
-              ]
+            ? [{
+                ref: "order.get",
+                input: { orderId: order.id },
+                guidance: { level: "available" },
+              }]
             : [];
           if (order?.status === "shipped")
             next.push({
@@ -62,21 +75,8 @@ export function createOrders(): AnwaApp<typeof schema> {
               input: { shipmentId: order.shipmentId },
               guidance: { level: "recommended" },
             });
-          return reply({ ok: false, error: decision.error }, next);
-        }
-        // Application-owned state transition; production storage must be atomic.
-        if (!order || order.status !== "pending")
-          return reply(
-            fail("ORDER_STATE_CHANGED", "Order changed during cancellation"),
-          );
-        order.status = "cancelled";
-        return reply(ok({ status: order.status }), [
-          {
-            ref: "order.get",
-            input: { orderId: order.id },
-            guidance: { level: "recommended" },
-          },
-        ]);
+          return next;
+        },
       },
 
       "shipment.track": async ({ input }) => {
