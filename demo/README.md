@@ -1,30 +1,28 @@
-# ANWA v0.2 — Executable Interaction-first demos
+# ANWA v0.2 — TypeScript demos on Bun ^1.4.4
 
-These are dependency-free Node.js **in-process** applications, not network services or a released framework.
+These examples are **in-process**. They are not deployed services, or a production runtime.
 
 ```bash
-npm run validate
-npm run types:orders
-npm test
-npm run demo
+bun install --frozen-lockfile
+bun run validate
+bun run types:orders
+bun fmt --check src demo test tools
+bun lint src demo test tools
+bun check
+bun test
+bun run demo
 ```
 
-| Demo                      | Declared Interactions                                                          | Things                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| [Calculator](calculator/) | `calculator.add`, `calculator.divide`                                          | **None**: pure service operations with typed results                                          |
-| [Orders](orders/)         | `order.get`, `order.cancel`, `shipment.track`                                  | **Optional metadata** for Order/Shipment; handlers receive orderId/shipmentId as normal input |
-| [Reports](reports/)       | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | **None**: accepted execution ID is data, not an Execution Thing                               |
+| Demo | First-class Interactions | What it demonstrates |
+| --- | --- | --- |
+| [Calculator](calculator/) | `calculator.add`, `calculator.divide` | Standalone pure operations, empty Context and typed domain errors |
+| [Orders](orders/) | `order.get`, `order.cancel`, `shipment.track` | Optional named Guard evaluated by the cancellation Handler; it returns its own contextual alternatives |
+| [Reports](reports/) | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | Async execution without a Thing, Event observation, a contextual timed retry |
 
-Each example has an `anwa.json` manifest and an `index.mjs` implementation, bound directly by InteractionRef using [the runtime](../src/anwa.mjs).
+Every app has an `anwa.json` schema and an **`index.ts`** implementation. The [TypeScript runtime](../src/anwa.ts) binds operations by InteractionRef. No `things` or `subjectType` declarations are present.
 
-### What this demonstrates
+Each Handler returns `reply(result, next)`. A simple operation uses `reply(ok(value))`, which contains `next: []`. A domain failure can provide recommended next Interactions or a timed retry. There is no application-wide Context resolver.
 
-- `app.bind({"report.generate": handler, ...})` — no Thing parent is necessary.
-- `catalog()` and `discover("execution.status")` describe individual Interactions.
-- `interact("execution.result", {executionId})` reads a result; `observe("execution.updates", {executionId})` observes events.
-- Both success and failure have `Outcome + Context`.
-- A `context.next` candidate can include an InteractionRef plus the input needed to target an instance. A retry is the **same ref** with `guidance.kind: "retry"` and optional `when.after`.
+Orders uses in-memory Maps rather than transactions; Reports uses short-lived async work rather than durable jobs. These are examples of expressive power, not ANWA-mandated application architectures.
 
-The Orders demo uses an in-memory Map rather than transactional storage. Reports uses ephemeral asynchronous work with no restart safety or guaranteed delivery. Guards and Context are implemented in ordinary code; ANWA does not infer the workflow.
-
-[v0.2 contract](../spec/anwa-0.2.md) · [Machine-readable schema](../spec/anwa-0.2.schema.json) · [README](../README.md)
+[v0.2 contract](../spec/anwa-0.2.md) · [README](../README.md)
