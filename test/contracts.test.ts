@@ -7,7 +7,6 @@ import {
   ok,
   reply,
   type Manifest,
-  type InteractionResponse,
 } from "../src/anwa.ts";
 import { validateManifest, generateTypes } from "../src/schema-tools.ts";
 
