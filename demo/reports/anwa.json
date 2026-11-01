@@ -1,0 +1,54 @@
+{
+  "anwa": "0.1",
+  "entrypoints": [
+    {
+      "type": "ReportService",
+      "id": "main"
+    }
+  ],
+  "things": {
+    "ReportService": {
+      "title": "Report generation service",
+      "description": "Starts a background document-generation execution.",
+      "actions": {
+        "generate": {
+          "description": "Accept a report generation request and return an execution reference.",
+          "input": {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "topic"
+            ]
+          }
+        }
+      }
+    },
+    "Execution": {
+      "title": "Report execution",
+      "description": "An in-memory execution with status and replayable events for this demo only.",
+      "properties": {
+        "status": {
+          "description": "Read the execution status.",
+          "output": {
+            "type": "string"
+          }
+        },
+        "result": {
+          "description": "Read the completed report or a typed NOT_READY failure.",
+          "output": {
+            "type": "string"
+          }
+        }
+      },
+      "events": {
+        "updates": {
+          "description": "Observe ordered progress, content chunks, and the final Interaction Result."
+        }
+      }
+    }
+  }
+}
