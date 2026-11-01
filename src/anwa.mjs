@@ -146,7 +146,8 @@ export class AnwaApp {
 
   #assertDeclaredError(spec, error) {
     if (typeof error?.code !== "string" || !error.code ||
-        RESERVED_ERRORS.has(error.code) || !own(spec.errors ?? {}, error.code)) {
+        RESERVED_ERRORS.has(error.code) || own(error, "retry") ||
+        !own(spec.errors ?? {}, error.code)) {
       throw new Error("Undeclared or invalid application error");
     }
   }
