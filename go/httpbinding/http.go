@@ -32,6 +32,12 @@ type Options struct {
 	MaxBodyBytes int64
 }
 
+// explicitNullInput preserves the difference between an omitted input and an
+// explicit JSON null, without changing the in-process Go App interface.
+type explicitNullInput struct{}
+
+func (explicitNullInput) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
 type invokeEnvelope struct {
 	Ref   string          `json:"ref"`
 	Input json.RawMessage `json:"input,omitempty"`
@@ -175,11 +181,15 @@ func New(runtime Runtime, options Options) (http.Handler, error) {
 		}
 		var input any
 		if envelope.Input != nil {
-			dec := json.NewDecoder(strings.NewReader(string(envelope.Input)))
-			dec.UseNumber()
-			if err := dec.Decode(&input); err != nil {
-				writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
-				return
+			if string(envelope.Input) == "null" {
+				input = explicitNullInput{}
+			} else {
+				dec := json.NewDecoder(strings.NewReader(string(envelope.Input)))
+				dec.UseNumber()
+				if err := dec.Decode(&input); err != nil {
+					writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
+					return
+				}
 			}
 		}
 		result, err := runtime.Interact(r.Context(), envelope.Ref, input, ctx)
