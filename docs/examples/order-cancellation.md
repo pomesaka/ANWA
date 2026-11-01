@@ -1,6 +1,6 @@
 # Worked example — schema-first order cancellation
 
-> **Illustrative only.** The YAML/TypeScript below is **not** valid WoT Thing Model or an implemented ANWA API. Its purpose is to align schema authoring, guard execution and the contextual Result model.
+> **Illustrative test case only; not a recommended way to model all applications.** The YAML/TypeScript below is **not** valid WoT Thing Model or an implemented ANWA API. It tests whether ANWA *allows* an application author to expose an Action, a named code-backed Guard, related resource links and Outcome + Context. **ANWA does not choose Order as a Thing, require a statechart or automatically infer which links to return.**
 
 ## 1. Author the public contract
 
@@ -126,15 +126,15 @@ Example domain failure (not transport failure):
 }
 ```
 
-If cancellation succeeds, the same outer shape would return `ok: true` and links/affordances relevant to the **new** state. Neither the application nor ANWA instructs the agent which next operation it must choose.
+If cancellation succeeds, the same outer shape could return `ok: true` and links/affordances **selected or supplied by the application** for the new context (or empty arrays). Neither the application nor ANWA instructs the agent which next operation it must choose.
 
 ## Design tradeoffs exposed by this example
 
 - **Avoid duplicating guard conditions.** Schema holds a named contract; code owns logic. Declared states/transitions remain useful but not fully enforced without transactional checks.
 - **Guards may be slow or expensive.** The runtime must define when to evaluate applicability and when to return `unknown`.
 - **Discovery can leak information.** Guard decisions and blocked-reason descriptions need policy-aware filtering.
-- **Link and affordance resolvers are needed.** A schema cannot infer current linked IDs or the best next action from arbitrary code.
+- **Link and affordance data are application choices.** ANWA may offer resolvers and common result fields but cannot infer current linked IDs, relevance, or the best next action from arbitrary code.
 - **Structured failures are important.** A named, machine-readable reason helps clients understand an error, but does not guarantee safe recovery.
 - **WoT compatibility is still open.** This illustrative YAML is a proposed ANWA authoring notation; it is not WoT TD/TM syntax.
 
-[Architecture](../architecture.md) · [Interaction model](../interaction-model.md) · [Glossary](../glossary.md)
+[Scope](../scope-and-boundaries.md) · [Architecture](../architecture.md) · [Interaction model](../interaction-model.md) · [Glossary](../glossary.md)
