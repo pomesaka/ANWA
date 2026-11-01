@@ -10,7 +10,7 @@
 
 A human can discover what a web application does by navigating pages and forms. An AI agent should instead be able to **discover application semantics and interactions**, retrieve state, invoke operations, and get enough context to decide where to go next.
 
-ANWA explores an **OpenAPI-like, schema-first development experience**: implementing agents or application authors declare **standalone Interactions** and bind them to ordinary handlers. **Thing modeling is optional**: no Interaction must be nested under an entity or service Thing. The framework exposes what the application chooses to publish; it does not decide domain structure or business workflows.
+ANWA explores an **OpenAPI-like, schema-first development experience**: implementing agents or application authors declare **standalone Interactions** and bind them to ordinary handlers. **Thing is not part of ANWA Core**: an Interaction is independently described, discovered and invoked. The framework exposes what the application chooses to publish; it does not decide domain structure or business workflows.
 
 **Core principle:** *Every delivered application-level interaction result contains an outcome and the context for what can come next.*
 
@@ -30,13 +30,13 @@ flowchart TB
 
 ### 1. Define the public contract
 
-Declare top-level **Interactions** (`query`, `action`, `event`), inputs/outputs, expected errors and optional guards. **Thing metadata is optional**; business entity IDs are regular input fields, not mandatory Thing references.
+Declare top-level **Interactions** (`query`, `action`, `event`), inputs/outputs, expected errors and optional guards. **No `things` or `subjectType` field exists in the active schema**; domain identifiers are ordinary typed input/output values.
 
 **The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
 
 ### 2. Implement behavior
 
-Application authors choose domain boundaries, states, policies and follow-up candidates. They bind InteractionRefs directly to handlers and optional guards in ordinary code. Where relevant, the **same named guard** may support Discovery-time applicability hints and Invocation-time checks. Real authorization and transactional enforcement still happen on the server.
+Application authors choose domain boundaries, states, policies and follow-up candidates. Each Interaction Handler constructs its **own `Outcome + Context`**, using `reply(result, next)`; there is **no application-wide Context resolver**. An optional named guard can be explicitly evaluated by its owning handler with `app.assess(ref, input)`. Authorization and atomic state transitions remain application responsibilities.
 
 ### 3. Serve a navigable application
 
@@ -44,7 +44,7 @@ Two **logical** interfaces—not necessarily two wire protocols:
 
 | Interface | Responsibility |
 | --- | --- |
-| **Discovery** | Expose declared Interactions, types, semantic annotations and optionally Thing metadata, without requiring a Thing parent |
+| **Discovery** | Expose standalone Interaction descriptions and declared types, without a Thing parent or dynamic Context resolver |
 | **Interaction** | Read, invoke and observe; return **Outcome + Context**, with a single `context.next` list of next standalone Interactions and optional prebound inputs, guidance/timing |
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
@@ -53,15 +53,19 @@ Interaction may complete immediately with a typed `Result<Success, Error>`, or o
 
 ## Executable v0.2 interaction-first contract lab
 
-The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [in-process runtime](src/anwa.mjs), [schema tooling](src/schema-tools.mjs) and [three runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
+The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [schema tooling](src/schema-tools.ts) and [three runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
 
 ```bash
-# Node.js >=20, no runtime dependencies
-npm test
-npm run demo
+# Bun ^1.4.4
+bun install --frozen-lockfile
+bun fmt --check src demo test tools
+bun lint src demo test tools
+bun check
+bun test
+bun run demo
 ```
 
-The demos use first-class InteractionRefs: [stateless Calculator](demo/calculator/), [Orders](demo/orders/) with **optional Thing metadata**, and [async Reports](demo/reports/) with **no Execution Thing**. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
+The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, and [async Reports](demo/reports/) with opaque execution IDs. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
 
 **v0.2 is a breaking experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for historical design context.
 
@@ -70,10 +74,10 @@ The demos use first-class InteractionRefs: [stateless Calculator](demo/calculato
 ANWA's experimental v0.2 Schema-first workflow includes **contract validation**, **type/interface generation** and a **diagnostic schema view**. These tools do not generate business logic. **Human ease of writing the manifest is not a design target**: the contract is primarily for implementing agents and consuming agents.
 
 ```bash
-npm run validate       # validates demo manifests against the supported schema subset
-npm run types:orders   # generates TypeScript handler interfaces
-npm run inspect:orders # renders schema meaning, fields and domain errors as Markdown
-npm test               # validates declared errors against runtime behavior
+bun run validate       # validates demo manifests against the supported schema subset
+bun run types:orders   # generates TypeScript handler interfaces
+bun run inspect:orders # renders schema meaning, fields and domain errors as Markdown
+bun test               # validates declared errors against runtime behavior
 ```
 
 For an Action that declares `errors`, **all expected domain error codes must be listed**. An undeclared domain error becomes opaque `UNEXPECTED_ERROR`; `INVALID_INPUT` is framework input validation. **Retries and other follow-up interactions use one `context.next` list**: `guidance.kind: "retry"`, optional `guidance.level`, and optional `when.after`. There is no separate `error.retry`.
@@ -86,9 +90,9 @@ ANWA uses **W3C Web of Things (WoT)** concepts for comparison, but the v0.2 core
 
 | WoT term | Working use in ANWA |
 | --- | --- |
-| Thing / Thing Description | Optional metadata for app domain concepts; not required to own an Interaction |
+| Thing / Thing Description | WoT prior art for adapters/research; **not present in ANWA Core** |
 | Property / Action / Event Affordance | Prior-art Thing-bound concepts; ANWA uses top-level `query` / `action` / `event` |
-| Link | Related resource/Thing |
+| Link | WoT relation concept; ANWA's current continuation contract is `context.next` |
 | DataSchema / Form | Typed data and a protocol-specific interaction binding |
 
 **WoT Interaction Affordance describes an offered interaction; it does not mean an action is currently authorized or guaranteed to succeed.** ANWA is investigating separate **contextual applicability** hints, plus a common Result + Context response. These are proposed ANWA abstractions, **not WoT TD 1.1 fields**.
@@ -159,8 +163,8 @@ Corrections, competing prior art and design feedback are welcome via issues or P
 
 ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探索・理解・操作できるWebアプリケーション**を作るための、Schema-firstなフレームワーク構想です。
 
-開発者はOpenAPIのような公開スキーマで必要なThingやActionなどを宣言し、GuardやActionのビジネスロジックは通常のコードで実装します。状態機械やGuard、関連リソースの設計をすべてのアプリに要求するわけではありません。ANWAは、開発者が選んだ意味・関係・操作と、成功・失敗のOutcome + ContextをAIに公開する共通の仕組みを目指します。Thingの粒度、業務フロー、次に何を提示するかはアプリケーション実装者の選択です。
+実装エージェントは公開スキーマにInteractionを定義し、TypeScriptのHandlerで各操作の結果と`context.next`を返します。ANWA CoreにThingはありません。ガード・業務ルール・永続化・次に提示する操作はアプリケーション実装者が決めます。
 
-WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。現在のv0.2ではInteractionをThingに属させず単独で公開・発見・実行できます。Thingは任意のメタデータです。実験実装と動作デモはありますが、製品向けの安全性や互換性は保証していません。
+WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。現在のv0.2ではInteractionをThingなしで公開・発見・実行します。Runtime・デモ・テストはBun ^1.4.4 / TypeScriptです。実験実装と動作デモはありますが、製品向けの安全性や互換性は保証していません。
 
 </details>
