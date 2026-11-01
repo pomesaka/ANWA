@@ -132,7 +132,8 @@ export class AnwaApp {
           ref: interaction(target, kind, name),
           description: spec.description,
           ...(spec.semanticTypes ? { semanticTypes: spec.semanticTypes } : {}),
-          ...(spec.effectKinds ? { effectKinds: spec.effectKinds } : {}),
+          ...(spec.hasSideEffects !== undefined ? { hasSideEffects: spec.hasSideEffects } : {}),
+          ...(spec.idempotent !== undefined ? { idempotent: spec.idempotent } : {}),
           ...(spec.input ? { input: spec.input } : {}),
           ...(spec.output ? { output: spec.output } : {}),
           ...(spec.errors ? { errors: spec.errors } : {})
