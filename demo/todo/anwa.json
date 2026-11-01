@@ -8,6 +8,252 @@
     "task.search",
     "task.plan"
   ],
+  "$defs": {
+    "Task": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task identifier"
+        },
+        "workspaceId": {
+          "type": "string",
+          "description": "Workspace identifier"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Project identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Concise title"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "todo",
+            "in_progress",
+            "blocked",
+            "done"
+          ],
+          "description": "Current or computed effective status"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ],
+          "description": "Task priority"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Tag"
+          },
+          "description": "Tags"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Task identifier"
+          },
+          "description": "Task dependencies"
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether archived"
+        },
+        "version": {
+          "type": "integer",
+          "description": "Optimistic concurrency version"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "Task identifier"
+        },
+        "dueAt": {
+          "type": "string",
+          "description": "ISO 8601 date/time"
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Member subject"
+        },
+        "recurrenceDays": {
+          "type": "integer",
+          "description": "Recur every N days"
+        },
+        "originId": {
+          "type": "string",
+          "description": "Task identifier"
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "ISO time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO time"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "string",
+                "description": "Author"
+              },
+              "body": {
+                "type": "string",
+                "description": "Comment"
+              },
+              "at": {
+                "type": "string",
+                "description": "Time"
+              }
+            },
+            "required": [
+              "author",
+              "body",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Comments"
+        }
+      },
+      "required": [
+        "id",
+        "workspaceId",
+        "projectId",
+        "title",
+        "status",
+        "priority",
+        "tags",
+        "dependencies",
+        "archived",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "Project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Project identifier"
+        },
+        "workspaceId": {
+          "type": "string",
+          "description": "Workspace identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Concise title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description"
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Archived"
+        },
+        "version": {
+          "type": "integer",
+          "description": "Version"
+        }
+      },
+      "required": [
+        "id",
+        "workspaceId",
+        "name",
+        "archived",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "SavedQuery": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Search phrase"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Project identifier"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "todo",
+            "in_progress",
+            "blocked",
+            "done"
+          ],
+          "description": "Current or computed effective status"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ],
+          "description": "Task priority"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Tag"
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Assigned member"
+        },
+        "dueBefore": {
+          "type": "string",
+          "description": "Date"
+        },
+        "includeArchived": {
+          "type": "boolean",
+          "description": "Archived"
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": [
+            "dueAt",
+            "priority",
+            "createdAt",
+            "updatedAt",
+            "title"
+          ],
+          "description": "Sort"
+        },
+        "descending": {
+          "type": "boolean",
+          "description": "Descending"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
   "interactions": {
     "workspace.create": {
       "kind": "action",
@@ -21,7 +267,9 @@
             "description": "Concise title"
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -40,7 +288,11 @@
               },
               "role": {
                 "type": "string",
-                "enum": ["owner", "editor", "viewer"],
+                "enum": [
+                  "owner",
+                  "editor",
+                  "viewer"
+                ],
                 "description": "Membership role"
               },
               "members": {
@@ -48,11 +300,18 @@
                 "description": "Member count"
               }
             },
-            "required": ["id", "name", "role", "members"],
+            "required": [
+              "id",
+              "name",
+              "role",
+              "members"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["workspace"],
+        "required": [
+          "workspace"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -85,7 +344,11 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": ["owner", "editor", "viewer"],
+                  "enum": [
+                    "owner",
+                    "editor",
+                    "viewer"
+                  ],
                   "description": "Membership role"
                 },
                 "members": {
@@ -93,12 +356,19 @@
                   "description": "Member count"
                 }
               },
-              "required": ["id", "name", "role", "members"],
+              "required": [
+                "id",
+                "name",
+                "role",
+                "members"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["workspaces"],
+        "required": [
+          "workspaces"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -123,11 +393,18 @@
           },
           "role": {
             "type": "string",
-            "enum": ["editor", "viewer"],
+            "enum": [
+              "editor",
+              "viewer"
+            ],
             "description": "Role"
           }
         },
-        "required": ["workspaceId", "subject", "role"],
+        "required": [
+          "workspaceId",
+          "subject",
+          "role"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -142,15 +419,23 @@
               },
               "role": {
                 "type": "string",
-                "enum": ["editor", "viewer"],
+                "enum": [
+                  "editor",
+                  "viewer"
+                ],
                 "description": "Role"
               }
             },
-            "required": ["subject", "role"],
+            "required": [
+              "subject",
+              "role"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["member"],
+        "required": [
+          "member"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -174,7 +459,9 @@
             "description": "Workspace identifier"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -191,16 +478,25 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": ["owner", "editor", "viewer"],
+                  "enum": [
+                    "owner",
+                    "editor",
+                    "viewer"
+                  ],
                   "description": "Role"
                 }
               },
-              "required": ["subject", "role"],
+              "required": [
+                "subject",
+                "role"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["members"],
+        "required": [
+          "members"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -220,7 +516,9 @@
             "description": "Workspace identifier"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -262,7 +560,12 @@
                 "description": "Done"
               }
             },
-            "required": ["todo", "in_progress", "blocked", "done"],
+            "required": [
+              "todo",
+              "in_progress",
+              "blocked",
+              "done"
+            ],
             "additionalProperties": false
           },
           "byProject": {
@@ -287,7 +590,12 @@
                   "description": "Completed"
                 }
               },
-              "required": ["projectId", "name", "total", "done"],
+              "required": [
+                "projectId",
+                "name",
+                "total",
+                "done"
+              ],
               "additionalProperties": false
             }
           }
@@ -327,45 +635,22 @@
             "description": "Description"
           }
         },
-        "required": ["workspaceId", "name"],
+        "required": [
+          "workspaceId",
+          "name"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "project": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "name": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "description": {
-                "type": "string",
-                "description": "Description"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Version"
-              }
-            },
-            "required": ["id", "workspaceId", "name", "archived", "version"],
-            "additionalProperties": false
+            "$ref": "#/$defs/Project"
           }
         },
-        "required": ["project"],
+        "required": [
+          "project"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -392,7 +677,9 @@
             "description": "Include archived"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -401,39 +688,13 @@
           "projects": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "name": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "description": {
-                  "type": "string",
-                  "description": "Description"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Version"
-                }
-              },
-              "required": ["id", "workspaceId", "name", "archived", "version"],
-              "additionalProperties": false
+              "$ref": "#/$defs/Project"
             }
           }
         },
-        "required": ["projects"],
+        "required": [
+          "projects"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -473,45 +734,23 @@
             "description": "Archived"
           }
         },
-        "required": ["workspaceId", "projectId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "projectId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "project": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "name": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "description": {
-                "type": "string",
-                "description": "Description"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Version"
-              }
-            },
-            "required": ["id", "workspaceId", "name", "archived", "version"],
-            "additionalProperties": false
+            "$ref": "#/$defs/Project"
           }
         },
-        "required": ["project"],
+        "required": [
+          "project"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -553,7 +792,12 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high", "urgent"],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
             "description": "Task priority"
           },
           "dueAt": {
@@ -580,141 +824,23 @@
             "description": "Interval days"
           }
         },
-        "required": ["workspaceId", "projectId", "title"],
+        "required": [
+          "workspaceId",
+          "projectId",
+          "title"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -743,141 +869,22 @@
             "description": "Task identifier"
           }
         },
-        "required": ["workspaceId", "taskId"],
+        "required": [
+          "workspaceId",
+          "taskId"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -918,7 +925,9 @@
             "description": "Offset"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -927,131 +936,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             },
             "description": "Matching tasks"
           },
@@ -1068,7 +953,12 @@
             "description": "Limit"
           }
         },
-        "required": ["items", "total", "offset", "limit"],
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1109,12 +999,20 @@
               },
               "priority": {
                 "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "urgent"
+                ],
                 "description": "Task priority"
               },
               "status": {
                 "type": "string",
-                "enum": ["todo", "in_progress"],
+                "enum": [
+                  "todo",
+                  "in_progress"
+                ],
                 "description": "Mutable status"
               },
               "dueAt": {
@@ -1145,141 +1043,24 @@
             "additionalProperties": false
           }
         },
-        "required": ["workspaceId", "taskId", "expectedVersion", "patch"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "expectedVersion",
+          "patch"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1313,145 +1094,27 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           },
           "spawnedId": {
             "type": "string",
             "description": "Task identifier"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1486,141 +1149,23 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1654,141 +1199,23 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1821,141 +1248,23 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -1992,141 +1301,24 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "dependsOnId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "dependsOnId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -2165,141 +1357,24 @@
             "description": "Version"
           }
         },
-        "required": ["workspaceId", "taskId", "dependsOnId", "expectedVersion"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "dependsOnId",
+          "expectedVersion"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -2342,12 +1417,20 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["todo", "in_progress"],
+                      "enum": [
+                        "todo",
+                        "in_progress"
+                      ],
                       "description": "Active state"
                     },
                     "priority": {
                       "type": "string",
-                      "enum": ["low", "medium", "high", "urgent"],
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high",
+                        "urgent"
+                      ],
                       "description": "Task priority"
                     },
                     "dueAt": {
@@ -2374,13 +1457,20 @@
                   "additionalProperties": false
                 }
               },
-              "required": ["taskId", "expectedVersion", "patch"],
+              "required": [
+                "taskId",
+                "expectedVersion",
+                "patch"
+              ],
               "additionalProperties": false
             },
             "description": "Updates"
           }
         },
-        "required": ["workspaceId", "updates"],
+        "required": [
+          "workspaceId",
+          "updates"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -2389,131 +1479,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             },
             "description": "Changed tasks"
           },
@@ -2522,7 +1488,10 @@
             "description": "Count"
           }
         },
-        "required": ["items", "count"],
+        "required": [
+          "items",
+          "count"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -2558,12 +1527,22 @@
           },
           "status": {
             "type": "string",
-            "enum": ["todo", "in_progress", "blocked", "done"],
+            "enum": [
+              "todo",
+              "in_progress",
+              "blocked",
+              "done"
+            ],
             "description": "Current or computed effective status"
           },
           "priority": {
             "type": "string",
-            "enum": ["low", "medium", "high", "urgent"],
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
             "description": "Task priority"
           },
           "tag": {
@@ -2588,7 +1567,13 @@
           },
           "sortBy": {
             "type": "string",
-            "enum": ["dueAt", "priority", "createdAt", "updatedAt", "title"],
+            "enum": [
+              "dueAt",
+              "priority",
+              "createdAt",
+              "updatedAt",
+              "title"
+            ],
             "description": "Sort order"
           },
           "descending": {
@@ -2604,7 +1589,9 @@
             "description": "Pagination offset"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -2613,131 +1600,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             },
             "description": "Matching tasks"
           },
@@ -2754,7 +1617,12 @@
             "description": "Limit"
           }
         },
-        "required": ["items", "total", "offset", "limit"],
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -2779,7 +1647,9 @@
             "description": "Project identifier"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -2788,525 +1658,34 @@
           "todo": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             }
           },
           "in_progress": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             }
           },
           "blocked": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             }
           },
           "done": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             }
           }
         },
-        "required": ["todo", "in_progress", "blocked", "done"],
+        "required": [
+          "todo",
+          "in_progress",
+          "blocked",
+          "done"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -3334,7 +1713,9 @@
             "description": "Count"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3343,131 +1724,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             }
           },
           "blocked": {
@@ -3475,7 +1732,10 @@
             "description": "Blocked count"
           }
         },
-        "required": ["items", "blocked"],
+        "required": [
+          "items",
+          "blocked"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -3504,141 +1764,23 @@
             "description": "Comment body"
           }
         },
-        "required": ["workspaceId", "taskId", "body"],
+        "required": [
+          "workspaceId",
+          "taskId",
+          "body"
+        ],
         "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
           "task": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "workspaceId": {
-                "type": "string",
-                "description": "Workspace identifier"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "title": {
-                "type": "string",
-                "description": "Concise title"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Tag"
-                },
-                "description": "Tags"
-              },
-              "dependencies": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "description": "Task dependencies"
-              },
-              "archived": {
-                "type": "boolean",
-                "description": "Whether archived"
-              },
-              "version": {
-                "type": "integer",
-                "description": "Optimistic concurrency version"
-              },
-              "notes": {
-                "type": "string",
-                "description": "Notes"
-              },
-              "parentId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "dueAt": {
-                "type": "string",
-                "description": "ISO 8601 date/time"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Member subject"
-              },
-              "recurrenceDays": {
-                "type": "integer",
-                "description": "Recur every N days"
-              },
-              "originId": {
-                "type": "string",
-                "description": "Task identifier"
-              },
-              "completedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "createdAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "updatedAt": {
-                "type": "string",
-                "description": "ISO time"
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "author": {
-                      "type": "string",
-                      "description": "Author"
-                    },
-                    "body": {
-                      "type": "string",
-                      "description": "Comment"
-                    },
-                    "at": {
-                      "type": "string",
-                      "description": "Time"
-                    }
-                  },
-                  "required": ["author", "body", "at"],
-                  "additionalProperties": false
-                },
-                "description": "Comments"
-              }
-            },
-            "required": [
-              "id",
-              "workspaceId",
-              "projectId",
-              "title",
-              "status",
-              "priority",
-              "tags",
-              "dependencies",
-              "archived",
-              "version"
-            ],
-            "additionalProperties": false
+            "$ref": "#/$defs/Task"
           }
         },
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -3667,63 +1809,14 @@
             "description": "Concise title"
           },
           "query": {
-            "type": "object",
-            "properties": {
-              "text": {
-                "type": "string",
-                "description": "Search phrase"
-              },
-              "projectId": {
-                "type": "string",
-                "description": "Project identifier"
-              },
-              "status": {
-                "type": "string",
-                "enum": ["todo", "in_progress", "blocked", "done"],
-                "description": "Current or computed effective status"
-              },
-              "priority": {
-                "type": "string",
-                "enum": ["low", "medium", "high", "urgent"],
-                "description": "Task priority"
-              },
-              "tag": {
-                "type": "string",
-                "description": "Tag"
-              },
-              "assignee": {
-                "type": "string",
-                "description": "Assigned member"
-              },
-              "dueBefore": {
-                "type": "string",
-                "description": "Date"
-              },
-              "includeArchived": {
-                "type": "boolean",
-                "description": "Archived"
-              },
-              "sortBy": {
-                "type": "string",
-                "enum": [
-                  "dueAt",
-                  "priority",
-                  "createdAt",
-                  "updatedAt",
-                  "title"
-                ],
-                "description": "Sort"
-              },
-              "descending": {
-                "type": "boolean",
-                "description": "Descending"
-              }
-            },
-            "required": [],
-            "additionalProperties": false
+            "$ref": "#/$defs/SavedQuery"
           }
         },
-        "required": ["workspaceId", "name", "query"],
+        "required": [
+          "workspaceId",
+          "name",
+          "query"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3741,71 +1834,25 @@
                 "description": "Concise title"
               },
               "query": {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string",
-                    "description": "Search phrase"
-                  },
-                  "projectId": {
-                    "type": "string",
-                    "description": "Project identifier"
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": ["todo", "in_progress", "blocked", "done"],
-                    "description": "Current or computed effective status"
-                  },
-                  "priority": {
-                    "type": "string",
-                    "enum": ["low", "medium", "high", "urgent"],
-                    "description": "Task priority"
-                  },
-                  "tag": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "assignee": {
-                    "type": "string",
-                    "description": "Assigned member"
-                  },
-                  "dueBefore": {
-                    "type": "string",
-                    "description": "Date"
-                  },
-                  "includeArchived": {
-                    "type": "boolean",
-                    "description": "Archived"
-                  },
-                  "sortBy": {
-                    "type": "string",
-                    "enum": [
-                      "dueAt",
-                      "priority",
-                      "createdAt",
-                      "updatedAt",
-                      "title"
-                    ],
-                    "description": "Sort"
-                  },
-                  "descending": {
-                    "type": "boolean",
-                    "description": "Descending"
-                  }
-                },
-                "required": [],
-                "additionalProperties": false
+                "$ref": "#/$defs/SavedQuery"
               },
               "creator": {
                 "type": "string",
                 "description": "Creator"
               }
             },
-            "required": ["id", "name", "query", "creator"],
+            "required": [
+              "id",
+              "name",
+              "query",
+              "creator"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["view"],
+        "required": [
+          "view"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -3828,7 +1875,9 @@
             "description": "Workspace identifier"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3848,72 +1897,26 @@
                   "description": "Concise title"
                 },
                 "query": {
-                  "type": "object",
-                  "properties": {
-                    "text": {
-                      "type": "string",
-                      "description": "Search phrase"
-                    },
-                    "projectId": {
-                      "type": "string",
-                      "description": "Project identifier"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["todo", "in_progress", "blocked", "done"],
-                      "description": "Current or computed effective status"
-                    },
-                    "priority": {
-                      "type": "string",
-                      "enum": ["low", "medium", "high", "urgent"],
-                      "description": "Task priority"
-                    },
-                    "tag": {
-                      "type": "string",
-                      "description": "Tag"
-                    },
-                    "assignee": {
-                      "type": "string",
-                      "description": "Assigned member"
-                    },
-                    "dueBefore": {
-                      "type": "string",
-                      "description": "Date"
-                    },
-                    "includeArchived": {
-                      "type": "boolean",
-                      "description": "Archived"
-                    },
-                    "sortBy": {
-                      "type": "string",
-                      "enum": [
-                        "dueAt",
-                        "priority",
-                        "createdAt",
-                        "updatedAt",
-                        "title"
-                      ],
-                      "description": "Sort"
-                    },
-                    "descending": {
-                      "type": "boolean",
-                      "description": "Descending"
-                    }
-                  },
-                  "required": [],
-                  "additionalProperties": false
+                  "$ref": "#/$defs/SavedQuery"
                 },
                 "creator": {
                   "type": "string",
                   "description": "Creator"
                 }
               },
-              "required": ["id", "name", "query", "creator"],
+              "required": [
+                "id",
+                "name",
+                "query",
+                "creator"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["views"],
+        "required": [
+          "views"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -3945,7 +1948,10 @@
             "description": "Offset"
           }
         },
-        "required": ["workspaceId", "viewId"],
+        "required": [
+          "workspaceId",
+          "viewId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -3954,131 +1960,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "workspaceId": {
-                  "type": "string",
-                  "description": "Workspace identifier"
-                },
-                "projectId": {
-                  "type": "string",
-                  "description": "Project identifier"
-                },
-                "title": {
-                  "type": "string",
-                  "description": "Concise title"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": ["todo", "in_progress", "blocked", "done"],
-                  "description": "Current or computed effective status"
-                },
-                "priority": {
-                  "type": "string",
-                  "enum": ["low", "medium", "high", "urgent"],
-                  "description": "Task priority"
-                },
-                "tags": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Tag"
-                  },
-                  "description": "Tags"
-                },
-                "dependencies": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "description": "Task identifier"
-                  },
-                  "description": "Task dependencies"
-                },
-                "archived": {
-                  "type": "boolean",
-                  "description": "Whether archived"
-                },
-                "version": {
-                  "type": "integer",
-                  "description": "Optimistic concurrency version"
-                },
-                "notes": {
-                  "type": "string",
-                  "description": "Notes"
-                },
-                "parentId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "dueAt": {
-                  "type": "string",
-                  "description": "ISO 8601 date/time"
-                },
-                "assignee": {
-                  "type": "string",
-                  "description": "Member subject"
-                },
-                "recurrenceDays": {
-                  "type": "integer",
-                  "description": "Recur every N days"
-                },
-                "originId": {
-                  "type": "string",
-                  "description": "Task identifier"
-                },
-                "completedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "updatedAt": {
-                  "type": "string",
-                  "description": "ISO time"
-                },
-                "comments": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "author": {
-                        "type": "string",
-                        "description": "Author"
-                      },
-                      "body": {
-                        "type": "string",
-                        "description": "Comment"
-                      },
-                      "at": {
-                        "type": "string",
-                        "description": "Time"
-                      }
-                    },
-                    "required": ["author", "body", "at"],
-                    "additionalProperties": false
-                  },
-                  "description": "Comments"
-                }
-              },
-              "required": [
-                "id",
-                "workspaceId",
-                "projectId",
-                "title",
-                "status",
-                "priority",
-                "tags",
-                "dependencies",
-                "archived",
-                "version"
-              ],
-              "additionalProperties": false
+              "$ref": "#/$defs/Task"
             },
             "description": "Matching tasks"
           },
@@ -4095,7 +1977,12 @@
             "description": "Limit"
           }
         },
-        "required": ["items", "total", "offset", "limit"],
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
         "additionalProperties": false
       },
       "errors": {
@@ -4117,7 +2004,9 @@
             "description": "Workspace identifier"
           }
         },
-        "required": ["workspaceId"],
+        "required": [
+          "workspaceId"
+        ],
         "additionalProperties": false
       },
       "errors": {
