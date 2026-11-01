@@ -76,14 +76,14 @@ These terms help discuss ANWA's goals, but are **not normative WoT terms** and s
 
 | Term | Working meaning | Responsibility boundary |
 | --- | --- | --- |
-| **Public schema / ANWA Schema** | OpenAPI-like machine-readable declaration of exposed Things, interactions, input/output, possible states/transitions, errors, named Guards and Links | Describes a contract, **not** executable business logic; exact syntax TBD |
+| **Public schema / ANWA Schema** | OpenAPI-like machine-readable declaration of the chosen Things, interactions, input/output and relevant Links; optional states/transitions, errors and guard references | Describes what an app author opts to expose, **not** executable business logic; exact syntax TBD |
 | **Implementation / Handler / Resolver** | Ordinary application code implementing Actions, Property reads, Link resolution and effects | Actual business logic and access checks |
 | **State / Transition** | Named domain state and a potentially valid change under a specified trigger | Declared possible transitions do not automatically guarantee atomic enforcement |
 | **Guard / Guard reference** | Named check referenced by the schema; evaluated by application code | May return structured allow/deny and reason; not a YAML predicate language |
 | **Guard decision** | Runtime result of evaluating a guard, potentially including a reason and navigational hints | Must be policy-filtered, can become stale, does not eliminate server-side revalidation |
 | **Interaction Response** | Proposed ANWA application-level envelope with Outcome and Context | **Not** a WoT standard response type and not yet a fixed wire format |
 | **Outcome / Result** | Settled operation success or domain failure; an accepted execution may instead be returned | `ok` indicates the invocation outcome, not necessarily achievement of a larger business goal |
-| **Interaction Context** | Subject, typed Links and next-interaction references, with optional revision/freshness metadata | May be empty or restricted; not a privileged agent instruction |
+| **Interaction Context** | Subject and application-supplied typed Links / next-interaction references, with optional revision/freshness metadata | May be empty or restricted; ANWA need not auto-select next steps; not a privileged instruction |
 | **Contextual applicability** | `available / blocked / unknown` hint for a particular caller, Thing and moment | **Distinct** from a WoT Interaction Affordance and from authorization |
 | **Execution** | Identifiable instance of an in-progress or completed invocation, with its own lifecycle | Not the same as business domain state; may be modeled as a Thing |
 | **Interaction Event / Observation** | State changes, progress reports, or artifact deltas sent to consumers | Streaming is not itself durable execution or an authoritative state store |
@@ -107,7 +107,7 @@ The **schema-first workflow and code-implemented Guard** are current design dire
 See [Current decision status](decisions.md).
 
 
-- Should each business entity be a Thing, or should a service expose many entities as Properties, Actions and Links on a smaller set of Things?
+- **Application choice, not a pending ANWA decision:** whether each business entity is a Thing or a service exposes several entities as Properties, Actions and Links. ANWA should provide a usable mechanism for chosen arrangements.
 - How should TDs evolve with user permissions and per-instance state, without leaking privileged metadata?
 - How should a Consumer discover domain data beyond the TD Directory's discovery function?
 - Do additionalResponses and HTTP Problem Details sufficiently describe recoverable **domain errors**, or is an extension needed for suggested next steps?
@@ -122,4 +122,4 @@ See [Current decision status](decisions.md).
 - [WoT Scripting API — Group Note](https://www.w3.org/TR/wot-scripting-api/)
 - [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)
 
-[Back to README](../README.md) · [WoT errors](research/wot-errors.md) · [Open questions](open-questions.md)
+[Back to README](../README.md) · [Scope](scope-and-boundaries.md) · [WoT errors](research/wot-errors.md) · [Open questions](open-questions.md)
