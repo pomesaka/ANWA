@@ -10,7 +10,9 @@
 | Schema | Top-level `interactions` and `entrypoints` | No `things` or `subjectType` |
 | Binding | One TypeScript Handler per Interaction | Handler owns `Outcome + Context` |
 | Context | Handler calls `reply(result, next)` | No global `context` resolver; no framework-selected business flow |
-| Guard | Runtime executes declared Guard before Action `run`; deny invokes per-Interaction `onDenied` | Preflight only: true authorization and atomic storage checks remain app-owned |
+| Guard | Runtime enforces declared Guard before Query/Action `run` or Event observation | Per-resource authorization and atomic storage checks are app-owned |
+| Authentication | Trusted Adapter supplies `VerifiedCaller` outside Interaction `input` | In-process runtime does not verify credentials or prevent caller spoofing if exposed directly |
+| Exposure | Unguarded Interactions must explicitly be `public`; guarded descriptions use caller-aware Discovery policy | No blanket implicit-public behavior |
 | Navigation | `context.next` lists potential next Interactions | Retry is another candidate with `guidance.kind: "retry"` |
 | Errors | Expected domain codes exhaustively declared; unexpected errors opaque | Actual side-effect certainty belongs to the outcome |
 | Side effects | Optional Action `hasSideEffects` / `idempotent` | Declared hints, not enforcement or safe retry certification |
