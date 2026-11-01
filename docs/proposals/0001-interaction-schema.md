@@ -6,6 +6,18 @@
 >
 > **Update:** ANWA's authoring direction is **schema-first**: describe the public contract, then implement guards/actions/resolvers in ordinary code. Do **not** treat the statechart or guard expressions as a required declarative programming language. See [current decisions](../decisions.md), [architecture](../architecture.md) and [worked example](../examples/order-cancellation.md) on `main`.
 
+## Responsibility boundary (2026-11-01 clarification)
+
+This draft proposes an **expressive framework contract**, not an application architecture mandated by ANWA. A developer chooses the Thing granularity, whether state machines or guards are used, which interactions and relations exist, and which next-step references to return. The runtime can expose/validate what is declared, but **does not automatically infer the right business workflow or next action** from arbitrary code.
+
+In particular:
+- **Result + Context** is the proposed common envelope; Context may contain empty lists or author-supplied/context-filtered affordances.
+- **Guard references and state-transition declarations are optional authoring facilities** where relevant, not required on every Action/Thing.
+- A business example is a **test of whether ANWA can express a choice**, not a reason to make that choice mandatory across applications.
+- Durable execution, event replay, storage, permissions, concurrency, and transport remain the application/runtime/adapter responsibility according to separately-defined contracts.
+
+See [Scope and responsibility boundaries](../scope-and-boundaries.md) and [Working decisions](../decisions.md) in the mainline documentation.
+
 ## 0. Design goal
 
 An agent interacting with an unfamiliar application should receive not only the current outcome, but also enough **typed, discoverable context** to choose what to inspect or invoke next.
