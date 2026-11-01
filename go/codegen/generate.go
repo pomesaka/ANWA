@@ -137,7 +137,7 @@ func Generate(m anwa.Manifest, packageName string) ([]byte, error) {
 		fmt.Fprintf(&out, " %q: {\n", ref)
 		if spec.Kind == "event" {
 			fmt.Fprintf(&out, " Observe: func(ctx context.Context, args anwa.Args, cursor *int) (<-chan any, error) {\n")
-			writeDecode(&out, name, spec.Input != nil)
+			writeDecode(&out, name, spec.Input != nil, spec.Kind == "event")
 			fmt.Fprintf(&out, " return server.%s(ctx, request, cursor)\n },\n", name)
 		} else {
 			fmt.Fprintf(&out, " Run: func(ctx context.Context, args anwa.Args) (anwa.Response, error) {\n")
@@ -148,7 +148,7 @@ func Generate(m anwa.Manifest, packageName string) ([]byte, error) {
 			fmt.Fprintf(&out, " return result.toANWA(), nil\n },\n")
 			if spec.Guard != "" {
 				fmt.Fprintf(&out, " OnDenied: func(ctx context.Context, args anwa.Args, denied anwa.DomainError) ([]anwa.Next, error) {\n")
-				writeDecode(&out, name, true, spec.Input != nil)
+				writeDecode(&out, name, spec.Input != nil, true)
 				fmt.Fprintf(&out, " return server.%sOnDenied(ctx, request, denied)\n },\n", name)
 			}
 		}
@@ -162,24 +162,16 @@ func Generate(m anwa.Manifest, packageName string) ([]byte, error) {
 	return formatted, nil
 }
 
-func writeDecode(out *strings.Builder, name string, options ...bool) {
-	// For an invoke Handler, options[0] indicates whether Input exists.
-	// For OnDenied, options are [true, hasInput] (the first is a placeholder).
-	hasInput := len(options) > 0 && options[0]
-	if len(options) > 1 {
-		hasInput = options[1]
-	}
+func writeDecode(out *strings.Builder, name string, hasInput bool, nilErrorReturn bool) {
 	fmt.Fprintf(out, " request := %sRequest{Caller: args.Caller}\n", name)
 	if hasInput {
-		fmt.Fprintf(out, " if err := args.DecodeInput(&request.Input); err != nil {\n")
-		if len(options) > 1 {
-			fmt.Fprintf(out, " return nil, err\n")
-		} else if strings.Contains(out.String()[max(0, out.Len()-150):], "Observe:") {
-			fmt.Fprintf(out, " return nil, err\n")
+		fmt.Fprintf(out, " if err := args.DecodeInput(&request.Input); err != nil {\\n")
+		if nilErrorReturn {
+			fmt.Fprintf(out, " return nil, err\\n")
 		} else {
-			fmt.Fprintf(out, " return anwa.Response{}, err\n")
+			fmt.Fprintf(out, " return anwa.Response{}, err\\n")
 		}
-		fmt.Fprintf(out, " }\n")
+		fmt.Fprintf(out, " }\\n")
 	}
 }
 
