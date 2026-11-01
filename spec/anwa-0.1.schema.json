@@ -107,16 +107,13 @@
         "semanticTypes": {
           "$ref": "#/$defs/SemanticTypes"
         },
-        "effectKinds": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "domain-state",
-              "external-system"
-            ]
-          },
-          "description": "Application-declared possible side effect categories. Missing means unknown; [] declares none. Hints do not assert authorization, success or idempotency."
+        "hasSideEffects": {
+          "type": "boolean",
+          "description": "Whether invoking this Action may create business-observable effects, including changes to domain state or external systems. false asserts no such effects; omission means unknown. Does not certify authorization or absence of telemetry."
+        },
+        "idempotent": {
+          "type": "boolean",
+          "description": "Whether repeated invocations with the same input have the same intended effects as one invocation, considering business-observable effects. Does not imply a safe retry; omission means unknown."
         }
       }
     },
@@ -365,13 +362,22 @@
         },
         {
           "not": {
-            "required": [
-              "effectKinds"
+            "anyOf": [
+              {
+                "required": [
+                  "hasSideEffects"
+                ]
+              },
+              {
+                "required": [
+                  "idempotent"
+                ]
+              }
             ]
           }
         }
       ],
-      "description": "Property/Event interactions cannot declare Action-specific effectKinds in this in-process reference profile."
+      "description": "Property/Event interactions cannot declare Action-only hasSideEffects or idempotent in this experimental profile."
     }
   }
 }
