@@ -252,7 +252,7 @@ func boolPtr(v bool) *bool { return &v }
 
 func TestAcceptedActionsAndObservationGuards(t *testing.T) {
 	doc := Manifest{ANWA: "0.2", EntryPoints: []string{"job.start", "job.events"}, Interactions: map[string]Interaction{
-		"job.start": {Kind: "action", Description: "Start job"},
+		"job.start": {Kind: "action", Description: "Start job", HasSideEffects: boolPtr(true), Idempotent: boolPtr(false)},
 		"job.events": {Kind: "event", Description: "Private updates", Guard: "canWatch",
 			Errors: map[string]string{"AUTH_REQUIRED": "Login"}},
 	}}
@@ -313,5 +313,38 @@ func TestResultNullIsSerializedAndNoErrorsAreLeaked(t *testing.T) {
 	if !strings.Contains(string(data), `"result":{"ok":true,"value":null}`) ||
 		!strings.Contains(string(data), `"context":{"next":[]}`) {
 		t.Fatalf("result wire contract: %s", data)
+	}
+}
+
+func TestActionEffectsMustBeExplicit(t *testing.T) {
+	base := Manifest{ANWA: "0.2", EntryPoints: []string{"action.run"},
+		Interactions: map[string]Interaction{
+			"action.run": {Kind: "action", Description: "A test mutation",
+				HasSideEffects: boolPtr(false), Idempotent: boolPtr(false)},
+		},
+	}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("explicit false must be allowed: %v", err)
+	}
+	for _, field := range []string{"hasSideEffects", "idempotent"} {
+		copy := base
+		copy.Interactions = map[string]Interaction{"action.run": base.Interactions["action.run"]}
+		spec := copy.Interactions["action.run"]
+		if field == "hasSideEffects" {
+			spec.HasSideEffects = nil
+		} else {
+			spec.Idempotent = nil
+		}
+		copy.Interactions["action.run"] = spec
+		if err := copy.Validate(); err == nil {
+			t.Fatalf("missing %s must be rejected", field)
+		}
+	}
+	query := base
+	query.Interactions = map[string]Interaction{
+		"action.run": {Kind: "query", Description: "Read only", HasSideEffects: boolPtr(false)},
+	}
+	if err := query.Validate(); err == nil {
+		t.Fatal("Queries cannot declare Action-only effects")
 	}
 }
