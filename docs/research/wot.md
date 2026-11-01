@@ -66,6 +66,8 @@ A valuable first prototype would compare:
 - Proposal: add contextual, intent-oriented progressive discovery and execution contracts **without changing the business logic**.
 - Measure task success, wrong operation attempts, token and tool-call usage, latency, and developer metadata burden.
 
+See also: [WoT error handling — response schemas, HTTP errors, async failures](wot-errors.md).
+
 ## Primary sources
 
 - [TD 1.1 (Recommendation)](https://www.w3.org/TR/wot-thing-description11/)
