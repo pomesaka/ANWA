@@ -50,7 +50,10 @@ export type GuardDecision =
 export type Guard = (
   args: HandlerArgs,
 ) => GuardDecision | Promise<GuardDecision>;
-export type Bindings = Record<string, InteractionHandler | EventHandler>;
+export type BindingHandler = (
+  args: HandlerArgs & { cursor?: number },
+) => InteractionResponse | Promise<InteractionResponse> | AsyncIterable<unknown>;
+export type Bindings = Record<string, BindingHandler>;
 export type GuardBindings = Record<string, Guard>;
 
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
@@ -69,13 +72,10 @@ export const accepted = (id: string): Accepted => ({
 export const reply = <T>(
   result: Result<T> | Accepted,
   next: NextInteraction[] = [],
-): InteractionResponse<T> => ({
-  outcome:
-    "kind" in result && result.kind === "accepted"
-      ? result
-      : { kind: "settled", result },
-  context: { next },
-});
+): InteractionResponse<T> => {
+  if ("kind" in result) return { outcome: result as Accepted, context: { next } };
+  return { outcome: { kind: "settled", result: result as Result<T> }, context: { next } };
+};
 const unexpected = (): InteractionResponse =>
   reply(
     fail("UNEXPECTED_ERROR", "Unexpected application failure", {
@@ -134,10 +134,7 @@ function checkPayload(
 
 export class AnwaApp {
   readonly schema: Manifest;
-  private readonly handlers = new Map<
-    string,
-    InteractionHandler | EventHandler
-  >();
+  private readonly handlers = new Map<string, BindingHandler>();
   private guards: GuardBindings = {};
 
   constructor(schema: Manifest) {
@@ -173,7 +170,7 @@ export class AnwaApp {
 
   private resolve(ref: string): {
     spec: InteractionDefinition;
-    handler: InteractionHandler | EventHandler;
+    handler: BindingHandler;
   } {
     if (
       typeof ref !== "string" ||
