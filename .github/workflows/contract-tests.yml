@@ -2,11 +2,11 @@ name: ANWA Bun TypeScript contract checks
 
 on:
   push:
-    branches: [main, feat/advanced-todo-demo]
+    branches: [main]
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -19,18 +19,6 @@ jobs:
       - run: bun --version
       - run: bun install --frozen-lockfile
       - run: bun run codegen
-      - name: Temporary Bun formatter for Todo demo implementation branch
-        if: github.ref == 'refs/heads/feat/advanced-todo-demo'
-        run: |
-          bun fmt src demo test tools
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src demo test tools
-          if ! git diff --cached --quiet; then
-            git commit -m "style: format advanced Todo demo with Bun"
-            git push
-          fi
-      - run: bun check
       - run: git diff --exit-code -- demo/calculator/contract.generated.ts demo/orders/contract.generated.ts demo/reports/contract.generated.ts demo/todo/contract.generated.ts
       - run: bun fmt --check src demo test tools
       - run: bunx oxlint src demo test tools
