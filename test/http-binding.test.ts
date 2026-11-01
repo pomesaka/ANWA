@@ -243,7 +243,12 @@ test("Explicit null does not become an omitted request input", async () => {
   const handler = createAnwaFetchHandler(runtime);
   const omitted = await handler(jsonRequest('{"ref":"ping"}'));
   assert.equal((await omitted.json()).outcome.result.value, "pong");
-  const explicitNull = await handler(jsonRequest('{"ref":"ping","input":null}'));
+  const explicitNull = await handler(
+    jsonRequest('{"ref":"ping","input":null}'),
+  );
   assert.equal(explicitNull.status, 200);
-  assert.equal((await explicitNull.json()).outcome.result.error.code, "INVALID_INPUT");
+  assert.equal(
+    (await explicitNull.json()).outcome.result.error.code,
+    "INVALID_INPUT",
+  );
 });
