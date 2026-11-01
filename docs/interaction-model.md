@@ -32,6 +32,8 @@ The shape is intentionally transport-neutral. `accepted` means the invocation pr
 
 Use **WoT Interaction Affordance** for the static interaction description (Property, Action, Event). ANWA may attach a *contextual applicability hint* (available / blocked / unknown, with reason). Hints can become stale and **do not authorize** anything.
 
+See [Errors, retry guidance and next-interaction navigation](error-recovery-navigation.md) for the three distinct responsibilities, a candidate structured Error Definition, per-attempt retry/effect data and the current implementation gap. **Context is available after both successful and failed interactions; it is not limited to error recovery.**
+
 ### Semantic errors
 
 The envisioned domain error is structured, e.g. a stable code, optional details, retry advice and side-effect certainty:
