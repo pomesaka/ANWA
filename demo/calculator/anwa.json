@@ -1,9 +1,6 @@
 {
   "anwa": "0.2",
-  "entrypoints": [
-    "calculator.add",
-    "calculator.divide"
-  ],
+  "entrypoints": ["calculator.add", "calculator.divide"],
   "interactions": {
     "calculator.add": {
       "kind": "action",
@@ -20,10 +17,7 @@
             "description": "The second numeric operand."
           }
         },
-        "required": [
-          "a",
-          "b"
-        ],
+        "required": ["a", "b"],
         "additionalProperties": false
       },
       "output": {
@@ -48,10 +42,7 @@
             "description": "The second numeric operand."
           }
         },
-        "required": [
-          "a",
-          "b"
-        ],
+        "required": ["a", "b"],
         "additionalProperties": false
       },
       "output": {

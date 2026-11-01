@@ -14,9 +14,9 @@ ANWA is an **Interaction-first, schema-first application framework concept**, no
 
 ### Workflow
 
-1. **Schema first** — top-level `query` / `action` / `event` Interaction descriptions, inputs/outputs, declared errors and optional Guard references; Thing metadata is **not required**.
-2. **Implementation second** — ordinary handlers/resolvers and guard code, with authorization, side effects and atomic transitions enforced on the server.
-3. **Runtime exposure** — logical Discovery and Interaction mechanisms. The latter carries **Outcome + Context**, with links and follow-up affordance references supplied or configured by the application (possibly none).
+1. **Schema first** — top-level `query` / `action` / `event` Interaction descriptions, inputs/outputs, declared errors and optional named Guards. The ANWA Core has **no Thing abstraction**.
+2. **Implementation second** — TypeScript Handlers return their own `Outcome + Context` through `reply(result, next)`. Optional Guards are explicitly invoked within their owning Handler; the application implements authorization and atomic transitions.
+3. **Runtime exposure** — logical Discovery and Interaction mechanisms. The latter carries **Outcome + Context**, with `context.next` candidate Interactions supplied by the owning Handler (possibly none).
 
 State machines are an **optional** application modeling technique, **not** ANWA's mandatory abstraction or authoring language. A Guard is a reference to code that can use data and external services; a schema can describe its intended outputs but not infer its complete logic.
 

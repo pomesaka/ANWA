@@ -1,4 +1,4 @@
-# Working glossary — WoT-aligned
+# Working glossary — ANWA v0.2 and WoT prior art
 
 > **Status:** Provisional vocabulary · 2026-11-01. Use W3C WoT terminology as the **reference vocabulary** until there is a demonstrated reason to diverge. ANWA is not yet a WoT-compliant framework, and a shared label does not imply a new standard.
 >
@@ -72,21 +72,21 @@ These terms help discuss ANWA's goals, but are **not normative WoT terms** and s
 
 ## 4a. ANWA working terminology — schema and runtime
 
-**The following terms are ANWA design vocabulary, not W3C WoT-defined constructs.** They describe our current schema-first development model, but their exact interfaces have not been standardized.
+**The following terms describe ANWA's experimental v0.2 contract.** WoT Things and Thing Descriptions above remain **prior-art terminology only**; ANWA Core does not define a Thing.
 
 | Term | Working meaning | Responsibility boundary |
 | --- | --- | --- |
-| **Public schema / ANWA Schema** | Machine-readable top-level Interaction declarations with input/output/errors, plus optional Thing metadata | Defines what the application exposes, **not** executable business logic; current v0.2 is experimental |
+| **Public schema / ANWA Schema** | Machine-readable top-level Interactions with input/output/errors and optional semantic annotations | No `things` or `subjectType`, no business logic; current v0.2 experimental |
 | **Implementation / Handler / Resolver** | Ordinary application code implementing Actions, Property reads, Link resolution and effects | Actual business logic and access checks |
 | **State / Transition** | Named domain state and a potentially valid change under a specified trigger | Declared possible transitions do not automatically guarantee atomic enforcement |
 | **Guard / Guard reference** | Named check referenced by the schema; evaluated by application code | May return structured allow/deny and reason; not a YAML predicate language |
-| **Guard decision** | Runtime result of evaluating a guard, potentially including a reason and navigational hints | Must be policy-filtered, can become stale, does not eliminate server-side revalidation |
+| **Guard decision** | Code-backed allow/deny result, explicitly obtained by the owning Handler | Handler constructs `Context.next`; Guard itself does not choose a business workflow |
 | **Interaction Response** | Proposed ANWA application-level envelope with Outcome and Context | **Not** a WoT standard response type and not yet a fixed wire format |
 | **Outcome / Result** | Settled operation success or domain failure; an accepted execution may instead be returned | `ok` indicates the invocation outcome, not necessarily achievement of a larger business goal |
 | **Interaction Context** | Application-supplied `next` entries referencing top-level InteractionRef strings, optionally with bound input, guidance, wait time and applicability | Required `next` list may be empty; candidates are not privileged instructions |
 | **Contextual applicability** | `available / blocked / unknown` hint for a particular caller, Thing and moment | **Distinct** from a WoT Interaction Affordance and from authorization |
 | **Next-interaction guidance** | Optional `guidance.kind: retry`, importance `required/recommended/available`, and `when.after` ISO 8601 duration on a `context.next` entry | Retry is the same interaction offered again, not a separate error retry property; hints are advisory |
-| **Execution** | Identifiable instance of an in-progress or completed invocation, with its own lifecycle | Not the same as business domain state; may be modeled as a Thing |
+| **Execution** | An opaque ID for accepted asynchronous work; inspect through standalone Interactions | No Execution Thing required or supported in ANWA Core |
 | **Interaction Event / Observation** | State changes, progress reports, or artifact deltas sent to consumers | Streaming is not itself durable execution or an authoritative state store |
 
 For a concrete end-to-end example, see [Order cancellation](examples/order-cancellation.md). The working conceptual model is in [Architecture](architecture.md) and [Interaction model](interaction-model.md).

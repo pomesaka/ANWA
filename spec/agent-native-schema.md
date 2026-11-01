@@ -1,147 +1,52 @@
-# ANWA — Agent-Native Schema Design Contract
+# ANWA Agent-native public contract — v0.2 principles
 
-> **Working design intent; 2026-11-01.** The reference implementation currently uses the experimental [ANWA 0.1 profile](anwa-0.1.md). This document identifies what an ANWA schema **should** optimize for and what is already testable. This is not a claim of superior measured LLM performance or WoT conformance.
+> Working design intent, 2026-11-01. The active executable [specification](anwa-0.2.md) is experimental. Agent task success has not been independently measured.
 
-## Who is the schema for?
+## Primary schema consumers
 
-Two primary consumers:
+- **Implementing agents** generate/maintain application code and verify it against a public Interaction schema.
+- **Consuming agents** discover available Interactions and typed inputs, invoke them, interpret outcomes, and select appropriate follow-ups.
 
-1. **Implementing agents**, which produce application code, adapters and tests from a shared, machine-checkable public contract.
-2. **Consuming agents**, which discover an unfamiliar application, choose applicable interactions, provide typed inputs, interpret typed outcomes, and follow application-provided links/affordance references.
+Human editability and concise JSON are not goals by themselves. The schema should optimize **semantic precision, verifiable contracts, incremental discovery, safe defaults and bounded context**.
 
-**Human ease of writing/editing is not a design objective.** An editor, a natural-language instruction, a generated UI, or another agent may produce the manifest. An `inspect` view may help debug it, but no design choice should be justified solely as more readable for people.
+## Current public shape
 
-The essential properties are **semantic precision, deterministic resolution, verifiability, safe defaults, partial disclosure, minimal context load, and extensibility**. The shape must not prescribe application-specific business workflows.
+A v0.2 manifest contains `anwa`, `entrypoints` and a top-level `interactions` map. Each Interaction is a standalone `query`, `action` or `event`. There is **no Thing abstraction in ANWA Core**, no `things` map, no `subjectType`, and no mandatory resource parent.
 
-## The schema is a contract, not a program
+Operations can declare typed `input` and `output`, exhaustive expected `errors`, optional semantic URI identifiers and optional Action-only `hasSideEffects` / `idempotent` booleans. Omitted Action flags mean **unknown**, not `false`; they do not certify permission or retry safety.
 
-| Responsibility | ANWA schema / framework | Application implementation |
-| --- | --- | --- |
-| Domain concepts | Standalone Interactions and **optional Thing metadata / semantic identifiers** | Chooses whether Things exist, and how resource identifiers appear in inputs |
-| Interactions | Top-level `query` / `action` / `event` with typed inputs and outputs | Implements handlers and effects |
-| Guard | Optional named hook | Actual predicate and authorization / consistency enforcement |
-| Domain errors | Exhaustive application-declared error codes | Chooses which errors exist; implements conditions |
-| Effects and repeatability | Optional `hasSideEffects` / `idempotent` booleans on Actions | Actual side effects, retries, enforcement and concurrency |
-| Runtime navigation | Typed `context.next` candidates with optional guidance/timing/applicability | Which next interactions/discovery targets are exposed in this context |
-| References | App-scoped InteractionRef string resolution, with optional Thing metadata | How an application identifies a business object in input |
-| Protocol | Logical Discovery / Interaction contracts, adapters to be defined | Hosting, storage, permissions and transports |
+## Handler owns both result and continuation
 
-Neither natural-language descriptions nor semantic identifiers nor effect declarations are proof that an action is safe, authorized, or guaranteed to succeed.
-
-## Current v0.2 machine description vocabulary
-
-The existing required fields remain unchanged. Two **optional** semantic annotations are now part of the experimental schema and Discovery representation:
-
-### `semanticTypes` — machine-addressable domain meaning
-
-Allowed on a Thing or interaction. Nonempty, unique absolute HTTP(S) URIs or URNs.
-
-```json
-{
-  "title": "Purchase order",
-  "description": "An order with a fulfillment state and cancellation operation.",
-  "semanticTypes": ["urn:example:domain:PurchaseOrder"]
-}
-```
-
-The vocabulary author is responsible for defining what the identifier means. The field is **not** a JSON-LD `@type` nor proof of W3C WoT conformance. Omitting it is valid: an opaque made-up URI with no shared semantics offers little practical advantage.
-
-### `hasSideEffects` and `idempotent` — independent Action properties
-
-Both fields are **optional booleans** on Actions, and are application-supplied declarations. The values are not inferred from the Handler.
-
-- `hasSideEffects: true`: invoking the Action **may cause business-observable effects**, including domain state mutations or external operations (payments, notifications).
-- `hasSideEffects: false`: the application asserts the Action will **not** cause such business-observable effects.
-- `idempotent: true`: the application asserts repeating the same Action with the same input has the same intended business-observable effects as invoking it once.
-- `idempotent: false`: that repeated-effect guarantee is not asserted.
-- **Omitted:** unknown, distinct from `false`. A client MUST NOT treat missing values as a no-effect or repeat-safe guarantee.
-
-Routine internal logs, tracing and metrics are excluded from `hasSideEffects` unless they themselves form part of the application's advertised domain behavior. The flags do not imply authorization, safe retries after network failure, ability to undo operations, or lack of concurrency concerns. A successful idempotency declaration is not a promise that two invocations produce identical response bodies.
-
-```json
-{
-  "description": "Cancel an order when allowed.",
-  "hasSideEffects": true,
-  "idempotent": false,
-  "input": {
-    "type": "object",
-    "properties": {
-      "reason": {"type": "string", "description": "Reason provided for cancellation."}
-    },
-    "required": ["reason"]
-  },
-  "output": {
-    "type": "object",
-    "properties": {"status": {"type": "string"}},
-    "required": ["status"]
-  },
-  "errors": {
-    "ORDER_ALREADY_SHIPPED": "The order was dispatched.",
-    "ALREADY_CANCELLED": "The order was already cancelled."
-  },
-  "guard": "canCancel"
-}
-```
-
-These ANWA fields are **not the same as WoT TD 1.1 `safe`**, whose specification concerns the Thing's internal resource state. WoT also defines an `idempotent` flag, but its default/semantics are governed by that specification. **ANWA omission = unknown**, even though WoT TD processors assign defaults to their own fields. Mapping to a conforming WoT TD is a separate adapter concern.
-
-An Action without either flag remains valid. Guards, state transition graphs, and recovery flows are not mandatory.
-
-## Consumption contract
-
-The most useful unit for a consuming agent is **a discoverable interaction description**, not an entire raw manifest. The runtime currently supports:
-
-1. `catalog()`: published Thing summaries and entrypoints.
-2. `discover(InteractionRef)`: a standalone Interaction definition, typed input/output, declared errors, optional semantic/effect metadata and a navigation Context.
-3. `interact(InteractionRef, input?)`: domain `Outcome + Context`, including **both success and expected domain failure**.
-4. Optional `observe(InteractionRef, input?)`: observations through an Event Interaction, which may be used for an asynchronous execution.
-
-A `Context` contains `next: []` even when the application offers no candidate. Each candidate refers to a **top-level InteractionRef string**, optionally including input values; retries refer to the same Interaction with `guidance.kind: "retry"`. These are not instructions to the agent.
-
-```json
-{
-  "outcome": {"kind":"settled","result":{"ok":false,"error":{"code":"ORDER_ALREADY_SHIPPED","effects":"none"}}},
-  "context": {
-    "next": [{
-      "ref": "shipment.track",
-      "input": {"shipmentId":"ship-1"},
-      "guidance": {"level":"recommended"}
-    }]
+```ts
+app.bind({
+  "execution.result": async ({ input }) => {
+    const run = await findExecution(input.executionId);
+    if (!run) return reply(fail("NOT_FOUND"));
+    if (!run.done) return reply(fail("NOT_READY", "Still running"), [{
+      ref: "execution.result",
+      input: { executionId: input.executionId },
+      guidance: { kind: "retry", level: "recommended" },
+      when: { after: "PT30S" }
+    }]);
+    return reply(ok(run.result));
   }
-}
+});
 ```
 
-**Static declarations and dynamic outcomes are different.** `hasSideEffects` is a declaration about whether effects are possible; `result.error.effects` (if provided by an application) concerns effects after an actual attempt. `context.next[].applicability` is an advisory hint, not authorization. A retry suggestion belongs in `context.next[].guidance`, not in the Error.
+This is illustrative application code. The framework checks the returned `Outcome + Context` structure; it does **not** select next actions or interpret server text as instructions superior to the user's goal.
 
-## Contracts an implementing agent should be able to enforce
+`context.next` may be empty. It is the single representation of runtime continuation candidates, including retries and recommendations. An `error.effects` field concerns what occurred **during this attempt**, unlike static `hasSideEffects`.
 
-The current reference toolchain supports a **subset**, not all envisioned checks:
+## Contract validation and boundaries
 
-1. **Manifest structure:** declared Thing names, descriptions, interaction categories, input/output shapes, known Link target types, optional semantics and effects.
-2. **Bindings:** each published interaction has a user-implemented handler; named Guards resolve.
-3. **Inputs/outputs:** runtime validates the supported JSON Schema subset.
-4. **Domain errors:** expected error codes are exhaustively declared; undeclared implementation errors are mapped to `UNEXPECTED_ERROR`.
-5. **Discovery fidelity:** public metadata, including semantic identifiers and the optional Action flags, is exposed without inventing new actions or domain state.
+TypeScript Handlers, generated interfaces, runtime payload validation, error-code checks and reference validation are available in the prototype. Missing or undeclared domain codes become opaque `UNEXPECTED_ERROR`. Named Guards are optional code-backed helpers and must be explicitly evaluated by their owning Handler.
 
-Important limits: **No full JSON Schema 2020-12 runtime validation, static TypeScript conformance of handlers, cross-service refs, security/authorization implementation, or automated proof that declared side-effect/idempotency flags match actual behavior.** The current JSON Schema file is a meta-schema plus reusable response definitions; it is not itself a complete running network protocol.
+Full JSON Schema 2020-12, network authentication, federation/external API delegation, replay and durable execution are not yet provided.
 
-## What not to optimize for
+W3C WoT Things and Thing Descriptions remain **prior art** and possible adapter targets, **not ANWA Core concepts**. No WoT conformance is claimed.
 
-- Shortest possible JSON or visual aesthetics.
-- Hand-editability or human-centric DSL syntax.
-- Exhaustively enumerating application-specific business states or Guard conditions.
-- Automatically selecting or ranking user business actions in the framework.
-- Assuming one transport, one API architecture or global resource registry.
-- Mistaking “model parsed JSON” for “model completed an unfamiliar app task correctly”.
+## Evidence still needed
 
-## Next objective evidence
+Evaluate unfamiliar AI clients using only public catalog/Discovery/Interaction responses and compare against OpenAPI/MCP/WoT alternatives for task success, invalid calls, unsafe actions, tokens and latency.
 
-The proposed contract remains **a hypothesis** until an unfamiliar agent uses it without implementation access. Compare progressive Discovery against full manifests and external baselines (WoT TD, OpenAPI, MCP) with equivalent semantics. Measure successful goal completion, unsafe attempts, invalid tool calls, cost/tokens, and recovery.
-
-## Primary specifications
-
-- [W3C WoT Thing Description 1.1](https://www.w3.org/TR/wot-thing-description11/): Thing, Property/Action/Event Interaction Affordances, Links, semantic annotations. ANWA alignment ≠ TD conformance.
-- [W3C WoT Discovery](https://www.w3.org/TR/wot-discovery/): description discovery and access constraints.
-- [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12): an established vocabulary for data types and validation; the prototype supports a constrained subset.
-
-[v0.2 contract](anwa-0.2.md) · [v0.2 manifest schema](anwa-0.2.schema.json) · [Decision status](../docs/decisions.md)
+[ANWA v0.2](anwa-0.2.md) · [Machine-readable schema](anwa-0.2.schema.json) · [Tooling](../docs/schema-authoring.md)

@@ -1,38 +1,29 @@
-# ANWA design decisions — current experimental direction
+# ANWA — Current experimental decisions
 
-> Updated 2026-11-01. The active runnable profile is [ANWA v0.2](../spec/anwa-0.2.md), not the superseded Thing-bound v0.1.
+> Active ANWA v0.2, 2026-11-01. Historical v0.1 Thing-bound notes are not current specifications.
 
-## Core principles
-
-| Area | Current decision | Boundary |
+| Area | Current direction | Responsibility boundary |
 | --- | --- | --- |
-| Public contract | **Interaction-first**: top-level `interactions` plus declared entrypoints | No required Thing or entity boundary |
-| InteractionRef | App-scoped string identifier; e.g. `order.cancel` | Federated/external API references deferred |
-| Kind | `query`, `action`, `event` | WoT Property/Action/Event Affordances are Thing-bound; ANWA does not claim WoT conformance |
-| Thing | Optional domain metadata in `things`, optional `subjectType` on an Interaction | Not a mandatory parent, input, execution or storage model |
-| Binding | Direct `app.bind({ref:handler})`; ordinary application code | No DSL for guard predicates or mandatory state machine |
-| Discovery | `catalog()` and `discover(InteractionRef)` | Adapter/authorization still undecided |
-| Interaction | Delivered `Outcome + Context` (including domain failure) | No guarantee on network loss |
-| Navigation | `context.next` holds offered Interactions; optional bound inputs, guidance, timing, applicability | Server does not instruct agent or choose business workflow |
-| Retry | Same Interaction in `context.next` with `guidance.kind:"retry"` | Not automatic and not assured safe |
-| Error | Exhaustive expected domain error codes, undeclared → `UNEXPECTED_ERROR` | Error details currently string descriptions |
-| Effects | Optional Action `hasSideEffects` and `idempotent`; per-attempt `error.effects` | Unknown when omitted; no transactional guarantee |
-| Async | `accepted` with opaque `ExecutionRef={id:string}` | No Execution Thing or workflow engine required |
-| Streaming | Optional standalone Event Interaction with application-defined input | No delivery/durability guarantees |
+| Core | **Interaction-first**, no Thing construct | Domain objects are application data |
+| Reference | App-scoped standalone InteractionRef string | No mandatory object identifier or globally resolvable URL |
+| Kinds | `query`, `action`, `event` | WoT's Thing-bound vocabulary is prior art, not an identical ANWA contract |
+| Schema | Top-level `interactions` and `entrypoints` | No `things` or `subjectType` |
+| Binding | One TypeScript Handler per Interaction | Handler owns `Outcome + Context` |
+| Context | Handler calls `reply(result, next)` | No global `context` resolver; no framework-selected business flow |
+| Guard | Optional code-backed named Guard; Handler explicitly calls `app.assess` | Real authorization/transactions remain app-owned |
+| Navigation | `context.next` lists potential next Interactions | Retry is another candidate with `guidance.kind: "retry"` |
+| Errors | Expected domain codes exhaustively declared; unexpected errors opaque | Actual side-effect certainty belongs to the outcome |
+| Side effects | Optional Action `hasSideEffects` / `idempotent` | Declared hints, not enforcement or safe retry certification |
+| Async | `accepted` with opaque execution ID, status/event as ordinary Interactions | No required Execution Thing or workflow engine |
+| Runtime | **Bun ^1.4.4 / TypeScript** | `bun fmt`, `bunx oxlint`, `bun check`, `bun test` and schema validation in CI |
+| Agents | Implementing and consuming agents are primary schema clients | Human editing convenience is not a design requirement |
 
-## Decisions intentionally left to implementers
+## Explicitly delegated to application authors
 
-Which Interactions to expose, domain entity/Thing granularity, names and identifiers, state graph, guards, storage, transactions, authorizations, next candidates, client interpretation and policy, external APIs, streaming backend, retries and business side effects.
+Which Interactions exist, domain ID shapes, business state and policy, authorization, Guards, effect semantics, concurrency, transactions, retry suggestions, generated reports, persistence, deployment, and next candidates. The framework must make these expressible, not decide them.
 
-## Future framework questions
+## Remaining framework questions
 
-- Stronger JSON Schema validation and static handler type-checking
-- Cross-app delegation/federated InteractionRefs
-- Protocol adapters including WoT mappings
-- Typed domain error detail definitions and contextual recovery guidance consistency
-- Authenticated Discovery, policy filtering and reference lifetime
-- Verification against unfamiliar agents, not only scripted tests
+Full JSON Schema dialect support, statically typed binding against generated Handler types, authenticated Discovery, network adapters, cross-app delegation, error detail schemas and independent unfamiliar-agent evaluations.
 
-**Historical v0.1 prose, draft PRs and research notes are non-normative.** If they mention mandatory ThingRef-based InteractionRefs, defer to v0.2.
-
-[Main README](../README.md) · [Scope](scope-and-boundaries.md)
+[ANWA v0.2 contract](../spec/anwa-0.2.md) · [TypeScript architecture](architecture.md)

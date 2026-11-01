@@ -17,7 +17,7 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 
 | Question ANWA owns | Why it matters |
 | --- | --- |
-| What should the minimal **top-level Interaction schema contract** guarantee? | An app can publish standalone Interactions without declaring Things; schemas and refs must remain interoperable |
+| What should the minimal **top-level Interaction schema contract** guarantee? | An app can publish standalone Interactions; no Thing-related schema field exists |
 | What is the minimal **Interaction Response**? | Stable Outcome + Context semantics on success/domain failure/accepted execution, with flexible/empty navigation hints |
 | How do we validate **`context.next` InteractionRefs**, optional inputs, guidance and timing? | Single list of app-supplied candidate Interactions, including retries, without choosing the business step |
 | How should schema entries bind to **application-provided handlers, guards and resolvers**? | Authoring ergonomics and reliable declarations without duplicating business logic |
@@ -46,7 +46,7 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 
 ## Not ANWA design questions
 
-- Should every Order be a Thing? What is the best business entity granularity?
+- How should an application identify individual domain objects or choose between per-record and service-oriented APIs? This remains application design, not ANWA Core.
 - What are the actual payment/order states or cancellation preconditions?
 - Does the app use a state machine, events, queues, a database or a particular cloud?
 - Which return-link is best for a specific end user's goal?
@@ -59,7 +59,7 @@ These may be **test scenarios**, but their answers belong to the app developer o
 
 | Example test | What ANWA's expressiveness should be evaluated for | What remains app-defined |
 | --- | --- | --- |
-| Order Thing vs OrderService Thing | Can both declare interactions and relevant result context? | Which grain to use |
+| Per-record versus service-oriented order APIs | Can both expose equivalent Interactions and contextual continuations? | Domain ID shape and API organization |
 | Shipping blocks cancellation | Can a guard/result convey structured reason and follow-up link? | How shipping state is checked; actual policy |
 | Async payment | Can an app return execution reference and later outcome? | Durability, payment execution, lifecycle details |
 | Report streaming | Can an app expose incremental output and a final result? | Content generator, storage and delivery backend |

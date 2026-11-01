@@ -3,14 +3,23 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.4",
   "engines": {
-    "node": ">=20"
+    "bun": "^1.4.4"
   },
   "scripts": {
-    "test": "node --test",
-    "demo": "node demo/run.mjs",
-    "validate": "node tools/anwa.mjs validate demo/calculator/anwa.json demo/orders/anwa.json demo/reports/anwa.json",
-    "types:orders": "node tools/anwa.mjs generate demo/orders/anwa.json demo/orders/types.generated.d.ts",
-    "inspect:orders": "node tools/anwa.mjs inspect demo/orders/anwa.json"
+    "test": "bun test",
+    "demo": "bun demo/run.ts",
+    "validate": "bun tools/anwa.ts validate demo/calculator/anwa.json demo/orders/anwa.json demo/reports/anwa.json",
+    "types:orders": "bun tools/anwa.ts generate demo/orders/anwa.json demo/orders/types.generated.d.ts",
+    "inspect:orders": "bun tools/anwa.ts inspect demo/orders/anwa.json",
+    "format": "bun fmt src demo test tools",
+    "format:check": "bun fmt --check src demo test tools",
+    "typecheck": "bun check",
+    "lint:check": "bunx oxlint src demo test tools"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "oxlint": "1.90.0"
   }
 }

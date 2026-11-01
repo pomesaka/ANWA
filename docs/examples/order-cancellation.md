@@ -1,75 +1,93 @@
-# Order cancellation — Interaction-first example
+# Order cancellation — Handler-owned Context (ANWA v0.2)
 
-> **Experimental ANWA v0.2**. The application uses *optional* Order/Shipment Thing metadata, but every operation is a standalone Interaction. This is an expressiveness example, not a required business architecture.
+> Experimental example based on [the executable Orders demo](../../demo/orders/index.ts). The domain contains orders and shipments, but **ANWA Core does not define Things**.
 
-## Public schema excerpt
+## Schema
+
+An `anwa.json` Interaction declaration describes `order.cancel` independently of any domain entity parent:
 
 ```json
 {
-  "anwa": "0.2",
-  "entrypoints": ["order.get", "order.cancel", "shipment.track"],
-  "things": {
-    "Order": {"title":"Purchase order","description":"Order metadata"},
-    "Shipment": {"title":"Shipment","description":"Shipment metadata"}
+  "kind": "action",
+  "description": "Cancel an order when permitted.",
+  "input": {
+    "type": "object",
+    "properties": {
+      "orderId": { "type": "string" },
+      "reason": { "type": "string" }
+    },
+    "required": ["orderId", "reason"],
+    "additionalProperties": false
   },
-  "interactions": {
-    "order.cancel": {
-      "kind": "action",
-      "description": "Request cancellation of an order.",
-      "subjectType": "Order",
-      "input": {
-        "type": "object",
-        "properties": {
-          "orderId": {"type":"string"},
-          "reason": {"type":"string"}
-        },
-        "required": ["orderId", "reason"],
-        "additionalProperties": false
-      },
-      "output": {"type":"object","properties":{"status":{"type":"string"}},"required":["status"]},
-      "errors": {
-        "NOT_FOUND":"Order not found",
-        "ORDER_ALREADY_SHIPPED":"Cancellation blocked by shipping",
-        "ALREADY_CANCELLED":"Order already cancelled",
-        "ORDER_STATE_CHANGED":"State changed while cancellation was attempted"
-      },
-      "guard": "canCancel",
-      "hasSideEffects": true,
-      "idempotent": false
+  "output": {
+    "type": "object",
+    "properties": { "status": { "type": "string" } },
+    "required": ["status"]
+  },
+  "errors": {
+    "NOT_FOUND": "The order was not found.",
+    "ORDER_ALREADY_SHIPPED": "Cancellation is unavailable after shipping.",
+    "ALREADY_CANCELLED": "The order has already been cancelled.",
+    "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
+  },
+  "guard": "canCancel",
+  "hasSideEffects": true,
+  "idempotent": false
+}
+```
+
+This is an excerpt of one definition, not a complete manifest. See [demo/orders/anwa.json](../../demo/orders/anwa.json) for the actual schema and other Interactions.
+
+## Handler and Context
+
+The **same Interaction Handler owns both its execution result and its follow-up candidates**. There is no global Context callback.
+
+```ts
+const app = new AnwaApp(schema);
+app.bind({
+  "order.cancel": async ({ input }) => {
+    const decision = await app.assess("order.cancel", input);
+    if (!decision.allowed) {
+      const next = decision.error.code === "ORDER_ALREADY_SHIPPED"
+        ? [{
+            ref: "shipment.track",
+            input: { shipmentId: await getShipmentId(input.orderId) },
+            guidance: { level: "recommended" }
+          }]
+        : [];
+      return reply({ ok: false, error: decision.error }, next);
     }
+    const order = await cancelConditionally(input.orderId, input.reason);
+    return reply(ok({ status: order.status }), [
+      { ref: "order.get", input: { orderId: input.orderId },
+        guidance: { level: "recommended" } }
+    ]);
+  }
+}, {
+  guards: { canCancel: async ({ input }) => canCancelOrder(input.orderId) }
+});
+```
+
+The code is illustrative; the real, runnable Handler is in [demo/orders/index.ts](../../demo/orders/index.ts). The named Guard is **bound by ANWA but explicitly called by the Handler**. The application still enforces authorization and atomic updates. A delayed or stale Guard check is not a transaction.
+
+A shipping-related domain failure might return:
+
+```json
+{
+  "outcome": {
+    "kind": "settled",
+    "result": { "ok": false, "error": { "code": "ORDER_ALREADY_SHIPPED", "effects": "none" } }
+  },
+  "context": {
+    "next": [{
+      "ref": "shipment.track",
+      "input": { "shipmentId": "shipped-ship" },
+      "guidance": { "level": "recommended" }
+    }]
   }
 }
 ```
 
-The actual manifest is [demo/orders/anwa.json](../../demo/orders/anwa.json); it additionally declares `order.get` and `shipment.track`. The excerpt above uses the same structure but is **not** a full standalone app because its entrypoints reference undeclared Interactions.
+This is **another Interaction**, not a retry. A retry (when warranted) would reference the **same** Interaction with `guidance.kind: "retry"`. The consuming agent chooses whether to follow a candidate based on the user's delegated goal.
 
-## Implementation and binding
-
-```js
-const app = new AnwaApp(manifest).bind({
-  "order.cancel": async ({input}) => cancelOrder(input.orderId, input.reason),
-  "order.get": async ({input}) => readOrder(input.orderId),
-  "shipment.track": async ({input}) => trackShipment(input.shipmentId)
-},{
-  guards:{canCancel: async ({input}) => checkCancellation(input.orderId)},
-  context:({ref,input,outcome}) => {
-    if(ref==="order.cancel" && outcome?.result?.error?.code==="ORDER_ALREADY_SHIPPED")
-      return {next:[{
-        ref:"shipment.track",
-        input:{shipmentId:findShipmentId(input.orderId)},
-        guidance:{level:"recommended"}
-      }]};
-    return {next:[]};
-  }
-});
-```
-
-These functions are illustrative application code, not ANWA SDK functions. The real, runnable example is [demo/orders/index.mjs](../../demo/orders/index.mjs).
-
-## Why this matters
-
-The result of a failed `order.cancel` carries an Error code explaining *why*, then `context.next` offers a different standalone Interaction to investigate the shipment. The agent chooses whether that is relevant to the user. **No per-order Thing or ThingRef is necessary**; the IDs are normal typed inputs.
-
-ANWA validates declared errors and references, but the application enforces authorization, transactions, side effects, state transitions and contextual next-action choices.
-
-[Architecture](../architecture.md) · [v0.2 specification](../../spec/anwa-0.2.md)
+[TypeScript architecture](../architecture.md) · [ANWA v0.2 spec](../../spec/anwa-0.2.md)
