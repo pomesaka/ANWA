@@ -37,8 +37,8 @@ export function createReports() {
             response: {
               outcome: { kind: "settled", result: ok(job.text) },
               context: {
-                links: [],
-                affordances: [{ ref: interaction(ref, "property", "result") }]
+                next: [{ ref: interaction(ref, "property", "result"),
+                  guidance: { level: "recommended" } }]
               }
             }
           });
@@ -48,13 +48,14 @@ export function createReports() {
     },
     context: ({ outcome }) => outcome?.kind === "accepted"
       ? {
-          links: [{ rel: "execution", target: outcome.execution }],
-          affordances: [
-            { ref: interaction(outcome.execution, "property", "status") },
-            { ref: interaction(outcome.execution, "event", "updates") }
+          next: [
+            { ref: interaction(outcome.execution, "property", "status"),
+              guidance: { level: "available" } },
+            { ref: interaction(outcome.execution, "event", "updates"),
+              guidance: { level: "recommended" } }
           ]
         }
-      : { links: [], affordances: [] }
+      : { next: [] }
   });
 
   app.bind("Execution", {
@@ -65,9 +66,7 @@ export function createReports() {
         const job = jobs.get(target.id);
         if (!job) return fail("NOT_FOUND");
         return job.status === "completed" ? ok(job.text)
-          : fail("NOT_READY", "Execution is still running", {
-              retry: { mode: "after", after: "PT0.05S" }
-            });
+          : fail("NOT_READY", "Execution is still running");
       }
     },
     events: {
@@ -82,16 +81,29 @@ export function createReports() {
         }
       })()
     },
-    context: ({ thing: target }) => jobs.has(target.id)
-      ? {
-          links: [],
-          affordances: [
-            { ref: interaction(target, "property", "status") },
-            { ref: interaction(target, "property", "result") },
-            { ref: interaction(target, "event", "updates") }
-          ]
-        }
-      : { links: [], affordances: [] }
+    context: ({ thing: target, interaction: source, outcome }) => {
+      const job = jobs.get(target.id);
+      if (!job) return { next: [] };
+      const next = [
+        { ref: interaction(target, "property", "status"),
+          guidance: { level: "available" } },
+        { ref: interaction(target, "event", "updates"),
+          guidance: { level: job.status === "completed" ? "available" : "recommended" } }
+      ];
+      if (job.status === "completed") {
+        next.push({ ref: interaction(target, "property", "result"),
+          guidance: { level: "recommended" } });
+      } else if (source?.name === "result" &&
+                 outcome?.kind === "settled" &&
+                 outcome.result?.error?.code === "NOT_READY") {
+        next.push({
+          ref: interaction(target, "property", "result"),
+          guidance: { kind: "retry", level: "recommended" },
+          when: { after: "PT0.05S" }
+        });
+      }
+      return { next };
+    }
   });
   return app;
 }
