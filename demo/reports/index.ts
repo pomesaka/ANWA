@@ -4,6 +4,7 @@ import {
   fail,
   ok,
   reply,
+  type InteractionResponse,
 } from "../../src/anwa.ts";
 
 import { schema } from "./contract.generated.ts";
@@ -12,7 +13,7 @@ const sleep = (milliseconds: number): Promise<void> =>
 type ReportEvent =
   | { type: "state.changed"; sequence: number; state: string }
   | { type: "artifact.delta"; sequence: number; data: string }
-  | { type: "settled"; sequence: number; response: ReturnType<typeof reply> };
+  | { type: "settled"; sequence: number; response: InteractionResponse };
 interface ReportJob {
   status: "accepted" | "running" | "completed";
   events: ReportEvent[];
