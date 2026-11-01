@@ -17,18 +17,18 @@ The essential properties are **semantic precision, deterministic resolution, ver
 
 | Responsibility | ANWA schema / framework | Application implementation |
 | --- | --- | --- |
-| Domain concepts | Descriptions and **optional semantic identifiers** for published Things and interactions | Chooses Thing boundaries and actual concepts |
-| Interactions | Declared Property / Action / Event, typed input/output | Implements handlers and effects |
+| Domain concepts | Standalone Interactions and **optional Thing metadata / semantic identifiers** | Chooses whether Things exist, and how resource identifiers appear in inputs |
+| Interactions | Top-level `query` / `action` / `event` with typed inputs and outputs | Implements handlers and effects |
 | Guard | Optional named hook | Actual predicate and authorization / consistency enforcement |
 | Domain errors | Exhaustive application-declared error codes | Chooses which errors exist; implements conditions |
 | Effects and repeatability | Optional `hasSideEffects` / `idempotent` booleans on Actions | Actual side effects, retries, enforcement and concurrency |
 | Runtime navigation | Typed `context.next` candidates with optional guidance/timing/applicability | Which next interactions/discovery targets are exposed in this context |
-| References | App-scoped ThingRef + InteractionRef resolution | Instance existence and resource identity policy |
+| References | App-scoped InteractionRef string resolution, with optional Thing metadata | How an application identifies a business object in input |
 | Protocol | Logical Discovery / Interaction contracts, adapters to be defined | Hosting, storage, permissions and transports |
 
 Neither natural-language descriptions nor semantic identifiers nor effect declarations are proof that an action is safe, authorized, or guaranteed to succeed.
 
-## Candidate v0.1 machine description vocabulary
+## Current v0.2 machine description vocabulary
 
 The existing required fields remain unchanged. Two **optional** semantic annotations are now part of the experimental schema and Discovery representation:
 
@@ -92,22 +92,19 @@ An Action without either flag remains valid. Guards, state transition graphs, an
 The most useful unit for a consuming agent is **a discoverable interaction description**, not an entire raw manifest. The runtime currently supports:
 
 1. `catalog()`: published Thing summaries and entrypoints.
-2. `discover(ThingRef)`: descriptions of offered interactions with their typed inputs/outputs, declared domain errors, optional semantics/effects and a navigation Context.
+2. `discover(InteractionRef)`: a standalone Interaction definition, typed input/output, declared errors, optional semantic/effect metadata and a navigation Context.
 3. `interact(InteractionRef, input?)`: domain `Outcome + Context`, including **both success and expected domain failure**.
-4. Optional `observe(EventInteractionRef)`: observations for apps that provide them, including asynchronous execution.
+4. Optional `observe(InteractionRef, input?)`: observations through an Event Interaction, which may be used for an asynchronous execution.
 
-A `Context` contains `next: []` even when the application offers no candidate. This is a single list of application-chosen follow-ups, not a command to execute them; retries are ordinary InteractionRef candidates with `guidance.kind: "retry"`.
+A `Context` contains `next: []` even when the application offers no candidate. Each candidate refers to a **top-level InteractionRef string**, optionally including input values; retries refer to the same Interaction with `guidance.kind: "retry"`. These are not instructions to the agent.
 
 ```json
 {
   "outcome": {"kind":"settled","result":{"ok":false,"error":{"code":"ORDER_ALREADY_SHIPPED","effects":"none"}}},
   "context": {
     "next": [{
-      "ref": {
-        "thing": {"type":"Shipment","id":"ship-1"},
-        "kind":"property",
-        "name":"tracking"
-      },
+      "ref": "shipment.track",
+      "input": {"shipmentId":"ship-1"},
       "guidance": {"level":"recommended"}
     }]
   }
@@ -147,4 +144,4 @@ The proposed contract remains **a hypothesis** until an unfamiliar agent uses it
 - [W3C WoT Discovery](https://www.w3.org/TR/wot-discovery/): description discovery and access constraints.
 - [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12): an established vocabulary for data types and validation; the prototype supports a constrained subset.
 
-[0.1 contract](anwa-0.1.md) · [0.1 manifest schema](anwa-0.1.schema.json) · [Decision status](../docs/decisions.md)
+[v0.2 contract](anwa-0.2.md) · [v0.2 manifest schema](anwa-0.2.schema.json) · [Decision status](../docs/decisions.md)
