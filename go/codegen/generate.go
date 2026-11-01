@@ -3,7 +3,6 @@
 package codegen
 
 import (
-	"bytes"
 	"fmt"
 	"go/format"
 	"sort"
@@ -141,7 +140,7 @@ func Generate(m anwa.Manifest, packageName string) ([]byte, error) {
 			fmt.Fprintf(&out, " return server.%s(ctx, request, cursor)\n },\n", name)
 		} else {
 			fmt.Fprintf(&out, " Run: func(ctx context.Context, args anwa.Args) (anwa.Response, error) {\n")
-			writeDecode(&out, name, spec.Input != nil)
+			writeDecode(&out, name, spec.Input != nil, false)
 			fmt.Fprintf(&out, " result, err := server.%s(ctx, request)\n", name)
 			fmt.Fprintf(&out, " if err != nil { return anwa.Response{}, err }\n")
 			fmt.Fprintf(&out, " if result == nil { return anwa.Response{}, fmt.Errorf(%q) }\n", ref+": nil response")
