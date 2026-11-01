@@ -13,5 +13,5 @@ export function createCalculator(): AnwaApp<typeof schema> {
             }),
           )
         : reply(ok(input.a / input.b)),
-  });
+  }, { public: ["calculator.add", "calculator.divide"] });
 }
