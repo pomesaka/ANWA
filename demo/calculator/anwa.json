@@ -1,74 +1,68 @@
 {
-  "anwa": "0.1",
+  "anwa": "0.2",
   "entrypoints": [
-    {
-      "type": "Calculator",
-      "id": "main"
-    }
+    "calculator.add",
+    "calculator.divide"
   ],
-  "things": {
-    "Calculator": {
-      "title": "Calculator",
-      "description": "A stateless arithmetic service with no guards or state machine.",
-      "actions": {
-        "add": {
-          "description": "Add two numbers.",
-          "input": {
-            "type": "object",
-            "properties": {
-              "a": {
-                "type": "number",
-                "description": "The first numeric operand."
-              },
-              "b": {
-                "type": "number",
-                "description": "The second numeric operand."
-              }
-            },
-            "required": [
-              "a",
-              "b"
-            ],
-            "additionalProperties": false
-          },
-          "output": {
+  "interactions": {
+    "calculator.add": {
+      "kind": "action",
+      "description": "Add two numbers.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "a": {
             "type": "number",
-            "description": "Sum of a and b."
+            "description": "The first numeric operand."
           },
-          "hasSideEffects": false,
-          "idempotent": true
+          "b": {
+            "type": "number",
+            "description": "The second numeric operand."
+          }
         },
-        "divide": {
-          "description": "Divide a by b; division by zero is a typed domain failure.",
-          "input": {
-            "type": "object",
-            "properties": {
-              "a": {
-                "type": "number",
-                "description": "The first numeric operand."
-              },
-              "b": {
-                "type": "number",
-                "description": "The second numeric operand."
-              }
-            },
-            "required": [
-              "a",
-              "b"
-            ],
-            "additionalProperties": false
-          },
-          "output": {
+        "required": [
+          "a",
+          "b"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "number",
+        "description": "Sum of a and b."
+      },
+      "hasSideEffects": false,
+      "idempotent": true
+    },
+    "calculator.divide": {
+      "kind": "action",
+      "description": "Divide a by b; division by zero is a typed domain failure.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "a": {
             "type": "number",
-            "description": "Quotient a / b."
+            "description": "The first numeric operand."
           },
-          "errors": {
-            "DIVIDE_BY_ZERO": "The divisor must be nonzero."
-          },
-          "hasSideEffects": false,
-          "idempotent": true
-        }
-      }
+          "b": {
+            "type": "number",
+            "description": "The second numeric operand."
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "number",
+        "description": "Quotient a / b."
+      },
+      "errors": {
+        "DIVIDE_BY_ZERO": "The divisor must be nonzero."
+      },
+      "hasSideEffects": false,
+      "idempotent": true
     }
   }
 }
