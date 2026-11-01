@@ -5,20 +5,9 @@
     "order.cancel",
     "shipment.track"
   ],
-  "things": {
-    "Order": {
-      "title": "Purchase order",
-      "description": "An order with application-defined status and cancellation policy."
-    },
-    "Shipment": {
-      "title": "Shipment",
-      "description": "Shipment tracking data associated with an order."
-    }
-  },
   "interactions": {
     "order.get": {
       "kind": "query",
-      "subjectType": "Order",
       "description": "Read the current state of an order by its ID.",
       "input": {
         "type": "object",
@@ -56,7 +45,6 @@
     },
     "order.cancel": {
       "kind": "action",
-      "subjectType": "Order",
       "description": "Request cancellation of an order.",
       "guard": "canCancel",
       "input": {
@@ -100,7 +88,6 @@
     },
     "shipment.track": {
       "kind": "query",
-      "subjectType": "Shipment",
       "description": "Read current shipment tracking state by shipment ID.",
       "input": {
         "type": "object",
