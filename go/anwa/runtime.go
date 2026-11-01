@@ -388,7 +388,7 @@ func (a *App) declaredError(spec Interaction, err *DomainError) bool {
 func validEffects(value string) bool {
 	return value == "" || value == "none" || value == "occurred" || value == "unknown"
 }
-var durationPattern = regexp.MustCompile(`^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$`)
+var durationPattern = regexp.MustCompile(`^P(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)
 
 func (a *App) validNext(source string, next []Next) bool {
 	for _, choice := range next {
@@ -412,7 +412,7 @@ func (a *App) validNext(source string, next []Next) bool {
 				return false
 			}
 		}
-		if choice.When != nil && !durationPattern.MatchString(choice.When.After) {
+		if choice.When != nil && (!durationPattern.MatchString(choice.When.After) || !strings.ContainsAny(choice.When.After, "0123456789")) {
 			return false
 		}
 		if p := choice.Applicability; p != nil &&
