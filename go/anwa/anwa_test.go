@@ -155,7 +155,7 @@ func TestContractViolationsAreOpaque(t *testing.T) {
 		{"undeclared domain error", func(_ context.Context, _ Args) (Response, error) { return Reply(Fail("PRIVATE_ERROR")), nil }},
 		{"invalid success output", func(_ context.Context, _ Args) (Response, error) { return Reply(OK(123)), nil }},
 		{"unknown next", func(_ context.Context, _ Args) (Response, error) { return Reply(OK("ok"), Next{Ref: "secret.missing"}), nil }},
-		{"retry wrong source", func(_ context.Context, _ Args) (Response, error) { return Reply(OK("ok"), Next{Ref: "public.ping", Guidance: &Guidance{Kind: "retry"}}), nil }},
+		{"invalid retry timing", func(_ context.Context, _ Args) (Response, error) { return Reply(OK("ok"), Next{Ref: "public.ping", Guidance: &Guidance{Kind: "retry"}, When: &Timing{After: "tomorrow"}}), nil }},
 		{"accepted query", func(_ context.Context, _ Args) (Response, error) { return Accepted("id"), nil }},
 		{"handler error", func(_ context.Context, _ Args) (Response, error) { return Response{}, errors.New("private information") }},
 		{"handler panic", func(_ context.Context, _ Args) (Response, error) { panic("secret stacktrace") }},
