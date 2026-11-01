@@ -1,53 +1,60 @@
 # ANWA v0.2 — Interaction-first architecture
 
-> Active experimental runtime: [TypeScript source](../src/anwa.ts). [Public schema](../spec/anwa-0.2.md).
+> Experimental reference runtime: [TypeScript](../src/anwa.ts). [Public schema](../spec/anwa-0.2.md).
 
-## Responsibilities
+ANWA Core publishes standalone Interactions. No Thing, ThingRef, domain-instance registry, global Context resolver or mandatory state machine is required.
 
-The first-class public object is a **standalone Interaction**. ANWA Core has no Thing, ThingRef, `things` collection, `subjectType`, domain entity registry, or required state machine.
+## Four responsibilities
 
-1. **Description:** an `InteractionRef → InteractionDefinition` map defining input, output, errors, purpose and optional action properties.
-2. **Binding:** bind each declared Interaction to a TypeScript Handler and optional named guard.
-3. **Discovery:** provide a catalog and a typed description for an InteractionRef, without a Thing parent.
-4. **Invocation:** call an Interaction Handler, validate its response, and forward its **Outcome + Context**.
+1. **Description:** public JSON schema declares Interactions and their input/output/error contracts.
+2. **Binding:** each declared Interaction is connected to a Handler; Actions can also reference a named Guard.
+3. **Discovery:** the public catalog and per-Interaction descriptions let an agent discover the contract.
+4. **Interaction:** the Runtime validates the input, runs a Guard if declared, dispatches the Handler and validates **Outcome + Context**.
 
-## Handler-owned Context
+## Handler-owned Context, Runtime-enforced Guard
 
-Each Handler builds its own response. There is **no application-wide Context callback**.
+The application implementation supplies Context on the same Interaction that produces the result:
 
 ```ts
-import { AnwaApp, fail, ok, reply } from "../src/anwa.ts";
-
-const app = new AnwaApp(manifest);
-app.bind({
-  "order.get": async ({ input }) => reply(ok(await loadOrder(input.orderId))),
-  "order.cancel": async ({ input }) => {
-    const decision = await app.assess("order.cancel", input);
-    if (!decision.allowed) {
-      return reply({ ok: false, error: decision.error }, [
-        { ref: "shipment.track", input: { shipmentId: await shipmentIdFor(input.orderId) },
-          guidance: { level: "recommended" } },
+const app = new AnwaApp(schema).bind({
+  "order.get": async ({input}) => reply(ok(await readOrder(input.orderId))),
+  "order.cancel": {
+    run: async ({input}) => {
+      const result = await cancelConditionally(input.orderId, input.reason);
+      return reply(ok(result), [
+        {ref:"order.get", input:{orderId:input.orderId}, guidance:{level:"recommended"}}
       ]);
+    },
+    onDenied: async ({input, error}) => {
+      // This Interaction owns the next candidates even when its Guard rejects it.
+      return error.code === "ORDER_ALREADY_SHIPPED"
+        ? [{ref:"shipment.track", input:{shipmentId:await shipmentIdFor(input.orderId)},
+            guidance:{level:"recommended"}}]
+        : [];
     }
-    const updated = await cancelOrder(input.orderId, input.reason);
-    return reply(ok(updated), [
-      { ref: "order.get", input: { orderId: input.orderId },
-        guidance: { level: "recommended" } },
-    ]);
-  },
-}, { guards: { canCancel: async ({ input }) => checkCancellation(input.orderId) } });
+  }
+}, {
+  guards: {canCancel: async ({input}) => checkCancellation(input.orderId)}
+});
 ```
 
-The functions above are illustrative application code. A named Guard is **bound and validated by the framework, but must be explicitly evaluated by the owning Handler**. The framework does not automatically check policy. Authorization and atomic data updates remain implementation responsibilities.
+This snippet is illustrative; the runnable example is [demo/orders/index.ts](../demo/orders/index.ts).
 
-`reply(ok(value))` produces an empty `context.next` when there is no useful next step. `reply(fail(code), next)` does the same for domain failures. `reply(accepted(executionId), next)` supports asynchronous acceptance. A Handler returning a bare `ok(...)` rather than a complete response is a contract error.
+**Runtime guarantees for declared Guards:**
+- Input is checked **before** the Guard.
+- The named Guard runs **before** the business `run` Handler.
+- If the Guard denies, `run` is never invoked; the Runtime keeps the declared Guard error as the Outcome.
+- The Interaction-specific `onDenied` callback supplies only `context.next`, and malformed output becomes an opaque `UNEXPECTED_ERROR`.
+- A missing Guard or `onDenied` is rejected at binding time.
 
-## Next Interactions
+This preflight **does not** replace application authorization, atomic state transitions or transactional storage: a Guard can become stale before the actual mutation. Guards and Handlers remain ordinary application code.
 
-`context.next` is a single list of references to published Interactions, optionally with bound `input`, advisory `guidance`, `when.after` timing and `applicability`. A retry is the same InteractionRef with `guidance.kind: "retry"`. The framework validates refs and supported input schemas but **does not select the next business step**.
+An unguarded Interaction simply returns `reply(ok(value), next)` or `reply(fail(code), next)`. There is **no app-level Context callback**. The Runtime does not choose the next business step.
 
-## Implementation
+## Schema-derived TypeScript types
 
-The reference is written in **TypeScript** and runs under **Bun ^1.4.4**. CI checks `bun fmt --check`, `bunx oxlint`, `bun check`, manifest validation, `bun test`, and all demos. It is not a production network framework; no transport, authentication, durable job engine, distributed transaction or full JSON Schema validation is provided.
+The author-maintained `anwa.json` is the source of truth. `bun run codegen` produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
 
-[README](../README.md) · [Demos](../demo/README.md) · [Error/next semantics](error-recovery-navigation.md)
+CI regenerates the contract and fails on drift; it also runs strict `bun check`, Formatter, Oxlint, Bun tests and demos. Runtime validation remains essential for untrusted agent inputs.
+
+[ANWA spec](../spec/anwa-0.2.md) · [Schema authoring](schema-authoring.md)
