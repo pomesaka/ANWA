@@ -7,7 +7,9 @@ export const fail = (code, message, extra = {}) => ({
   ok: false, error: { code, ...(message ? { message } : {}), ...extra }
 });
 export const accepted = execution => ({ kind: "accepted", execution });
-const emptyContext = () => ({ links: [], affordances: [] });
+const emptyContext = () => ({ next: [] });
+const GUIDANCE_LEVELS = new Set(["required", "recommended", "available"]);
+const AFTER_DURATION = /^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$/;
 const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 const RESERVED_ERRORS = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
 const unexpected = () => fail("UNEXPECTED_ERROR", "Unexpected application failure", {
@@ -161,17 +163,54 @@ export class AnwaApp {
   }
 
   #context(raw) {
-    const result = { ...emptyContext(), ...(raw ?? {}) };
-    if (!Array.isArray(result.links) || !Array.isArray(result.affordances)) {
-      throw new Error("Invalid context arrays");
+    const result = raw ?? emptyContext();
+    if (!result || typeof result !== "object" || Array.isArray(result) ||
+        Object.keys(result).some(k => k !== "next") ||
+        !Array.isArray(result.next)) {
+      throw new Error("Interaction Context must be {next: []}");
     }
-    for (const link of result.links) {
-      if (typeof link.rel !== "string") throw new Error("Invalid link relation");
-      this.#lookup(link.target);
-    }
-    for (const affordance of result.affordances) {
-      const ref = affordance.ref;
-      this.#lookup(ref?.thing, ref?.kind, ref?.name);
+    for (const next of result.next) {
+      if (!next || typeof next !== "object" || Array.isArray(next) ||
+          Object.keys(next).some(k => !["kind", "ref", "guidance", "when", "applicability"].includes(k))) {
+        throw new Error("Invalid next-interaction candidate");
+      }
+      if (next.kind === "discover") {
+        if (next.ref?.thing || !next.ref?.type ||
+            next.guidance?.kind === "retry") {
+          throw new Error("Discover next requires ThingRef and cannot be retry");
+        }
+        this.#lookup(next.ref);
+      } else if (next.kind === undefined) {
+        this.#lookup(next.ref?.thing, next.ref?.kind, next.ref?.name);
+      } else {
+        throw new Error("Unsupported next-interaction kind");
+      }
+      if (next.guidance !== undefined) {
+        const g = next.guidance;
+        if (!g || typeof g !== "object" || Array.isArray(g) ||
+            Object.keys(g).some(k => !["kind", "level"].includes(k)) ||
+            (g.kind !== undefined && g.kind !== "retry") ||
+            (g.level !== undefined && !GUIDANCE_LEVELS.has(g.level))) {
+          throw new Error("Invalid next-interaction guidance");
+        }
+      }
+      if (next.when !== undefined) {
+        const when = next.when;
+        if (!when || typeof when !== "object" || Array.isArray(when) ||
+            Object.keys(when).length !== 1 || typeof when.after !== "string" ||
+            !AFTER_DURATION.test(when.after)) {
+          throw new Error("Invalid next-interaction timing");
+        }
+      }
+      if (next.applicability !== undefined) {
+        const a = next.applicability;
+        if (!a || typeof a !== "object" || Array.isArray(a) ||
+            Object.keys(a).some(k => !["state", "reason"].includes(k)) ||
+            !["available", "blocked", "unknown"].includes(a.state) ||
+            (a.reason !== undefined && typeof a.reason !== "string")) {
+          throw new Error("Invalid applicability hint");
+        }
+      }
     }
     return result;
   }
