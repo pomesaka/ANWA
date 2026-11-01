@@ -1,7 +1,14 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { AnwaApp, fail, ok, reply, type Manifest, type InteractionResponse } from "../src/anwa.ts";
+import {
+  AnwaApp,
+  fail,
+  ok,
+  reply,
+  type Manifest,
+  type InteractionResponse,
+} from "../src/anwa.ts";
 import { validateManifest, generateTypes } from "../src/schema-tools.ts";
 
 const fixture = (path: string): Manifest =>
@@ -26,29 +33,38 @@ const minimal = (): Manifest => ({
 test("Three demo manifests validate without Thing declarations", () => {
   for (const manifest of manifests) {
     assert.deepEqual(validateManifest(manifest), []);
-    assert.deepEqual(Object.keys(manifest).sort(), ["anwa", "entrypoints", "interactions"]);
+    assert.deepEqual(Object.keys(manifest).sort(), [
+      "anwa",
+      "entrypoints",
+      "interactions",
+    ]);
   }
 });
 
 test("Thing and subjectType are forbidden core fields", () => {
   const old = structuredClone(manifests[1]) as Manifest & { things?: unknown };
   old.things = { Order: { title: "Order", description: "Not core" } };
-  const interaction = old.interactions["order.cancel"] as typeof old.interactions[string] & { subjectType?: string };
+  const interaction = old.interactions[
+    "order.cancel"
+  ] as (typeof old.interactions)[string] & { subjectType?: string };
   interaction.subjectType = "Order";
-  const issues = validateManifest(old).map(d => d.path);
+  const issues = validateManifest(old).map((d) => d.path);
   assert.ok(issues.includes("$.things"));
-  assert.ok(issues.some(x => x.endsWith("subjectType")));
+  assert.ok(issues.some((x) => x.endsWith("subjectType")));
   assert.throws(() => new AnwaApp(old), /schema invalid/);
 });
 
 test("Schema detects unknown entrypoints and unsupported payload keywords", () => {
   const bad = structuredClone(manifests[1]);
   bad.entrypoints = ["missing"];
-  const schema = bad.interactions["order.get"].input as object as Record<string, unknown>;
+  const schema = bad.interactions["order.get"].input as object as Record<
+    string,
+    unknown
+  >;
   schema.pattern = "not supported";
-  const issues = validateManifest(bad).map(x => x.path);
-  assert.ok(issues.some(x => x.includes("entrypoints")));
-  assert.ok(issues.some(x => x.includes("pattern")));
+  const issues = validateManifest(bad).map((x) => x.path);
+  assert.ok(issues.some((x) => x.includes("entrypoints")));
+  assert.ok(issues.some((x) => x.includes("pattern")));
 });
 
 test("Type generation is keyed by top-level InteractionRef", () => {
@@ -62,31 +78,49 @@ test("Type generation is keyed by top-level InteractionRef", () => {
 
 test("Binding rejects absent or undeclared handlers", () => {
   const app = new AnwaApp(manifests[0]);
-  assert.throws(() => app.bind({ "calculator.add": async () => reply(ok(1)) }), /Unbound interaction/);
-  assert.throws(() => app.bind({
-    "calculator.add": async () => reply(ok(1)),
-    "calculator.divide": async () => reply(ok(1)),
-    "unknown": async () => reply(ok(1)),
-  }), /Unknown or invalid/);
+  assert.throws(
+    () => app.bind({ "calculator.add": async () => reply(ok(1)) }),
+    /Unbound interaction/,
+  );
+  assert.throws(
+    () =>
+      app.bind({
+        "calculator.add": async () => reply(ok(1)),
+        "calculator.divide": async () => reply(ok(1)),
+        unknown: async () => reply(ok(1)),
+      }),
+    /Unknown or invalid/,
+  );
 });
 
 test("Named guard can be assessed by the same handler that constructs Context", async () => {
   const doc = minimal();
   doc.interactions["test.run"].guard = "check";
   const app = new AnwaApp(doc);
-  app.bind({
-    "test.run": async ({ input }) => {
-      const decision = await app.assess("test.run", input);
-      if (!decision.allowed) return reply({ ok: false, error: decision.error }, [
-        { ref: "test.run", guidance: { kind: "retry", level: "available" }, when: { after: "PT30S" } },
-      ]);
-      return reply(ok(null));
+  app.bind(
+    {
+      "test.run": async ({ input }) => {
+        const decision = await app.assess("test.run", input);
+        if (!decision.allowed)
+          return reply({ ok: false, error: decision.error }, [
+            {
+              ref: "test.run",
+              guidance: { kind: "retry", level: "available" },
+              when: { after: "PT30S" },
+            },
+          ]);
+        return reply(ok(null));
+      },
     },
-  }, {
-    guards: {
-      check: async () => ({ allowed: false, error: { code: "EXPECTED_FAILURE", effects: "none" } }),
+    {
+      guards: {
+        check: async () => ({
+          allowed: false,
+          error: { code: "EXPECTED_FAILURE", effects: "none" },
+        }),
+      },
     },
-  });
+  );
   const result = await app.interact("test.run");
   assert.equal(result.outcome.kind, "settled");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
@@ -95,11 +129,15 @@ test("Named guard can be assessed by the same handler that constructs Context", 
 });
 
 test("Undeclared errors are mapped to opaque framework errors", async () => {
-  const app = new AnwaApp(minimal()).bind({ "test.run": async () => reply(fail("SECRET", "private")) });
+  const app = new AnwaApp(minimal()).bind({
+    "test.run": async () => reply(fail("SECRET", "private")),
+  });
   const result = await app.interact("test.run");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
     assert.deepEqual(result.outcome.result.error, {
-      code: "UNEXPECTED_ERROR", message: "Unexpected application failure", effects: "unknown",
+      code: "UNEXPECTED_ERROR",
+      message: "Unexpected application failure",
+      effects: "unknown",
     });
   assert.deepEqual(result.context, { next: [] });
 });
@@ -132,10 +170,19 @@ test("Invalid next candidate prevents success with malformed guidance", async ()
 
 test("Per-handler next result is not overwritten by a global context resolver", async () => {
   const doc = minimal();
-  doc.interactions["test.read"] = { kind: "query", description: "Read something" };
+  doc.interactions["test.read"] = {
+    kind: "query",
+    description: "Read something",
+  };
   const app = new AnwaApp(doc).bind({
-    "test.run": async () => reply(ok(null), [{ ref: "test.read", guidance: { level: "recommended" } }]),
-    "test.read": async () => reply(ok("read"), [{ ref: "test.run", guidance: { level: "available" } }]),
+    "test.run": async () =>
+      reply(ok(null), [
+        { ref: "test.read", guidance: { level: "recommended" } },
+      ]),
+    "test.read": async () =>
+      reply(ok("read"), [
+        { ref: "test.run", guidance: { level: "available" } },
+      ]),
   });
   const one = await app.interact("test.run");
   const two = await app.interact("test.read");

@@ -9,11 +9,11 @@ npm test
 npm run demo
 ```
 
-| Demo | Declared Interactions | Things |
-| --- | --- | --- |
-| [Calculator](calculator/) | `calculator.add`, `calculator.divide` | **None**: pure service operations with typed results |
-| [Orders](orders/) | `order.get`, `order.cancel`, `shipment.track` | **Optional metadata** for Order/Shipment; handlers receive orderId/shipmentId as normal input |
-| [Reports](reports/) | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | **None**: accepted execution ID is data, not an Execution Thing |
+| Demo                      | Declared Interactions                                                          | Things                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| [Calculator](calculator/) | `calculator.add`, `calculator.divide`                                          | **None**: pure service operations with typed results                                          |
+| [Orders](orders/)         | `order.get`, `order.cancel`, `shipment.track`                                  | **Optional metadata** for Order/Shipment; handlers receive orderId/shipmentId as normal input |
+| [Reports](reports/)       | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | **None**: accepted execution ID is data, not an Execution Thing                               |
 
 Each example has an `anwa.json` manifest and an `index.mjs` implementation, bound directly by InteractionRef using [the runtime](../src/anwa.mjs).
 

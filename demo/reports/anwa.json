@@ -1,8 +1,6 @@
 {
   "anwa": "0.2",
-  "entrypoints": [
-    "report.generate"
-  ],
+  "entrypoints": ["report.generate"],
   "interactions": {
     "report.generate": {
       "kind": "action",
@@ -15,9 +13,7 @@
             "description": "Subject of the report to generate."
           }
         },
-        "required": [
-          "topic"
-        ]
+        "required": ["topic"]
       },
       "hasSideEffects": true,
       "idempotent": false
@@ -33,9 +29,7 @@
             "description": "Execution identifier"
           }
         },
-        "required": [
-          "executionId"
-        ],
+        "required": ["executionId"],
         "additionalProperties": false
       },
       "output": {
@@ -57,9 +51,7 @@
             "description": "Execution identifier"
           }
         },
-        "required": [
-          "executionId"
-        ],
+        "required": ["executionId"],
         "additionalProperties": false
       },
       "output": {
@@ -82,9 +74,7 @@
             "description": "Execution identifier"
           }
         },
-        "required": [
-          "executionId"
-        ],
+        "required": ["executionId"],
         "additionalProperties": false
       }
     }

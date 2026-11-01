@@ -1,13 +1,23 @@
 #!/usr/bin/env bun
 import { readFileSync, writeFileSync } from "node:fs";
-import { validateManifest, generateTypes, type Manifest } from "../src/schema-tools.ts";
+import {
+  validateManifest,
+  generateTypes,
+  type Manifest,
+} from "../src/schema-tools.ts";
 
 const [command, ...args] = process.argv.slice(2);
-if (!["validate", "generate", "inspect"].includes(command) || args.length === 0) {
-  console.error("Usage: bun tools/anwa.ts validate|generate|inspect <anwa.json> [output.d.ts]");
+if (
+  !["validate", "generate", "inspect"].includes(command) ||
+  args.length === 0
+) {
+  console.error(
+    "Usage: bun tools/anwa.ts validate|generate|inspect <anwa.json> [output.d.ts]",
+  );
   process.exit(2);
 }
-const load = (path: string): Manifest => JSON.parse(readFileSync(path, "utf8")) as Manifest;
+const load = (path: string): Manifest =>
+  JSON.parse(readFileSync(path, "utf8")) as Manifest;
 
 try {
   if (command === "validate") {
@@ -15,16 +25,25 @@ try {
     for (const path of args) {
       const diagnostics = validateManifest(load(path));
       if (!diagnostics.length) console.log("VALID " + path);
-      else for (const diagnostic of diagnostics) {
-        console.error("INVALID " + path + " " + diagnostic.path + ": " + diagnostic.message);
-        failures++;
-      }
+      else
+        for (const diagnostic of diagnostics) {
+          console.error(
+            "INVALID " +
+              path +
+              " " +
+              diagnostic.path +
+              ": " +
+              diagnostic.message,
+          );
+          failures++;
+        }
     }
     if (failures > 0) process.exitCode = 1;
   } else {
     const manifest = load(args[0]);
     const problems = validateManifest(manifest);
-    if (problems.length) throw Error(problems.map(x => x.path + ": " + x.message).join("\n"));
+    if (problems.length)
+      throw Error(problems.map((x) => x.path + ": " + x.message).join("\n"));
     if (command === "generate") {
       const code = generateTypes(manifest);
       if (args[1]) {
@@ -34,14 +53,29 @@ try {
     } else {
       const lines = ["# ANWA " + manifest.anwa + " Interactions", ""];
       for (const [ref, spec] of Object.entries(manifest.interactions)) {
-        lines.push("## " + ref + " (" + spec.kind + ")", "", spec.description, "");
-        for (const [direction, schema] of [["Input", spec.input], ["Output", spec.output]] as const) {
+        lines.push(
+          "## " + ref + " (" + spec.kind + ")",
+          "",
+          spec.description,
+          "",
+        );
+        for (const [direction, schema] of [
+          ["Input", spec.input],
+          ["Output", spec.output],
+        ] as const) {
           if (!schema) continue;
           lines.push("- " + direction + ": " + schema.type);
-          for (const [field, value] of Object.entries(schema.properties ?? {})) {
-            lines.push("  - " + field + ": " + value.type +
-              (schema.required?.includes(field) ? " (required)" : "") +
-              (value.description ? " — " + value.description : ""));
+          for (const [field, value] of Object.entries(
+            schema.properties ?? {},
+          )) {
+            lines.push(
+              "  - " +
+                field +
+                ": " +
+                value.type +
+                (schema.required?.includes(field) ? " (required)" : "") +
+                (value.description ? " — " + value.description : ""),
+            );
           }
         }
         if (spec.guard) lines.push("- Guard: " + spec.guard);
@@ -53,6 +87,9 @@ try {
     }
   }
 } catch (error) {
-  console.error("ANWA tooling error:", error instanceof Error ? error.message : String(error));
+  console.error(
+    "ANWA tooling error:",
+    error instanceof Error ? error.message : String(error),
+  );
   process.exitCode = 1;
 }
