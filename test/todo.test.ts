@@ -19,11 +19,6 @@ function code(r:InteractionResponse):string {
     throw Error("Expected domain failure: "+JSON.stringify(r.outcome));
   return r.outcome.result.error.code;
 }
-function setup(){
-  const app=createTodo();
-  const ws=value(app.interact("workspace.create",{name:"Engineering"},alice) as never);
-  return {app,ws};
-}
 async function createWorkspace(){
   const app=createTodo();
   const {workspace}=value(await app.interact("workspace.create",{name:"Engineering"},alice));
