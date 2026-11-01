@@ -10,7 +10,7 @@
 
 A human can discover what a web application does by navigating pages and forms. An AI agent should instead be able to **discover application semantics and interactions**, retrieve state, invoke operations, and get enough context to decide where to go next.
 
-ANWA explores an **OpenAPI-like, schema-first development experience**: define the public contract, implement business logic in normal code, and let the framework expose both discovery and interaction interfaces.
+ANWA explores an **OpenAPI-like, schema-first development experience**: application authors define the public contract and implement business logic in normal code. The framework supplies common mechanisms to describe, expose and interact with what authors choose to publish — it does **not** decide an application's domain model or workflow.
 
 **Core principle:** *Every delivered application-level interaction result contains an outcome and the context for what can come next.*
 
@@ -30,13 +30,13 @@ flowchart TB
 
 ### 1. Define the public contract
 
-Describe **Things**, Properties, Actions, Events, Links, input/output types, possible states/transitions, documented errors, and named Guard references.
+Describe the **Things, Properties, Actions, Events, Links, input/output types** and any **optional** state/transition, error or Guard contracts that the application needs. ANWA should make these expressible, not mandatory for every app.
 
 **The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
 
 ### 2. Implement behavior
 
-Developers implement handlers, relation resolvers, state updates, and guards in regular code. The **same guard implementation** may power Discovery-time applicability hints and Invocation-time checks. Real authorization and transactional enforcement still happen on the server.
+Developers choose their domain boundaries, states, policies, related resources and next-action hints. They implement handlers, relation resolvers, and any guards in regular code. Where relevant, the **same named guard** may support Discovery-time applicability hints and Invocation-time checks. Real authorization and transactional enforcement still happen on the server.
 
 ### 3. Serve a navigable application
 
@@ -44,8 +44,8 @@ Two **logical** interfaces—not necessarily two wire protocols:
 
 | Interface | Responsibility |
 | --- | --- |
-| **Discovery** | Find Thing descriptions, semantics, related Links and Property/Action/Event Interaction Affordances, optionally with state/caller-specific applicability hints |
-| **Interaction** | Read, invoke and observe; return **Outcome + Context** (links and next-interaction references), on domain success or failure |
+| **Discovery** | Expose author-declared Thing descriptions, semantics, Links and Property/Action/Event Interaction Affordances, with optional state/caller-specific applicability hints |
+| **Interaction** | Allow applications to read, invoke and observe; carry **Outcome + Context** (possibly empty/restricted links and next-interaction references) on delivered domain results |
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or accept a durable execution to observe later. **Async execution and streaming observation are different concerns.**
 
@@ -66,13 +66,14 @@ ANWA currently adopts the **W3C Web of Things (WoT)** vocabulary as a starting p
 
 ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP and related technologies remain possible adapters rather than required foundations.
 
-[WoT-aligned Glossary](docs/glossary.md) · [Current decisions and non-decisions](docs/decisions.md)
+[WoT-aligned Glossary](docs/glossary.md) · [Framework vs application boundaries](docs/scope-and-boundaries.md) · [Current decisions and non-decisions](docs/decisions.md)
 
 ## Documentation map
 
 | Start here | Document |
 | --- | --- |
 | Vision & scope | [Vision](docs/vision.md) |
+| Responsibility boundary and feature-evaluation method | [Scope & boundaries](docs/scope-and-boundaries.md) |
 | Working decisions / unresolved choices | [Decision status](docs/decisions.md) |
 | Schema-first architecture | [Architecture](docs/architecture.md) |
 | Step-by-step schema + code example | [Order cancellation](docs/examples/order-cancellation.md) |
@@ -110,7 +111,7 @@ These are **references, not mandatory dependencies or endorsements**. Hydra's co
 
 ## Status and contributing
 
-The repository currently hosts **working documents only**. Schema syntax, runtime, protocol bindings, versioning and licensing are not selected. The immediate goal is to test whether schema-first authoring plus contextual Interaction Results lets agents navigate unfamiliar applications more reliably, without excessive annotation or tool-call costs.
+The repository currently hosts **working documents only**. Schema syntax, runtime, protocol bindings, versioning and licensing are not selected. The immediate goal is to test whether the framework lets developers express agent-navigable applications with less duplication and acceptable interoperability costs. **Application design choices remain with application authors**; example orders/payments are tests of expressive power, not universal ANWA requirements.
 
 Corrections, competing prior art and design feedback are welcome via issues or PRs. Please distinguish **established standard behavior** from **ANWA proposals**.
 
@@ -123,7 +124,7 @@ Corrections, competing prior art and design feedback are welcome via issues or P
 
 ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探索・理解・操作できるWebアプリケーション**を作るための、Schema-firstなフレームワーク構想です。
 
-開発者はOpenAPIのような公開スキーマでThing、Action、状態遷移、関連リソース、Guardの契約を宣言し、GuardやActionのビジネスロジックは通常のコードで実装します。ANWAがDiscoveryとInteractionを公開し、成功・失敗どちらの結果にも関連するリソースと次に検討できる操作の情報を付けることを目指します。
+開発者はOpenAPIのような公開スキーマで必要なThingやActionなどを宣言し、GuardやActionのビジネスロジックは通常のコードで実装します。状態機械やGuard、関連リソースの設計をすべてのアプリに要求するわけではありません。ANWAは、開発者が選んだ意味・関係・操作と、成功・失敗のOutcome + ContextをAIに公開する共通の仕組みを目指します。Thingの粒度、業務フロー、次に何を提示するかはアプリケーション実装者の選択です。
 
 WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。実装も仕様も未確定です。
 
