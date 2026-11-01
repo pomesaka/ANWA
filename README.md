@@ -51,6 +51,10 @@ Interaction may complete immediately with a typed `Result<Success, Error>`, or o
 
 [Architecture and developer workflow](docs/architecture.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
 
+### Authentication and authorization boundary
+
+Authentication is delegated to a trusted Adapter that supplies verified caller information separately from untrusted Interaction input. The in-process runtime enforces declared Guards on **Query, Action and Event**, requires unguarded Interactions to be explicitly marked `public`, and filters Discovery by caller. These are **not** a network authentication implementation or a substitute for atomic application authorization. See [authentication and authorization](docs/authentication-authorization.md).
+
 ## Executable v0.2 interaction-first contract lab
 
 The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [schema tooling](src/schema-tools.ts) and [three runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
