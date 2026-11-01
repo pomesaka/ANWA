@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { validateManifest, generateTypes, type Manifest } from "../src/schema-tools.ts";
 
-const [command, ...args] = Bun.argv.slice(2);
+const [command, ...args] = process.argv.slice(2);
 if (!["validate", "generate", "inspect"].includes(command) || args.length === 0) {
   console.error("Usage: bun tools/anwa.ts validate|generate|inspect <anwa.json> [output.d.ts]");
   process.exit(2);
