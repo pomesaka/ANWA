@@ -12,6 +12,8 @@ import type {
   GuardNames,
   GuardDecision,
   Refs,
+  ExecutableRefs,
+  ObservableRefs,
   InputOf,
   Operation,
   OutputOf,
@@ -337,7 +339,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   }
 
   /** Runtime enforces the named Guard before run; onDenied only builds this Interaction's Context. */
-  async interact<R extends Refs<M>>(
+  async interact<R extends ExecutableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [input?: unknown]
@@ -345,12 +347,12 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         ? [input?: undefined]
         : [input: InputOf<Operation<M, R>>]
   ): Promise<
-    InteractionResponse<OutputOf<Operation<M, R>>, ErrorCodes<Operation<M, R>>>
+    InteractionResponse<OutputOf<Operation<M, R>>, ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR">
   > {
     return this.interactInternal(ref, args[0]) as Promise<
       InteractionResponse<
         OutputOf<Operation<M, R>>,
-        ErrorCodes<Operation<M, R>>
+        ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
       >
     >;
   }
@@ -424,7 +426,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     }
   }
 
-  observe<R extends Refs<M>>(
+  observe<R extends ObservableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [input?: unknown, options?: { cursor?: number }]
