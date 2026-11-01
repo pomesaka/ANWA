@@ -1,53 +1,48 @@
 # Vision and scope
 
-> Working document · 2026-11-01 · Non-normative
+> Working direction · 2026-11-01 · Non-normative
 
 ## Motivation
 
-Human-facing web apps rely on pages, links, and forms to help people infer what exists and what they can do. When an AI agent becomes the primary consumer, the same domain knowledge could be offered through a discoverable, machine-readable application interface rather than a predetermined UI.
+Human-facing web applications communicate domain meaning and next actions through pages, forms and navigation. AI-agent consumers need a directly discoverable application contract and interaction outputs that help them decide what to inspect or do next.
 
-ANWA explores whether application authors can describe **domain meaning, Links between Things, WoT-style Interaction Affordances, and separate state-dependent availability hints** once, independently of the protocol used to expose them.
+ANWA is a **schema-first application framework concept**, not a replacement for GraphQL, MCP, REST or a UI toolkit. The goal is an authoring experience in which developers describe **what an application exposes**, implement **how it behaves**, and let tooling consistently expose those semantics.
 
-This is a design hypothesis, not a claim that current web standards are unsuitable.
+## Product thesis
 
-## What we are exploring
+> Build a web application by describing its public domain contract and writing its behavior. ANWA makes the application discoverable, interactive and navigable for AI agents.
 
-A self-describing application model, interpreted through two logical concerns:
+### Workflow
 
-- **Discovery:** Find relevant concepts, resources, relations, capabilities, input/output shapes, preconditions, and contextual hints.
-- **Interaction:** Read data, invoke operations, inspect failures, and observe asynchronous outcomes.
+1. **Schema first** — public descriptions of Things, Links, Property/Action/Event Affordances, input/output and errors, named Guard contracts and possible states/transitions.
+2. **Implementation second** — ordinary handlers/resolvers and guard code, with authorization, side effects and atomic transitions enforced on the server.
+3. **Runtime exposure** — logical Discovery and Interaction interfaces. The latter produces **Outcome + Context**, including links and relevant follow-up affordance references.
 
-An agent may alternate between them; the distinction does not imply separate endpoints or services.
+State machines are a useful **part of the declared contract**, **not** an alternative authoring language that must encode every business rule. A Guard is a reference to code that can use data and external services; a schema can describe its intended outputs but not infer its complete logic.
 
-### Why the distinction matters
+## Design principles being explored
 
-Static descriptions answer *what is possible in general*. Dynamic context answers *what appears applicable here and now*. Execution ultimately decides *whether the requested operation is actually permitted and possible*. Conflating these creates security and correctness problems.
+- **WoT-aligned vocabulary**, without claiming WoT conformance or inventing duplicate standards.
+- **Transport independence** for the application model.
+- **Progressive discovery** of relevant descriptions rather than forcing a full schema into context.
+- **Outcome + Context** for delivered application-level interactions, including domain failure.
+- **Dynamic applicability separate from affordance** and separate from actual authorization.
+- **Structured error semantics** with retry and side-effect uncertainty, beyond HTTP codes alone.
+- **Domain state separate from execution state**; streaming is a way of observing changes and partial outputs.
+- **Optional human UI** rather than screen-first architecture.
 
-For example, a `cancelOrder` capability may exist in the application's schema while a specific order has already shipped or the caller lacks the right permission.
+## What ANWA is not claiming
 
-## Design principles to test
+- That Hydra, HATEOAS, WoT or RPC error details are novel.
+- That a statechart or a single Guard function removes race conditions or transactional requirements.
+- That descriptions guarantee safe AI behavior.
+- That all results arrive (network failures may prevent that).
+- That an ANWA schema, protocol, runtime or package exists today.
 
-1. Protocol independence: the domain model should not require GraphQL, REST, RPC, or MCP.
-2. Progressive exploration: clients should not need the full application description upfront.
-3. Explicit meanings: explanations, typed inputs/outputs, relationships, and constraints should be available.
-4. WoT-aligned interaction affordances: describe Properties, Actions and Events. Explore contextual availability as a separate hint, never as an authorization guarantee.
-5. Clear enforcement boundary: authorization, approval, and invariants remain server-side.
-6. Optional UI: dynamic or static presentations are possible but not required.
-7. Honest interoperability: prefer existing specifications when they already solve a problem.
+## Evaluation direction
 
-## Out of scope for now
+Compare the same small domain application exposed via ordinary typed APIs/tool definitions and an ANWA-style navigable contract. Keep the business logic, permissions and explanation quantity comparable. Measure task success, wrong actions, number of calls, tokens, latency, authoring effort and correctness of state transitions.
 
-- Defining a transport protocol or wire format
-- Choosing a runtime, database, SDK, or schema DSL
-- Replacing an agent runtime or planning model
-- Providing automatic trustworthiness from natural-language descriptions
-- Solving universal identity, delegation, payments, and policy enforcement
-- Claiming a new standard or production readiness
+Novelty, developer ergonomics and performance remain **hypotheses to test**, not demonstrated properties.
 
-## Success criteria (research hypotheses)
-
-Compared with conventional API/tool exposure, an agent using the proposed model should be more capable of handling unfamiliar applications. Measure task completion, invalid or risky calls, total calls and tokens, latency, and developer annotation burden under comparable conditions.
-
-The idea may ultimately be best implemented as a thin authoring framework over existing standards; that remains a valid outcome.
-
-[Back to README](../README.md) · [Glossary](glossary.md) · [Open questions](open-questions.md)
+[README](../README.md) · [Decision status](decisions.md) · [Architecture](architecture.md) · [Open questions](open-questions.md)
