@@ -75,7 +75,7 @@ The current `anwa.json` format is a **machine-readable contract**. How humans ed
 1. Purpose and semantics of each operation, with optional machine identifiers (`semanticTypes`) where a meaningful shared vocabulary exists, and field-level descriptions where useful.
 2. Clear typed input and output, including complete expected domain error categories.
 3. Minimal Discovery payload and navigable references, instead of always sending the full application manifest.
-4. Explicit context for related resources and follow-up interactions when supplied by the application, and optional author-declared Action `effectKinds` (which are not safety guarantees).
+4. Explicit context for related resources and follow-up interactions when supplied by the application, and optional Action `hasSideEffects` and `idempotent` booleans (neither is a safety or retry guarantee).
 5. Consistent evaluation of task success, wrong calls, token consumption and latency versus ordinary OpenAPI/MCP/WoT descriptions.
 
 An `inspect` command and parseable JSON are **not evidence** that an unfamiliar AI performs better. See the [agent-native schema design contract](../spec/agent-native-schema.md).
