@@ -1,4 +1,4 @@
-import { AnwaApp, fail, ok, reply, type Manifest } from "../../src/anwa.ts";
+import { AnwaApp, fail, ok, reply } from "../../src/anwa.ts";
 
 import { schema } from "./contract.generated.ts";
 
