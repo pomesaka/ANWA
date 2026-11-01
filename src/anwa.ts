@@ -34,6 +34,14 @@ export interface DiscoveryArgs {
 }
 export type DiscoveryPolicy = (args: DiscoveryArgs) => boolean;
 
+/** Failed Event subscription: no Event handler ran or produced data. */
+export class ObservationDenied extends Error {
+  constructor(readonly code: string) {
+    super("Event subscription denied");
+    this.name = "ObservationDenied";
+  }
+}
+
 export interface DomainError<C extends string = string> {
   code: C;
   message?: string;
@@ -417,17 +425,17 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   async interact<R extends Refs<M> & ExecutableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
-      ? [input?: unknown]
+      ? [input?: unknown, request?: RequestContext]
       : InputOf<Operation<M, R>> extends undefined
-        ? [input?: undefined]
-        : [input: InputOf<Operation<M, R>>]
+        ? [input?: undefined, request?: RequestContext]
+        : [input: InputOf<Operation<M, R>>, request?: RequestContext]
   ): Promise<
     InteractionResponse<
       OutputOf<Operation<M, R>>,
       ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
     >
   > {
-    return this.interactInternal(ref, args[0]) as Promise<
+    return this.interactInternal(ref, args[0], args[1]) as Promise<
       InteractionResponse<
         OutputOf<Operation<M, R>>,
         ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
@@ -436,14 +444,16 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   }
 
   /** Follow a runtime-selected candidate. Dynamic inputs are checked against the public schema. */
-  async follow(candidate: NextInteraction): Promise<InteractionResponse> {
-    return this.interactInternal(candidate.ref, candidate.input);
+  async follow(candidate: NextInteraction, request?: RequestContext): Promise<InteractionResponse> {
+    return this.interactInternal(candidate.ref, candidate.input, request);
   }
 
   private async interactInternal(
     ref: string,
     input?: unknown,
+    request?: RequestContext,
   ): Promise<InteractionResponse> {
+    const caller = verifiedCaller(request);
     const { spec, handler } = this.resolve(ref);
     if (spec.kind === "event")
       throw Error("Use observe for Event Interactions");
@@ -454,7 +464,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         : "Unexpected input";
     if (error) return reply(fail("INVALID_INPUT", error));
     try {
-      const params = { ref, input, app: this };
+      const params = { ref, input, app: this, caller };
       let response: InteractionResponse;
       if (spec.guard) {
         const decision = await this.guards[spec.guard](params);
@@ -466,7 +476,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         const guarded = handler as Extract<RuntimeBinding, { run: RuntimeRun }>;
         if (!decision.allowed) {
           this.declaredError(spec, decision.error);
-          const next = await guarded.onDenied({
+          const next = await guarded.onDenied!({
             ...params,
             error: decision.error,
           });
@@ -498,42 +508,56 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         } else this.declaredError(spec, result.error);
       } else throw Error("Unknown outcome");
       this.validateContext(response.context, ref);
-      return response;
+      // Avoid advertising private Interaction names in a result delivered to this caller.
+      return {
+        ...response,
+        context: {next: response.context.next.filter(choice =>
+          this.canDiscover(choice.ref, caller))},
+      };
     } catch {
       return unexpected();
     }
   }
 
+  /** Async Guards are evaluated when an Event stream is first consumed, before the Event handler starts. */
   observe<R extends Refs<M> & ObservableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
-      ? [input?: unknown, options?: { cursor?: number }]
+      ? [input?: unknown, options?: {cursor?: number}, request?: RequestContext]
       : InputOf<Operation<M, R>> extends undefined
-        ? [input?: undefined, options?: { cursor?: number }]
-        : [input: InputOf<Operation<M, R>>, options?: { cursor?: number }]
+        ? [input?: undefined, options?: {cursor?: number}, request?: RequestContext]
+        : [input: InputOf<Operation<M, R>>, options?: {cursor?: number}, request?: RequestContext]
   ): AsyncIterable<unknown> {
-    const [input, options = {}] = args;
-    const { spec, handler } = this.resolve(ref);
+    const [input, options = {}, request] = args;
+    const caller = verifiedCaller(request);
+    const {spec, handler} = this.resolve(ref);
     if (spec.kind !== "event")
-      throw Error("Only event Interactions may be observed");
-    const error = spec.input
+      throw Error("Only Event Interactions may be observed");
+    const invalid = spec.input
       ? checkPayload(spec.input, input)
-      : input === undefined
-        ? null
-        : "Unexpected event input";
-    if (error) throw Error("Invalid event input");
-    const stream = (handler as RuntimeRun)({
-      ref,
-      input,
-      app: this,
-      ...options,
-    });
-    if (
-      !stream ||
-      typeof (stream as AsyncIterable<unknown>)[Symbol.asyncIterator] !==
-        "function"
-    )
-      throw Error("Event must return AsyncIterable");
-    return stream as AsyncIterable<unknown>;
+      : input === undefined ? null : "Unexpected event input";
+    if (invalid) throw Error("Invalid event input");
+    const self = this;
+    return (async function* (): AsyncGenerator<unknown> {
+      const params = {ref, input, app: self, caller};
+      if (spec.guard) {
+        let decision: GuardDecision;
+        try {
+          decision = await self.guards[spec.guard](params);
+          if (typeof decision?.allowed !== "boolean" ||
+              (!decision.allowed && !decision.error?.code))
+            throw Error("Invalid Guard decision");
+          if (!decision.allowed) self.declaredError(spec, decision.error);
+        } catch {
+          throw new ObservationDenied("UNEXPECTED_ERROR");
+        }
+        if (!decision.allowed) throw new ObservationDenied(decision.error.code);
+      }
+      const run = typeof handler === "function" ? handler : handler.run;
+      const stream = run({...params, ...options});
+      if (!stream || typeof (stream as AsyncIterable<unknown>)[Symbol.asyncIterator] !== "function")
+        throw Error("Event must return AsyncIterable");
+      yield* stream as AsyncIterable<unknown>;
+    })();
   }
 }
