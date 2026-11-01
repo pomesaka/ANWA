@@ -90,9 +90,11 @@ The base `interact(InteractionRef, input?)` returns a **settled domain result** 
     "kind": "settled",
     "result": { "ok": true, "value": 5 }
   },
-  "context": { "links": [], "affordances": [] }
+  "context": { "next": [] }
 }
 ```
+
+An accepted execution also receives a `context.next` list, which can expose status Properties or observation Events. **No separate retry field exists on the Error or Context**; retries are ordinary next-interaction candidates.
 
 A domain failure uses exactly the same outer shape:
 
@@ -105,7 +107,7 @@ A domain failure uses exactly the same outer shape:
       "error": { "code": "INVALID_OPERAND", "message": "Not allowed" }
     }
   },
-  "context": { "links": [], "affordances": [] }
+  "context": { "next": [] }
 }
 ```
 
@@ -113,20 +115,46 @@ A domain failure uses exactly the same outer shape:
 
 - `outcome` must exist. For base profile, `outcome.kind` = `settled`.
 - `result.ok` discriminates success/failure. Successful results have a `value` (can be `null`); failures have an `error.code` (nonempty machine-readable string).
-- `context` must exist, containing **`links` and `affordances` arrays**, both allowed to be empty.
-- A Link is `{rel:string,target:ThingRef}`. The relation's meaning is application-defined; global registration is not assumed.
-- An affordance reference is `{ref:InteractionRef}`. It may optionally include an application-supplied `applicability` hint (`available` / `blocked` / `unknown`), separate from WoT's Interaction Affordance definition and from authorization.
-- **The application selects** contextual links/affordances; ANWA conveys and validates them, but does not decide which next action best satisfies a user's goal.
+- `context` must exist and contains **`next: []`** even when no follow-up options are available.
+- Each `next` entry references an **InteractionRef** (Property/Action/Event), or a `ThingRef` with `kind: "discover"` for further exploration. Description-level Links remain distinct from runtime navigation.
+- `guidance.kind: "retry"` marks an **offered repeat of the same Interaction**. It is optional and does not promise safe input reuse or make a request automatically.
+- `guidance.level` is optionally `required`, `recommended`, or `available`. The first means an application-authored prerequisite **for a chosen continuation**, not a command to override the user or policy.
+- `when.after`, if present, is an ISO 8601 wait duration (e.g., `PT30S`) relative to receipt of the response. The runtime validates its shape but **does not schedule the action**.
+- `applicability` is an optional `available` / `blocked` / `unknown` hint; it is not authorization.
+- The application chooses which candidates to publish after success, business failure or async acceptance. ANWA validates and transmits the choices; the agent decides what to do.
 - Action-level `hasSideEffects` and `idempotent` are **untrusted application declarations**, not runtime-enforced guarantees. Omitted values are unknown, not `false`. An outcome's `error.effects` instead relates to effects after a particular attempt.
-- Expected domain error `code`s **must appear in that interaction's declared `errors` map**. Undeclared domain errors, handler exceptions and contract violations become opaque `UNEXPECTED_ERROR` results (`effects: unknown`), with no internal detail disclosed. `INVALID_INPUT` is a separate framework validation failure. Error `message`, `details`, `retry` and effect information are optional, application-supplied fields; retry advice is not a guarantee of safe duplication.
+- Expected domain error `code`s **must appear in that interaction's declared `errors` map**. Undeclared domain errors, handler exceptions and contract violations become opaque `UNEXPECTED_ERROR` results (`effects: unknown`), with no internal detail disclosed. `INVALID_INPUT` is a separate framework validation failure. Error `message`, `details` and per-attempt `effects` are separate from **next-step retry guidance in `context.next`**. A returned `error.retry` is a contract violation in the reference adapter.
 - `settled/ok` means this particular interaction completed, not necessarily that the user's broader task has completed.
 - This contract applies only to **delivered application-level outcomes**. A dropped connection may yield no ANWA Result.
+
+### Example: timed retry after a domain error
+
+```json
+{
+  "outcome": {
+    "kind": "settled",
+    "result": { "ok": false, "error": { "code": "NOT_READY", "effects": "none" } }
+  },
+  "context": {
+    "next": [{
+      "ref": {
+        "thing": { "type": "Execution", "id": "42" },
+        "kind": "property", "name": "result"
+      },
+      "guidance": { "kind": "retry", "level": "recommended" },
+      "when": { "after": "PT30S" }
+    }]
+  }
+}
+```
+
+`error.code` explains the outcome. The retry is simply one `next` candidate. A different next candidate might be a Shipment's tracking Property, a report's updates Event, or `{ "kind": "discover", "ref": ThingRef }`. See [errors and next-interaction navigation](../docs/error-recovery-navigation.md).
 
 ## 6. Binding
 
 Application code binds every declared Property/Action to a handler. For Event interactions it supplies an optional observation source. The framework checks declared bindings, routes requests to the implementation, validates a limited payload schema subset in the demo, and wraps returned `ok(value)` / `fail(code,...)` in `Outcome + Context`.
 
-An application may implement a `context` resolver to provide links or affordance references on Discovery and following each interaction. A named Guard is an **optional implementation hook**: one guard can be reused by Discovery's advisory applicability and Interaction's actual check. Reuse **does not** prevent races; applications remain responsible for atomic transitions and permission enforcement.
+An application may implement a `context` resolver to provide `next` candidates on Discovery and after each interaction. A named Guard is an **optional implementation hook**: one guard can be reused by Discovery's advisory applicability and Interaction's actual check. Reuse **does not** prevent races; applications remain responsible for atomic transitions and permission enforcement.
 
 An implementation's exceptions are not the same as typed domain failures. The demo maps unexpected exceptions **and undeclared error codes** to a generic `UNEXPECTED_ERROR`, suppressing internal details. Errors from context assembly likewise produce an opaque `UNEXPECTED_ERROR` with empty Context; potential side effects are marked unknown. Unknown/unbound interaction refs in the in-process adapter throw *outside* the domain Result boundary; a future network binding needs its own transport-level mapping.
 
@@ -140,7 +168,7 @@ An extension can return an accepted execution reference:
     "kind": "accepted",
     "execution": { "type": "Execution", "id": "job-1" }
   },
-  "context": { "links": [], "affordances": [] }
+  "context": { "next": [] }
 }
 ```
 
