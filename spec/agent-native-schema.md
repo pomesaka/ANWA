@@ -22,7 +22,7 @@ The essential properties are **semantic precision, deterministic resolution, ver
 | Guard | Optional named hook | Actual predicate and authorization / consistency enforcement |
 | Domain errors | Exhaustive application-declared error codes | Chooses which errors exist; implements conditions |
 | Effects and repeatability | Optional `hasSideEffects` / `idempotent` booleans on Actions | Actual side effects, retries, enforcement and concurrency |
-| Navigation | Typed Links and InteractionRefs, optional applicability hints | Which links/affordances are included for this context |
+| Runtime navigation | Typed `context.next` candidates with optional guidance/timing/applicability | Which next interactions/discovery targets are exposed in this context |
 | References | App-scoped ThingRef + InteractionRef resolution | Instance existence and resource identity policy |
 | Protocol | Logical Discovery / Interaction contracts, adapters to be defined | Hosting, storage, permissions and transports |
 
@@ -96,21 +96,25 @@ The most useful unit for a consuming agent is **a discoverable interaction descr
 3. `interact(InteractionRef, input?)`: domain `Outcome + Context`, including **both success and expected domain failure**.
 4. Optional `observe(EventInteractionRef)`: observations for apps that provide them, including asynchronous execution.
 
-A `Context` can have zero Links and zero AffordanceRefs. It conveys choices the *application* exposes, not an instruction to the agent to execute them.
+A `Context` contains `next: []` even when the application offers no candidate. This is a single list of application-chosen follow-ups, not a command to execute them; retries are ordinary InteractionRef candidates with `guidance.kind: "retry"`.
 
 ```json
 {
-  "outcome": {"kind":"settled","result":{"ok":false,"error":{"code":"ORDER_ALREADY_SHIPPED"}}},
+  "outcome": {"kind":"settled","result":{"ok":false,"error":{"code":"ORDER_ALREADY_SHIPPED","effects":"none"}}},
   "context": {
-    "links": [{"rel":"shipment","target":{"type":"Shipment","id":"ship-1"}}],
-    "affordances": [
-      {"ref":{"thing":{"type":"Shipment","id":"ship-1"},"kind":"property","name":"tracking"}}
-    ]
+    "next": [{
+      "ref": {
+        "thing": {"type":"Shipment","id":"ship-1"},
+        "kind":"property",
+        "name":"tracking"
+      },
+      "guidance": {"level":"recommended"}
+    }]
   }
 }
 ```
 
-**Static declarations and dynamic outcomes are different.** `hasSideEffects` is a declaration about whether effects are possible; `result.error.effects` (if provided by an application) concerns effects after an actual attempt. `context.applicability` is an advisory hint, not authorization.
+**Static declarations and dynamic outcomes are different.** `hasSideEffects` is a declaration about whether effects are possible; `result.error.effects` (if provided by an application) concerns effects after an actual attempt. `context.next[].applicability` is an advisory hint, not authorization. A retry suggestion belongs in `context.next[].guidance`, not in the Error.
 
 ## Contracts an implementing agent should be able to enforce
 
