@@ -54,8 +54,19 @@ try {
         for (const [bucket, label] of [["properties","Property"], ["actions","Action"], ["events","Event"]]) {
           for (const [op, detail] of Object.entries(thing[bucket] ?? {})) {
             lines.push("- **" + label + " `" + op + "`** — " + detail.description);
-            if (detail.input) lines.push("  - Input: `" + JSON.stringify(detail.input) + "`");
-            if (detail.output) lines.push("  - Output: `" + JSON.stringify(detail.output) + "`");
+            for (const [direction, dataSchema] of [["Input", detail.input], ["Output", detail.output]]) {
+              if (!dataSchema) continue;
+              lines.push("  - " + direction + ": " + dataSchema.type +
+                (dataSchema.description ? " — " + dataSchema.description : ""));
+              if (dataSchema.type === "object") {
+                const required = new Set(dataSchema.required ?? []);
+                for (const [field, spec] of Object.entries(dataSchema.properties ?? {})) {
+                  lines.push("    - `" + field + "`: " + spec.type +
+                    (required.has(field) ? " (required)" : " (optional)") +
+                    (spec.description ? " — " + spec.description : ""));
+                }
+              }
+            }
             if (detail.guard) lines.push("  - Named guard: `" + detail.guard + "`");
             if (detail.errors) for (const [code, meaning] of Object.entries(detail.errors)) {
               lines.push("  - Error `" + code + "`: " + meaning);
