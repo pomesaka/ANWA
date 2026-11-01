@@ -4,7 +4,7 @@
 
 > A schema-first framework concept for web applications that AI agents can discover, understand, and interact with — without requiring a predefined human-facing UI.
 
-**Status: Early design / research.** No package, stable schema, runtime, compatibility guarantee, or published standard exists yet.
+**Status: Experimental specification + executable demos.** A tiny in-process reference adapter exists on the v0.1 development branch; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
 
 ## Why ANWA?
 
@@ -47,9 +47,23 @@ Two **logical** interfaces—not necessarily two wire protocols:
 | **Discovery** | Expose author-declared Thing descriptions, semantics, Links and Property/Action/Event Interaction Affordances, with optional state/caller-specific applicability hints |
 | **Interaction** | Allow applications to read, invoke and observe; carry **Outcome + Context** (possibly empty/restricted links and next-interaction references) on delivered domain results |
 
-Interaction may complete immediately with a typed `Result<Success, Error>`, or accept a durable execution to observe later. **Async execution and streaming observation are different concerns.**
+Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
 
 [Architecture and developer workflow](docs/architecture.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
+
+## Executable v0.1 contract lab
+
+The current work-in-progress contains an [experimental contract](spec/anwa-0.1.md), a [machine-readable manifest schema](spec/anwa-0.1.schema.json), a small [in-process reference adapter](src/anwa.mjs), and [three runnable demos](demo/README.md) with automated tests.
+
+```bash
+# Node.js >=20, no runtime dependencies
+npm test
+npm run demo
+```
+
+The demos deliberately cover different author choices: [stateless Calculator](demo/calculator/), [stateful Orders](demo/orders/), and [async Reports](demo/reports/). They demonstrate **expressiveness**, not prescribed application design or production-grade runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
+
+**v0.1 is a concrete experimental profile for discussion, not an adopted standard.** See the open [Minimal Core Draft PR #2](https://github.com/pomesaka/ANWA/pull/2) for a distinct, more abstract discussion of required vs optional fields.
 
 ## Vocabulary and relationship to WoT
 
@@ -81,6 +95,9 @@ ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP an
 | Established and proposed terminology | [Glossary](docs/glossary.md) |
 | Risks, next tests, unresolved design | [Open questions](docs/open-questions.md) |
 | Comparison against existing work | [Prior art](docs/prior-art.md) |
+| Executable draft profile | [ANWA 0.1 contract](spec/anwa-0.1.md) |
+| Schema reference | [Manifest / Result JSON Schema](spec/anwa-0.1.schema.json) |
+| Working demos and tests | [Demo guide](demo/README.md) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
 
 ### Research notes
@@ -111,7 +128,7 @@ These are **references, not mandatory dependencies or endorsements**. Hydra's co
 
 ## Status and contributing
 
-The repository currently hosts **working documents only**. Schema syntax, runtime, protocol bindings, versioning and licensing are not selected. The immediate goal is to test whether the framework lets developers express agent-navigable applications with less duplication and acceptable interoperability costs. **Application design choices remain with application authors**; example orders/payments are tests of expressive power, not universal ANWA requirements.
+The repository now includes **working documents and a runnable experimental in-process prototype**. Its JSON profile is a testable proposal, not a final schema or public API. Network transports, runtime security, versioning and licensing remain unselected. The immediate goal is to test whether the framework lets developers express agent-navigable applications with less duplication and acceptable interoperability costs. **Application design choices remain with application authors**; example orders/payments are tests of expressive power, not universal ANWA requirements.
 
 Corrections, competing prior art and design feedback are welcome via issues or PRs. Please distinguish **established standard behavior** from **ANWA proposals**.
 
@@ -126,6 +143,6 @@ ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探�
 
 開発者はOpenAPIのような公開スキーマで必要なThingやActionなどを宣言し、GuardやActionのビジネスロジックは通常のコードで実装します。状態機械やGuard、関連リソースの設計をすべてのアプリに要求するわけではありません。ANWAは、開発者が選んだ意味・関係・操作と、成功・失敗のOutcome + ContextをAIに公開する共通の仕組みを目指します。Thingの粒度、業務フロー、次に何を提示するかはアプリケーション実装者の選択です。
 
-WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。実装も仕様も未確定です。
+WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。試験的なv0.1 JSONスキーマと動作デモはありますが、仕様は未確定で、製品向けの安全性や互換性は保証していません。
 
 </details>
