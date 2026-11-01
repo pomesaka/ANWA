@@ -1,90 +1,68 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { interaction, thing } from "../src/anwa.mjs";
-import { createCalculator, calculatorRef } from "../demo/calculator/index.mjs";
-import { createOrders, orderRef } from "../demo/orders/index.mjs";
-import { createReports, reportServiceRef } from "../demo/reports/index.mjs";
+import {createCalculator} from "../demo/calculator/index.mjs";
+import {createOrders} from "../demo/orders/index.mjs";
+import {createReports} from "../demo/reports/index.mjs";
 
-const action = (target, name) => interaction(target, "action", name);
-const property = (target, name) => interaction(target, "property", name);
-
-test("catalog bootstraps discovery without a hard-coded URL", async () => {
-  const app = createCalculator();
-  assert.deepEqual(app.catalog().entrypoints, [calculatorRef]);
-  const discovered = await app.discover(app.catalog().entrypoints[0]);
-  assert.equal(discovered.description.title, "Calculator");
-  const add = discovered.description.interactions.find(x => x.ref.name === "add");
-  assert.deepEqual(add.ref, action(calculatorRef, "add"));
-  assert.equal(add.description, "Add two numbers.");
+test("Interaction-first catalogs and Discovery do not require a Thing",async()=>{
+ const app=createCalculator();
+ assert.deepEqual(app.catalog().entrypoints,["calculator.add","calculator.divide"]);
+ assert.equal(Object.hasOwn(app.catalog(),"things"),false);
+ const discovered=await app.discover("calculator.divide");
+ assert.equal(discovered.description.ref,"calculator.divide");
+ assert.equal(discovered.description.kind,"action");
+ assert.deepEqual(discovered.context,{next:[]});
 });
-
-test("stateless actions use Outcome + Context on success and domain failure", async () => {
-  const app = createCalculator();
-  const result = await app.interact(action(calculatorRef, "add"), { a: 2, b: 3 });
-  assert.deepEqual(result.outcome, { kind: "settled", result: { ok: true, value: 5 } });
-  assert.deepEqual(result.context, { next: [] });
-  const err = await app.interact(action(calculatorRef, "divide"), { a: 1, b: 0 });
-  assert.equal(err.outcome.result.error.code, "DIVIDE_BY_ZERO");
-  assert.equal(Object.hasOwn(err.outcome.result.error, "retry"), false);
-  assert.deepEqual(err.context, { next: [] });
+test("stateless Interaction success and declared error use Outcome + Context",async()=>{
+ const app=createCalculator();
+ assert.deepEqual(await app.interact("calculator.add",{a:2,b:3}),
+  {outcome:{kind:"settled",result:{ok:true,value:5}},context:{next:[]}});
+ const failure=await app.interact("calculator.divide",{a:1,b:0});
+ assert.equal(failure.outcome.result.error.code,"DIVIDE_BY_ZERO");
+ assert.deepEqual(failure.context,{next:[]});
 });
-
-test("invalid input is typed failure, not thrown handler exception", async () => {
-  const app = createCalculator();
-  const result = await app.interact(action(calculatorRef, "add"), { a: "two", b: 3 });
-  assert.equal(result.outcome.result.error.code, "INVALID_INPUT");
-  assert.deepEqual(result.context, { next: [] });
+test("input contract errors do not call a handler",async()=>{
+ const result=await createCalculator().interact("calculator.add",{a:"bad",b:1});
+ assert.equal(result.outcome.result.error.code,"INVALID_INPUT");
+ assert.deepEqual(result.context,{next:[]});
 });
-
-test("code-backed guard and application-selected affordance navigation", async () => {
-  const app = createOrders();
-  const ref = orderRef("shipped");
-  const discovery = await app.discover(ref);
-  const blocked = discovery.context.next.find(x => x.ref.name === "cancel");
-  assert.equal(blocked.applicability.state, "blocked");
-  const result = await app.interact(action(ref, "cancel"), { reason: "test" });
-  assert.equal(result.outcome.result.error.code, "ORDER_ALREADY_SHIPPED");
-  assert.equal(result.context.next.some(x => x.ref.name === "cancel"), false);
-  const tracking = result.context.next.find(x => x.ref.name === "tracking");
-  assert.equal(tracking.guidance.level, "recommended");
-  assert.equal(tracking.ref.kind, "property");
-  assert.equal((await app.interact(tracking.ref)).outcome.result.value, "delivered");
+test("Orders use optional Thing metadata, not a mandatory ThingRef for invocation",async()=>{
+ const app=createOrders();
+ assert.equal(app.catalog().things.Order.title,"Purchase order");
+ assert.equal(app.describe("order.cancel").subjectType,"Order");
+ const result=await app.interact("order.cancel",{orderId:"pending",reason:"Changed mind"});
+ assert.equal(result.outcome.result.value.status,"cancelled");
+ assert.deepEqual(result.context.next.find(x=>x.ref==="order.get").input,{orderId:"pending"});
+ const confirmed=await app.interact("order.get",{orderId:"pending"});
+ assert.equal(confirmed.outcome.result.value.status,"cancelled");
 });
-
-test("app controls state model and same Result form covers changed state", async () => {
-  const app = createOrders();
-  const ref = orderRef("pending");
-  assert.equal((await app.interact(property(ref, "summary"))).outcome.result.value.status, "pending");
-  const cancelled = await app.interact(action(ref, "cancel"), { reason: "test" });
-  assert.equal(cancelled.outcome.result.value.status, "cancelled");
-  assert.equal((await app.interact(property(ref, "summary"))).outcome.result.value.status, "cancelled");
-  assert.equal((await app.interact(action(ref, "cancel"), { reason: "again" })).outcome.result.error.code, "ALREADY_CANCELLED");
+test("Domain failure recommends another Interaction with bound input",async()=>{
+ const app=createOrders();
+ const failure=await app.interact("order.cancel",{orderId:"shipped",reason:"Changed mind"});
+ assert.equal(failure.outcome.result.error.code,"ORDER_ALREADY_SHIPPED");
+ const next=failure.context.next.find(x=>x.ref==="shipment.track");
+ assert.deepEqual(next.input,{shipmentId:"shipped-ship"});
+ assert.equal(next.guidance.level,"recommended");
+ const tracking=await app.interact(next.ref,next.input);
+ assert.equal(tracking.outcome.result.value,"delivered");
+ assert.equal(failure.context.next.some(x=>x.ref==="order.cancel"),false);
 });
-
-test("async acceptance is distinct from final success; observe artifact updates", async () => {
-  const app = createReports();
-  const call = await app.interact(action(reportServiceRef, "generate"), { topic: "Agent" });
-  assert.equal(call.outcome.kind, "accepted");
-  const execution = call.outcome.execution;
-  assert.equal(execution.type, "Execution");
-  const notReady = await app.interact(property(execution, "result"));
-  assert.equal(notReady.outcome.result.error.code, "NOT_READY");
-  assert.equal(Object.hasOwn(notReady.outcome.result.error, "retry"), false);
-  const retry = notReady.context.next.find(x => x.guidance?.kind === "retry");
-  assert.deepEqual(retry.ref, property(execution, "result"));
-  assert.equal(retry.guidance.level, "recommended");
-  assert.equal(retry.when.after, "PT0.05S");
-  assert.ok(call.context.next.some(x => x.ref.kind === "event"));
-  const events = [];
-  for await (const e of app.observe(interaction(execution, "event", "updates"))) events.push(e);
-  assert.equal(events.at(-1).type, "settled");
-  assert.equal(events.at(-1).response.outcome.result.ok, true);
-  assert.ok(events.at(-1).response.context.next.some(x => x.ref.name === "result"));
-  assert.ok(events.some(x => x.type === "artifact.delta"));
-  assert.equal((await app.interact(property(execution, "status"))).outcome.result.value, "completed");
-  assert.match((await app.interact(property(execution, "result"))).outcome.result.value, /Agent/);
-});
-
-test("service-level Thing is possible; per-object Thing is not mandated", () => {
-  assert.deepEqual(createCalculator().catalog().entrypoints, [thing("Calculator", "main")]);
+test("Report execution works with no Execution Thing",async()=>{
+ const app=createReports();
+ assert.equal(Object.hasOwn(app.catalog(),"things"),false);
+ const start=await app.interact("report.generate",{topic:"ANWA"});
+ assert.equal(start.outcome.kind,"accepted");
+ const id=start.outcome.execution.id;
+ assert.equal(typeof id,"string");
+ const notReady=await app.interact("execution.result",{executionId:id});
+ assert.equal(notReady.outcome.result.error.code,"NOT_READY");
+ const retry=notReady.context.next.find(x=>x.guidance?.kind==="retry");
+ assert.equal(retry.ref,"execution.result");
+ assert.deepEqual(retry.input,{executionId:id});
+ assert.equal(retry.when.after,"PT0.05S");
+ const events=[];
+ for await(const event of app.observe("execution.updates",{executionId:id}))events.push(event);
+ assert.equal(events.at(-1).type,"settled");
+ assert.equal(events.at(-1).response.outcome.result.ok,true);
+ assert.match((await app.interact("execution.result",{executionId:id})).outcome.result.value,/ANWA/);
 });
