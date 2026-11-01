@@ -65,7 +65,7 @@ test("declared domain errors remain typed and are discoverable", async () => {
   });
   const result = await app.interact(ref);
   assert.equal(result.outcome.result.error.code, "EXPECTED_FAILURE");
-  assert.deepEqual(result.context, { links: [], affordances: [] });
+  assert.deepEqual(result.context, { next: [] });
 });
 
 test("undeclared handler errors become UNEXPECTED_ERROR without leaking details", async () => {
@@ -78,7 +78,7 @@ test("undeclared handler errors become UNEXPECTED_ERROR without leaking details"
     message: "Unexpected application failure",
     effects: "unknown"
   });
-  assert.deepEqual(result.context, { links: [], affordances: [] });
+  assert.deepEqual(result.context, { next: [] });
 });
 
 test("undeclared guard errors become UNEXPECTED_ERROR, not a leaked policy detail", async () => {
@@ -103,7 +103,7 @@ test("unexpected handler exception and context failure share opaque error", asyn
   });
   const result = await app.interact(ref);
   assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
-  assert.deepEqual(result.context, { links: [], affordances: [] });
+  assert.deepEqual(result.context, { next: [] });
 });
 
 test("agent-oriented semantic annotations are validated and exposed, without changing business logic", async () => {
@@ -164,4 +164,63 @@ test("Action boolean flags reject textual or non-Action values", () => {
   const paths = validateManifest(bad).map(x => x.path);
   assert.ok(paths.some(p => p.endsWith("cancel.hasSideEffects")));
   assert.ok(paths.some(p => p.endsWith("summary.idempotent")));
+});
+
+test("Context next can recommend a timed retry of the same Interaction", async () => {
+  const app = new AnwaApp(schema()).bind("Test", {
+    actions: { run: async () => fail("EXPECTED_FAILURE", "Try later", { effects: "none" }) },
+    context: ({ interaction: source, outcome }) => ({
+      next: source && outcome?.result?.ok === false ? [{
+        ref: source,
+        guidance: { kind: "retry", level: "recommended" },
+        when: { after: "PT30S" }
+      }] : []
+    })
+  });
+  const r = await app.interact(ref);
+  assert.equal(r.outcome.result.error.code, "EXPECTED_FAILURE");
+  assert.deepEqual(r.context.next[0], {
+    ref, guidance: { kind: "retry", level: "recommended" },
+    when: { after: "PT30S" }
+  });
+  assert.equal(Object.hasOwn(r.outcome.result.error, "retry"), false);
+});
+
+test("Context next may direct Discovery to a Thing without inventing an Action", async () => {
+  const app = new AnwaApp(schema()).bind("Test", {
+    actions: { run: async () => ({ ok: true, value: null }) },
+    context: () => ({ next: [{ kind: "discover", ref: target,
+      guidance: { level: "available" } }] })
+  });
+  const r = await app.interact(ref);
+  assert.deepEqual(r.context.next, [{ kind: "discover", ref: target,
+    guidance: { level: "available" } }]);
+});
+
+test("Invalid guidance, timing and old Context fields are rejected, not silently accepted", async () => {
+  for (const bad of [
+    { next: [{ ref, guidance: { kind: "retry", level: "critical" } }] },
+    { next: [{ ref, when: { after: "tomorrow" } }] },
+    { next: [{ ref, when: { after: "P" } }] },
+    { next: [{ kind: "discover", ref: target, guidance: { kind: "retry" } }] },
+    { links: [], affordances: [] }
+  ]) {
+    const app = new AnwaApp(schema()).bind("Test", {
+      actions: { run: async () => ({ ok: true, value: null }) },
+      context: () => bad
+    });
+    const result = await app.interact(ref);
+    assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
+    assert.deepEqual(result.context, { next: [] });
+  }
+});
+
+test("Error retry is rejected in favor of contextual next retry guidance", async () => {
+  const app = new AnwaApp(schema()).bind("Test", {
+    actions: { run: async () => fail("EXPECTED_FAILURE", "Try later",
+      { retry: { mode: "after", after: "PT10S" } }) }
+  });
+  const result = await app.interact(ref);
+  assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
+  assert.deepEqual(result.context, { next: [] });
 });
