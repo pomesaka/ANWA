@@ -107,6 +107,7 @@ ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP an
 | Schema-first architecture | [Architecture](docs/architecture.md) |
 | Step-by-step schema + code example | [Order cancellation](docs/examples/order-cancellation.md) |
 | Result, async execution, streaming | [Interaction model](docs/interaction-model.md) |
+| Errors, retry guidance and next-interaction navigation | [Error recovery and navigation](docs/error-recovery-navigation.md) |
 | Established and proposed terminology | [Glossary](docs/glossary.md) |
 | Risks, next tests, unresolved design | [Open questions](docs/open-questions.md) |
 | Comparison against existing work | [Prior art](docs/prior-art.md) |
