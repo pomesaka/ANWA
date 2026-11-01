@@ -34,7 +34,8 @@
           "output": {
             "type": "number",
             "description": "Sum of a and b."
-          }
+          },
+          "effectKinds": []
         },
         "divide": {
           "description": "Divide a by b; division by zero is a typed domain failure.",
@@ -62,7 +63,8 @@
           },
           "errors": {
             "DIVIDE_BY_ZERO": "The divisor must be nonzero."
-          }
+          },
+          "effectKinds": []
         }
       }
     }
