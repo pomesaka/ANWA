@@ -187,7 +187,10 @@ function checkPayload(
   schema: DataSchema,
   value: unknown,
   path = "$",
+  definitions: Readonly<Record<string, DataSchema>> = {},
 ): string | null {
+  if (schema.$ref)
+    return checkPayload(definitions[schema.$ref.slice(8)], value, path, definitions);
   if (schema.enum && !schema.enum.some((item) => Object.is(item, value)))
     return path + " not in enum";
   const valid =
@@ -213,14 +216,14 @@ function checkPayload(
         if (schema.additionalProperties === false)
           return path + "." + field + " not allowed";
       } else {
-        const error = checkPayload(fieldSchema, child, path + "." + field);
+        const error = checkPayload(fieldSchema, child, path + "." + field, definitions);
         if (error) return error;
       }
     }
   }
   if (schema.type === "array" && schema.items) {
     for (const [index, item] of (value as unknown[]).entries()) {
-      const error = checkPayload(schema.items, item, path + "[" + index + "]");
+      const error = checkPayload(schema.items, item, path + "[" + index + "]", definitions);
       if (error) return error;
     }
   }
@@ -421,7 +424,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       const { spec } = this.resolve(next.ref);
       if (
         own(next, "input") &&
-        (!spec.input || checkPayload(spec.input, next.input))
+        (!spec.input || checkPayload(spec.input, next.input, "$", this.schema.$defs))
       )
         throw Error("Invalid bound next input");
       if (next.guidance !== undefined) {
@@ -508,7 +511,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     if (spec.kind === "event")
       throw Error("Use observe for Event Interactions");
     const error = spec.input
-      ? checkPayload(spec.input, input)
+      ? checkPayload(spec.input, input, "$", this.schema.$defs)
       : input === undefined
         ? null
         : "Unexpected input";
@@ -553,7 +556,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         const result = outcome.result;
         if (typeof result?.ok !== "boolean") throw Error("Invalid Result");
         if (result.ok) {
-          if (spec.output && checkPayload(spec.output, result.value))
+          if (spec.output && checkPayload(spec.output, result.value, "$", this.schema.$defs))
             throw Error("Invalid handler output");
         } else this.declaredError(spec, result.error);
       } else throw Error("Unknown outcome");
@@ -599,7 +602,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     if (spec.kind !== "event")
       throw Error("Only Event Interactions may be observed");
     const invalid = spec.input
-      ? checkPayload(spec.input, input)
+      ? checkPayload(spec.input, input, "$", this.schema.$defs)
       : input === undefined
         ? null
         : "Unexpected event input";
