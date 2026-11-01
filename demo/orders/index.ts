@@ -2,6 +2,7 @@ import {
   AnwaApp, fail, ok, reply, type NextInteraction, type VerifiedCaller
 } from "../../src/anwa.ts";
 import { schema } from "./contract.generated.ts";
+import type {GuardDecision} from "../../src/contracts.ts";
 
 interface Order {
   id: string;
@@ -11,7 +12,7 @@ interface Order {
 }
 
 /** Example domain policy; real authorization belongs to the application's data layer. */
-function access(caller: VerifiedCaller | null, owner?: string) {
+function access(caller: VerifiedCaller | null, owner?: string): GuardDecision<"AUTH_REQUIRED" | "PERMISSION_DENIED"> {
   if (!caller) return {allowed: false, error: {code: "AUTH_REQUIRED" as const, effects: "none" as const}};
   if (!owner || caller.subject !== owner)
     return {allowed: false, error: {code: "PERMISSION_DENIED" as const, effects: "none" as const}};
