@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/pomesaka/ANWA/blob/feat/anwa-0.1-spec-and-demos/spec/anwa-0.1.schema.json",
+  "$id": "https://raw.githubusercontent.com/pomesaka/ANWA/main/spec/anwa-0.1.schema.json",
   "title": "ANWA 0.1 experimental Description manifest",
   "type": "object",
   "required": [
@@ -77,7 +77,7 @@
       "required": [
         "description"
       ],
-      "additionalProperties": true,
+      "additionalProperties": false,
       "properties": {
         "description": {
           "type": "string",
@@ -103,6 +103,20 @@
             "minLength": 1
           },
           "description": "Exhaustive set of domain failure codes this interaction may return; runtime-generated INVALID_INPUT and UNEXPECTED_ERROR are reserved."
+        },
+        "semanticTypes": {
+          "$ref": "#/$defs/SemanticTypes"
+        },
+        "effectKinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "domain-state",
+              "external-system"
+            ]
+          },
+          "description": "Application-declared possible side effect categories. Missing means unknown; [] declares none. Hints do not assert authorization, success or idempotency."
         }
       }
     },
@@ -125,7 +139,7 @@
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/Interaction"
+            "$ref": "#/$defs/NonActionInteraction"
           }
         },
         "actions": {
@@ -137,7 +151,7 @@
         "events": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/Interaction"
+            "$ref": "#/$defs/NonActionInteraction"
           }
         },
         "links": {
@@ -157,6 +171,9 @@
               }
             }
           }
+        },
+        "semanticTypes": {
+          "$ref": "#/$defs/SemanticTypes"
         }
       }
     },
@@ -330,6 +347,31 @@
           "$ref": "#/$defs/Context"
         }
       }
+    },
+    "SemanticTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:https?://|urn:)[^\\s]+$"
+      },
+      "description": "Optional application-chosen machine identifiers of domain meanings; not JSON-LD assertions and not inherently trusted."
+    },
+    "NonActionInteraction": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Interaction"
+        },
+        {
+          "not": {
+            "required": [
+              "effectKinds"
+            ]
+          }
+        }
+      ],
+      "description": "Property/Event interactions cannot declare Action-specific effectKinds in this in-process reference profile."
     }
   }
 }
