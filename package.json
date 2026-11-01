@@ -10,14 +10,15 @@
   "scripts": {
     "test": "bun test",
     "demo": "bun demo/run.ts",
-    "validate": "bun tools/anwa.ts validate demo/calculator/anwa.json demo/orders/anwa.json demo/reports/anwa.json",
+    "validate": "bun tools/anwa.ts validate demo/calculator/anwa.json demo/orders/anwa.json demo/reports/anwa.json demo/todo/anwa.json",
     "types:orders": "bun tools/anwa.ts generate demo/orders/anwa.json demo/orders/types.generated.d.ts",
     "inspect:orders": "bun tools/anwa.ts inspect demo/orders/anwa.json",
     "format": "bun fmt src demo test tools",
     "format:check": "bun fmt --check src demo test tools",
     "typecheck": "bun check",
     "lint:check": "bunx oxlint src demo test tools",
-    "codegen": "bun tools/anwa.ts generate-manifest demo/calculator/anwa.json demo/calculator/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/orders/anwa.json demo/orders/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/reports/anwa.json demo/reports/contract.generated.ts"
+    "codegen": "bun tools/anwa.ts generate-manifest demo/calculator/anwa.json demo/calculator/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/orders/anwa.json demo/orders/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/reports/anwa.json demo/reports/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/todo/anwa.json demo/todo/contract.generated.ts",
+    "demo:todo": "bun demo/todo/run.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
