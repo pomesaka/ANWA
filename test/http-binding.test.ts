@@ -203,3 +203,25 @@ test("Hono can register the Fetch binding directly on an existing router", async
   assert.equal(response.status, 200);
   assert.equal((await response.json()).outcome.result.value, 15);
 });
+
+test("Hono + Fetch binding accepts real loopback HTTP traffic", async () => {
+  const router = new Hono();
+  const handler = createAnwaFetchHandler(createCalculator());
+  router.all("/anwa/*", (c) => handler(c.req.raw));
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (request) => router.fetch(request),
+  });
+  try {
+    const response = await fetch("http://127.0.0.1:" + server.port + "/anwa/invoke", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: invokeBody("calculator.add", { a: 20, b: 22 }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).outcome.result.value, 42);
+  } finally {
+    server.stop(true);
+  }
+});
