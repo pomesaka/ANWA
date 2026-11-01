@@ -1,282 +1,186 @@
-import { validateManifest } from "./schema-tools.mjs";
-/** Dependency-free ANWA 0.1 in-memory reference adapter; NOT production ready. */
-export const thing = (type, id) => ({ type, id: String(id) });
-export const interaction = (target, kind, name) => ({ thing: target, kind, name });
-export const ok = (value = null) => ({ ok: true, value });
-export const fail = (code, message, extra = {}) => ({
-  ok: false, error: { code, ...(message ? { message } : {}), ...extra }
+import { validateManifest } from "./schema-v02.mjs";
+/** ANWA 0.2 experimental in-process Interaction-first adapter; not production ready. */
+export const ok=(value=null)=>({ok:true,value});
+export const fail=(code,message,extra={})=>({
+  ok:false,error:{code,...(message?{message}:{}),...extra}
 });
-export const accepted = execution => ({ kind: "accepted", execution });
-const emptyContext = () => ({ next: [] });
-const GUIDANCE_LEVELS = new Set(["required", "recommended", "available"]);
-const AFTER_DURATION = /^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$/;
-const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-const RESERVED_ERRORS = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
-const unexpected = () => fail("UNEXPECTED_ERROR", "Unexpected application failure", {
-  effects: "unknown"
-});
+export const accepted=id=>({kind:"accepted",execution:{id:String(id)}});
+export const emptyContext=()=>({next:[]});
+const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+const levels=new Set(["required","recommended","available"]);
+const duration=/^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$/;
+const unexpected=()=>fail("UNEXPECTED_ERROR","Unexpected application failure",{effects:"unknown"});
 
-function validate(schema, value, at = "$") {
-  if (!schema) return null;
-  if (schema.enum && !schema.enum.some(v => Object.is(v, value))) return at + " is not in enum";
-  const t = schema.type;
-  const typeOK = t === "object" ? value !== null && typeof value === "object" && !Array.isArray(value)
-    : t === "array" ? Array.isArray(value)
-    : t === "integer" ? Number.isInteger(value)
-    : t === "number" ? typeof value === "number" && Number.isFinite(value)
-    : t === "null" ? value === null : !t || typeof value === t;
-  if (!typeOK) return at + " must be " + t;
-  if (t === "object") {
-    for (const key of schema.required ?? []) {
-      if (!own(value, key)) return at + "." + key + " is required";
-    }
-    for (const [key, item] of Object.entries(value)) {
-      const sub = schema.properties?.[key];
-      if (!sub) {
-        if (schema.additionalProperties === false) return at + "." + key + " is not allowed";
-      } else {
-        const issue = validate(sub, item, at + "." + key);
-        if (issue) return issue;
-      }
+function checkPayload(s,value,path="$"){
+  if(!s)return null;
+  if(s.enum&&!s.enum.some(x=>Object.is(x,value)))return path+" is not in the enum";
+  const type=s.type;
+  const valid=type==="object"?value!==null&&typeof value==="object"&&!Array.isArray(value)
+    :type==="array"?Array.isArray(value)
+    :type==="integer"?Number.isInteger(value)
+    :type==="number"?typeof value==="number"&&Number.isFinite(value)
+    :type==="null"?value===null:typeof value===type;
+  if(!valid)return path+" must be "+type;
+  if(type==="object"){
+    for(const k of s.required??[])if(!own(value,k))return path+"."+k+" is required";
+    for(const [k,v] of Object.entries(value)){
+      const schema=s.properties?.[k];
+      if(!schema){if(s.additionalProperties===false)return path+"."+k+" is not allowed";}
+      else {const error=checkPayload(schema,v,path+"."+k);if(error)return error;}
     }
   }
-  if (t === "array" && schema.items) {
-    for (let i = 0; i < value.length; i++) {
-      const issue = validate(schema.items, value[i], at + "[" + i + "]");
-      if (issue) return issue;
-    }
+  if(type==="array")for(let i=0;i<value.length;i++){
+    const error=checkPayload(s.items,value[i],path+"["+i+"]");if(error)return error;
   }
   return null;
 }
-
-function assertRef(ref) {
-  if (!ref || typeof ref.type !== "string" || !ref.type ||
-      typeof ref.id !== "string" || !ref.id) {
-    throw new Error("ThingRef needs nonempty type and string id");
-  }
-}
+const refValid=ref=>typeof ref==="string"&&ref.length>0;
+const contextKeys=new Set(["ref","input","guidance","when","applicability"]);
 
 export class AnwaApp {
-  constructor(schema) {
-    const diagnostics = validateManifest(schema);
-    if (diagnostics.length) {
-      throw new Error("ANWA schema validation failed:\n" +
-        diagnostics.map(d => d.path + ": " + d.message).join("\n"));
-    }
-    this.schema = schema;
-    this.bindings = new Map();
+  constructor(manifest){
+    const issues=validateManifest(manifest);
+    if(issues.length)throw Error("ANWA 0.2 schema invalid:\n"+issues.map(d=>d.path+": "+d.message).join("\n"));
+    this.schema=manifest;
+    this.handlers=new Map();
+    this.guards={};
+    this.context=()=>emptyContext();
   }
-
-  catalog() {
-    return {
-      anwa: this.schema.anwa,
-      things: Object.entries(this.schema.things).map(([type, model]) => ({
-        type, title: model.title, description: model.description,
-        ...(model.semanticTypes ? { semanticTypes: model.semanticTypes } : {})
-      })),
-      entrypoints: this.schema.entrypoints
-    };
-  }
-
-  bind(type, { properties = {}, actions = {}, events = {}, guards = {},
-               context = () => emptyContext() }) {
-    const model = this.schema.things[type];
-    if (!model) throw new Error("Undeclared Thing type: " + type);
-    for (const [kind, handlers] of [["properties", properties], ["actions", actions], ["events", events]]) {
-      for (const name of Object.keys(model[kind] ?? {})) {
-        if (typeof handlers[name] !== "function") {
-          throw new Error("Missing " + kind + " implementation: " + type + "." + name);
-        }
-      }
-      for (const name of Object.keys(handlers)) {
-        if (!own(model[kind] ?? {}, name)) {
-          throw new Error("Undeclared " + kind + " handler: " + type + "." + name);
-        }
-      }
+  bind(handlers,{guards={},context=()=>emptyContext()}={}){
+    if(!handlers||typeof handlers!=="object"||Array.isArray(handlers))throw Error("Expected handler map");
+    for(const [ref,op] of Object.entries(this.schema.interactions)){
+      if(typeof handlers[ref]!=="function")throw Error("Unbound interaction: "+ref);
+      if(op.guard&&typeof guards[op.guard]!=="function")throw Error("Missing Guard: "+op.guard);
     }
-    for (const [kind, bucket] of [["properties", model.properties], ["actions", model.actions], ["events", model.events]]) {
-      for (const [name, spec] of Object.entries(bucket ?? {})) {
-        for (const code of Object.keys(spec.errors ?? {})) {
-          if (RESERVED_ERRORS.has(code)) {
-            throw new Error("Reserved framework error code: " + type + "." + name + "." + code);
-          }
-        }
-        if (kind === "actions" && spec.guard && typeof guards[spec.guard] !== "function") {
-          throw new Error("Missing guard implementation: " + type + "." + spec.guard);
-        }
-      }
+    for(const [ref,handler] of Object.entries(handlers)){
+      if(!own(this.schema.interactions,ref)||typeof handler!=="function")
+        throw Error("Unknown or invalid interaction binding: "+ref);
     }
-    if (typeof context !== "function") throw new Error("context must be a function");
-    this.bindings.set(type, { properties, actions, events, guards, context });
+    if(typeof context!=="function")throw Error("Context resolver must be a function");
+    this.handlers=new Map(Object.entries(handlers));
+    this.guards=guards;
+    this.context=context;
     return this;
   }
-
-  #lookup(target, kind, name) {
-    assertRef(target);
-    const model = this.schema.things[target.type];
-    const binding = this.bindings.get(target.type);
-    if (!model || !binding) throw new Error("Unknown or unbound Thing: " + target.type);
-    if (!kind) return { model, binding };
-    const bucket = { property: "properties", action: "actions", event: "events" }[kind];
-    if (!bucket || !own(model[bucket] ?? {}, name)) {
-      throw new Error("Unknown interaction: " + target.type + "." + kind + "." + name);
-    }
-    return { model, binding, spec: model[bucket][name], handler: binding[bucket][name] };
+  #resolve(ref){
+    if(!refValid(ref)||!own(this.schema.interactions,ref)||!this.handlers.has(ref))
+      throw Error("Unknown or unbound InteractionRef");
+    return {ref,spec:this.schema.interactions[ref],handler:this.handlers.get(ref)};
   }
-
-  describe(target) {
-    const { model } = this.#lookup(target);
+  catalog(){
     return {
-      thing: target, title: model.title, description: model.description,
-      ...(model.semanticTypes ? { semanticTypes: model.semanticTypes } : {}),
-      interactions: Object.entries({ properties: "property", actions: "action", events: "event" })
-        .flatMap(([bucket, kind]) => Object.entries(model[bucket] ?? {}).map(([name, spec]) => ({
-          ref: interaction(target, kind, name),
-          description: spec.description,
-          ...(spec.semanticTypes ? { semanticTypes: spec.semanticTypes } : {}),
-          ...(spec.hasSideEffects !== undefined ? { hasSideEffects: spec.hasSideEffects } : {}),
-          ...(spec.idempotent !== undefined ? { idempotent: spec.idempotent } : {}),
-          ...(spec.input ? { input: spec.input } : {}),
-          ...(spec.output ? { output: spec.output } : {}),
-          ...(spec.errors ? { errors: spec.errors } : {})
-        }))),
-      links: model.links ?? {}
+      anwa:this.schema.anwa,
+      entrypoints:[...this.schema.entrypoints],
+      interactions:Object.entries(this.schema.interactions).map(([ref,spec])=>({
+        ref,kind:spec.kind,description:spec.description
+      })),
+      ...(this.schema.things?{things:this.schema.things}:{})
     };
   }
-
-  #assertDeclaredError(spec, error) {
-    if (typeof error?.code !== "string" || !error.code ||
-        RESERVED_ERRORS.has(error.code) || own(error, "retry") ||
-        !own(spec.errors ?? {}, error.code)) {
-      throw new Error("Undeclared or invalid application error");
-    }
+  describe(ref){
+    const {spec}=this.#resolve(ref);
+    return {ref,...spec};
   }
-
-  async assess(target, actionName) {
-    const { binding, spec } = this.#lookup(target, "action", actionName);
-    if (!spec.guard) return { allowed: true };
-    const decision = await binding.guards[spec.guard]({ thing: target, app: this });
-    if (typeof decision?.allowed !== "boolean" || (!decision.allowed && !decision.error?.code)) {
-      throw new Error("Invalid guard decision for " + target.type + "." + actionName);
-    }
-    if (!decision.allowed) this.#assertDeclaredError(spec, decision.error);
+  async discover(ref){
+    this.#resolve(ref);
+    const raw=await this.context({phase:"discovery",ref,app:this});
+    return {description:this.describe(ref),context:this.#context(raw)};
+  }
+  #declaredError(spec,error){
+    if(typeof error?.code!=="string"||error.code==="INVALID_INPUT"||
+       error.code==="UNEXPECTED_ERROR"||own(error,"retry")||
+       !own(spec.errors??{},error.code))
+      throw Error("Undeclared domain error");
+  }
+  async assess(ref,input){
+    const {spec}=this.#resolve(ref);
+    if(!spec.guard)return {allowed:true};
+    const guard=this.guards[spec.guard];
+    const decision=await guard({ref,input,app:this});
+    if(typeof decision?.allowed!=="boolean"||
+       (!decision.allowed&&!decision.error?.code))
+      throw Error("Invalid Guard decision");
+    if(!decision.allowed)this.#declaredError(spec,decision.error);
     return decision;
   }
-
-  #context(raw) {
-    const result = raw ?? emptyContext();
-    if (!result || typeof result !== "object" || Array.isArray(result) ||
-        Object.keys(result).some(k => k !== "next") ||
-        !Array.isArray(result.next)) {
-      throw new Error("Interaction Context must be {next: []}");
-    }
-    for (const next of result.next) {
-      if (!next || typeof next !== "object" || Array.isArray(next) ||
-          Object.keys(next).some(k => !["kind", "ref", "guidance", "when", "applicability"].includes(k))) {
-        throw new Error("Invalid next-interaction candidate");
+  #context(raw,source){
+    const context=raw??emptyContext();
+    if(!context||typeof context!=="object"||Array.isArray(context)||
+       Object.keys(context).some(k=>k!=="next")||!Array.isArray(context.next))
+      throw Error("Context must contain only next array");
+    for(const candidate of context.next){
+      if(!candidate||typeof candidate!=="object"||Array.isArray(candidate)||
+         Object.keys(candidate).some(k=>!contextKeys.has(k)))throw Error("Invalid next candidate");
+      const {ref,spec}=this.#resolve(candidate.ref);
+      if(own(candidate,"input")){
+        if(!spec.input||checkPayload(spec.input,candidate.input))throw Error("Invalid next input");
       }
-      if (next.kind === "discover") {
-        if (next.ref?.thing || !next.ref?.type ||
-            next.guidance?.kind === "retry") {
-          throw new Error("Discover next requires ThingRef and cannot be retry");
-        }
-        this.#lookup(next.ref);
-      } else if (next.kind === undefined) {
-        this.#lookup(next.ref?.thing, next.ref?.kind, next.ref?.name);
-      } else {
-        throw new Error("Unsupported next-interaction kind");
+      if(candidate.guidance!==undefined){
+        const g=candidate.guidance;
+        if(!g||typeof g!=="object"||Array.isArray(g)||
+          Object.keys(g).some(k=>!["kind","level"].includes(k))||
+          (g.kind!==undefined&&g.kind!=="retry")||
+          (g.level!==undefined&&!levels.has(g.level))||
+          !Object.keys(g).length)throw Error("Invalid next guidance");
+        if(g.kind==="retry"&&ref!==source)throw Error("Retry must reference current Interaction");
       }
-      if (next.guidance !== undefined) {
-        const g = next.guidance;
-        if (!g || typeof g !== "object" || Array.isArray(g) ||
-            Object.keys(g).some(k => !["kind", "level"].includes(k)) ||
-            (g.kind !== undefined && g.kind !== "retry") ||
-            (g.level !== undefined && !GUIDANCE_LEVELS.has(g.level))) {
-          throw new Error("Invalid next-interaction guidance");
-        }
+      if(candidate.when!==undefined){
+        const w=candidate.when;
+        if(!w||typeof w!=="object"||Array.isArray(w)||
+           Object.keys(w).length!==1||typeof w.after!=="string"||
+           !duration.test(w.after))throw Error("Invalid next timing");
       }
-      if (next.when !== undefined) {
-        const when = next.when;
-        if (!when || typeof when !== "object" || Array.isArray(when) ||
-            Object.keys(when).length !== 1 || typeof when.after !== "string" ||
-            !AFTER_DURATION.test(when.after)) {
-          throw new Error("Invalid next-interaction timing");
-        }
-      }
-      if (next.applicability !== undefined) {
-        const a = next.applicability;
-        if (!a || typeof a !== "object" || Array.isArray(a) ||
-            Object.keys(a).some(k => !["state", "reason"].includes(k)) ||
-            !["available", "blocked", "unknown"].includes(a.state) ||
-            (a.reason !== undefined && typeof a.reason !== "string")) {
-          throw new Error("Invalid applicability hint");
-        }
+      if(candidate.applicability!==undefined){
+        const a=candidate.applicability;
+        if(!a||typeof a!=="object"||Array.isArray(a)||
+          Object.keys(a).some(k=>!["state","reason"].includes(k))||
+          !["available","blocked","unknown"].includes(a.state)||
+          (a.reason!==undefined&&typeof a.reason!=="string"))
+          throw Error("Invalid next applicability");
       }
     }
-    return result;
+    return context;
   }
-
-  async discover(target) {
-    const { binding } = this.#lookup(target);
-    const raw = await binding.context({ thing: target, phase: "discovery", app: this });
-    return { description: this.describe(target), context: this.#context(raw) };
-  }
-
-  async interact(ref, input) {
-    const { binding, spec, handler } = this.#lookup(ref?.thing, ref?.kind, ref?.name);
-    if (ref.kind === "event") throw new Error("Use observe() for EventAffordances");
-    const issue = spec.input ? validate(spec.input, input)
-      : input === undefined ? null : "Interaction does not accept input";
+  async interact(ref,input){
+    const {spec,handler}=this.#resolve(ref);
+    if(spec.kind==="event")throw Error("Use observe for event interactions");
+    const bad=spec.input?checkPayload(spec.input,input):
+      input!==undefined?"Interaction does not accept input":null;
     let outcome;
-    if (issue) {
-      outcome = { kind: "settled", result: fail("INVALID_INPUT", issue) };
-    } else {
-      try {
-        const decision = ref.kind === "action"
-          ? await this.assess(ref.thing, ref.name) : { allowed: true };
-        if (!decision.allowed) {
-          outcome = { kind: "settled", result: { ok: false, error: decision.error } };
-        } else {
-          const result = await handler({ thing: ref.thing, input, app: this });
-          if (result?.kind === "accepted") {
-            this.#lookup(result.execution);
-            outcome = { kind: "accepted", execution: result.execution };
-          } else if (typeof result?.ok === "boolean" &&
-                     (result.ok ? own(result, "value") : !!result.error?.code)) {
-            if (result.ok && spec.output) {
-              const bad = validate(spec.output, result.value);
-              if (bad) throw new Error("Output contract violated: " + bad);
-            }
-            if (!result.ok) this.#assertDeclaredError(spec, result.error);
-            outcome = { kind: "settled", result };
-          } else {
-            throw new Error("Handler returned invalid Result");
+    if(bad)outcome={kind:"settled",result:fail("INVALID_INPUT",bad)};
+    else try{
+      const decision=spec.kind==="action"?await this.assess(ref,input):{allowed:true};
+      if(!decision.allowed)outcome={kind:"settled",result:{ok:false,error:decision.error}};
+      else {
+        const result=await handler({ref,input,app:this});
+        if(result?.kind==="accepted"){
+          if(typeof result.execution?.id!=="string"||!result.execution.id)throw Error("Invalid ExecutionRef");
+          outcome={kind:"accepted",execution:result.execution};
+        }else if(typeof result?.ok==="boolean"&&(result.ok?own(result,"value"):!!result.error?.code)){
+          if(result.ok&&spec.output){
+            const issue=checkPayload(spec.output,result.value);
+            if(issue)throw Error("Output contract violation");
           }
-        }
-      } catch {
-        // Undeclared domain errors and unexpected exceptions share one opaque framework error.
-        outcome = { kind: "settled", result: unexpected() };
+          if(!result.ok)this.#declaredError(spec,result.error);
+          outcome={kind:"settled",result};
+        }else throw Error("Invalid Result");
       }
-    }
-    try {
-      const raw = await binding.context({
-        thing: ref.thing, interaction: ref, outcome, phase: "result", app: this
-      });
-      return { outcome, context: this.#context(raw) };
-    } catch {
-      // Handler side effects may already have occurred; do not imply a safe retry.
-      return {
-        outcome: { kind: "settled", result: unexpected() },
-        context: emptyContext()
-      };
+    }catch{outcome={kind:"settled",result:unexpected()};}
+    try{
+      const raw=await this.context({phase:"result",ref,input,outcome,app:this});
+      return {outcome,context:this.#context(raw,ref)};
+    }catch{
+      return {outcome:{kind:"settled",result:unexpected()},context:emptyContext()};
     }
   }
-
-  observe(ref, options = {}) {
-    const { handler } = this.#lookup(ref?.thing, ref?.kind, ref?.name);
-    if (ref.kind !== "event") throw new Error("Only EventAffordances may be observed");
-    const events = handler({ thing: ref.thing, app: this, ...options });
-    if (!events?.[Symbol.asyncIterator]) throw new Error("Event handler must return AsyncIterable");
+  observe(ref,input,options={}){
+    const {spec,handler}=this.#resolve(ref);
+    if(spec.kind!=="event")throw Error("observe requires event");
+    const bad=spec.input?checkPayload(spec.input,input):
+      input!==undefined?"Event does not accept input":null;
+    if(bad)throw Error("Invalid event input: "+bad);
+    const events=handler({ref,input,app:this,...options});
+    if(!events?.[Symbol.asyncIterator])throw Error("Event must return AsyncIterable");
     return events;
   }
 }
