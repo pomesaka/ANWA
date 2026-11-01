@@ -30,13 +30,6 @@
       "additionalProperties": {
         "$ref": "#/$defs/Interaction"
       }
-    },
-    "things": {
-      "type": "object",
-      "description": "Optional domain metadata, not a required parent of Interactions",
-      "additionalProperties": {
-        "$ref": "#/$defs/Thing"
-      }
     }
   },
   "$defs": {
@@ -88,11 +81,6 @@
         },
         "semanticTypes": {
           "$ref": "#/$defs/SemanticTypes"
-        },
-        "subjectType": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Optional link to a Thing metadata type, not a mandatory owner or instance binding"
         },
         "input": {
           "type": "object",
@@ -159,28 +147,8 @@
             }
           }
         }
-      ]
-    },
-    "Thing": {
-      "type": "object",
-      "required": [
-        "title",
-        "description"
       ],
-      "additionalProperties": false,
-      "properties": {
-        "title": {
-          "type": "string",
-          "minLength": 1
-        },
-        "description": {
-          "type": "string",
-          "minLength": 1
-        },
-        "semanticTypes": {
-          "$ref": "#/$defs/SemanticTypes"
-        }
-      }
+      "description": "Standalone application Interaction definition. No parent Thing or subject type is required or supported."
     },
     "Error": {
       "type": "object",
@@ -369,5 +337,6 @@
         }
       }
     }
-  }
+  },
+  "description": "Interaction-first ANWA 0.2 experimental manifest. Thing, things and subjectType are not part of the core contract; application domain objects are represented via typed Interaction data."
 }
