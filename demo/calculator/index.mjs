@@ -9,9 +9,7 @@ export function createCalculator() {
     actions: {
       add: async ({ input }) => ok(input.a + input.b),
       divide: async ({ input }) => input.b === 0
-        ? fail("DIVIDE_BY_ZERO", "Cannot divide by zero", {
-            retry: { mode: "after-input-change" }
-          })
+        ? fail("DIVIDE_BY_ZERO", "Cannot divide by zero")
         : ok(input.a / input.b)
     }
   });
