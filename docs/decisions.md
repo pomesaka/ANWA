@@ -1,76 +1,38 @@
-# Current direction and decision status
+# ANWA design decisions — current experimental direction
 
-> **As of 2026-11-01.** Conversation-level design intent, **not** an accepted specification or a guarantee that a runtime exists. Start with [Scope and responsibility boundaries](scope-and-boundaries.md).
+> Updated 2026-11-01. The active runnable profile is [ANWA v0.2](../spec/anwa-0.2.md), not the superseded Thing-bound v0.1.
 
-## Principles we intend to preserve
+## Core principles
 
-| Topic | Current direction | Important boundary |
+| Area | Current decision | Boundary |
 | --- | --- | --- |
-| Product | Schema-first agent-facing web application framework | ANWA is a **framework**, not an application generator that chooses business workflows |
-| Authoring | Developer declares a public contract and implements behavior in ordinary code | ANWA does not prescribe the business domain |
-| Protocol | Application semantics independent of GraphQL/REST/RPC/MCP; adapters possible | Exact adapters and conformance TBD |
-| Vocabulary | Prefer W3C WoT terms (Thing, Interaction Affordances, Link, DataSchema, Form) | Vocabulary alignment ≠ WoT conformance |
-| Discovery | Provide means to expose descriptions, relations, available interactions and contextual hints | Developer decides what is published; ANWA need not enumerate everything |
-| Interaction | **Outcome + Context** with required `context.next: []` for delivered application-level results | A single list of application-supplied next Interaction/Discovery candidates; may be empty; not instructions |
-| Errors | Exhaustively declared domain codes; per-attempt `effects` remains on the error/outcome | **Retry** is a `context.next` candidate with `guidance.kind: retry`, not an Error field |
-| Guards | If an application uses guards, schema may reference their contract, actual checks live in code | A declarative guard DSL is not required; ANWA does not automatically infer conditions |
-| States/transitions | ANWA should allow state/transition descriptions when useful | **Not required** that every application or Thing be authored as a state machine |
-| Async / streaming | Provide appropriate representation/integration paths for nonblocking work and observation | Application/infrastructure chooses durable engine, event guarantees, transport |
-| UI | Human UI is not required as primary interface | Generating the actual UI is a client/application choice |
+| Public contract | **Interaction-first**: top-level `interactions` plus declared entrypoints | No required Thing or entity boundary |
+| InteractionRef | App-scoped string identifier; e.g. `order.cancel` | Federated/external API references deferred |
+| Kind | `query`, `action`, `event` | WoT Property/Action/Event Affordances are Thing-bound; ANWA does not claim WoT conformance |
+| Thing | Optional domain metadata in `things`, optional `subjectType` on an Interaction | Not a mandatory parent, input, execution or storage model |
+| Binding | Direct `app.bind({ref:handler})`; ordinary application code | No DSL for guard predicates or mandatory state machine |
+| Discovery | `catalog()` and `discover(InteractionRef)` | Adapter/authorization still undecided |
+| Interaction | Delivered `Outcome + Context` (including domain failure) | No guarantee on network loss |
+| Navigation | `context.next` holds offered Interactions; optional bound inputs, guidance, timing, applicability | Server does not instruct agent or choose business workflow |
+| Retry | Same Interaction in `context.next` with `guidance.kind:"retry"` | Not automatic and not assured safe |
+| Error | Exhaustive expected domain error codes, undeclared → `UNEXPECTED_ERROR` | Error details currently string descriptions |
+| Effects | Optional Action `hasSideEffects` and `idempotent`; per-attempt `error.effects` | Unknown when omitted; no transactional guarantee |
+| Async | `accepted` with opaque `ExecutionRef={id:string}` | No Execution Thing or workflow engine required |
+| Streaming | Optional standalone Event Interaction with application-defined input | No delivery/durability guarantees |
 
-## Error-contract and tooling decisions (2026-11-01 update)
+## Decisions intentionally left to implementers
 
-- Expected **domain error codes are exhaustively declared** on each interaction when domain errors are possible.
-- Runtime-reported but undeclared domain codes are classified as the reserved **`UNEXPECTED_ERROR`**, without revealing internal implementation details. **`INVALID_INPUT`** is the separate framework-generated input contract error. The current 0.1 reference has not standardized all transport-level failures.
-- **Schema-first tooling should generate interfaces/type declarations**, not application business logic.
-- Schema shape/known references and implementation outputs should be validated; runtime side-effect correctness cannot be proven by static types.
-- The existing hand-authored JSON manifest is not presumed human-friendly or empirically AI-friendly; the 0.1 prototype provides `validate`, `generate`, and `inspect` commands.
-- **Cross-service/external API delegation is deferred** for a future interoperability proposal; app-scoped references remain the experimental profile.
+Which Interactions to expose, domain entity/Thing granularity, names and identifiers, state graph, guards, storage, transactions, authorizations, next candidates, client interpretation and policy, external APIs, streaming backend, retries and business side effects.
 
-See [Schema authoring and validation](schema-authoring.md) for the current implementation and limitations.
+## Future framework questions
 
-## Agent-first schema design clarification (2026-11-01)
+- Stronger JSON Schema validation and static handler type-checking
+- Cross-app delegation/federated InteractionRefs
+- Protocol adapters including WoT mappings
+- Typed domain error detail definitions and contextual recovery guidance consistency
+- Authenticated Discovery, policy filtering and reference lifetime
+- Verification against unfamiliar agents, not only scripted tests
 
-- Primary consumers of the schema are **agents generating/implementing applications** and **agents discovering/invoking applications**. Human writing/editing convenience is not a design objective.
-- Preserve an **unambiguous machine-verifiable public contract** and progressive Discovery rather than optimizing the manifest's visual compactness.
-- Optional `semanticTypes` provide application-authored semantic identifiers (absolute URI/URN). On Actions, independent optional booleans `hasSideEffects` and `idempotent` describe business-observable effects and repeatability. **Omission means unknown**, not `false`; these are not an alias for WoT `safe`.
-- Semantic and effect annotations are **untrusted metadata**. They do not certify authorization, actual side effects, business rule enforcement, or automatic safe retries.
-- Actual utility for unfamiliar AI agents remains unmeasured; neither structured JSON nor readable prose is proof of better task completion.
+**Historical v0.1 prose, draft PRs and research notes are non-normative.** If they mention mandatory ThingRef-based InteractionRefs, defer to v0.2.
 
-See [Agent-native schema contract](../spec/agent-native-schema.md).
-
-## Things explicitly delegated to application developers
-
-These are **not pending ANWA decisions**:
-
-- Granularity: an order, an order collection or an order service as a Thing.
-- Which domain states, transitions, Actions, errors and relations exist.
-- Whether an application needs a state machine at all.
-- Guard predicates, business rules, approval requirements, how to implement transactions and data persistence.
-- Which related resources/next interactions to expose for a specific result.
-- Which optional facilities (streaming, async execution, persistence) to adopt and how to deploy them.
-- User experience, domain-specific recommendations and business success criteria.
-
-ANWA's job is to supply **ways to express and expose** these decisions when appropriate, without making them universal.
-
-## Questions ANWA itself still owns (non-exhaustive)
-
-- Which interoperable core primitives and extension points are necessary to expose descriptions, links, interactions, results and context?
-- Which fields/semantics of **Outcome + Context** are common, required, optional or extensible?
-- How can a public schema bind to user-defined guards/handlers/resolvers, and how much validation can tooling actually guarantee?
-- What, if any, canonical model should adapt to WoT/GraphQL/MCP/RPC without falsely asserting conformance?
-- What optional lifecycle/observation interfaces make async and streaming representable without mandating an execution engine?
-- What are the minimum safeguards against unsafe interpretation of descriptions and disclosure of unauthorized hints?
-
-See [Open questions](open-questions.md) for prioritization. The above are **framework-design questions**, not decisions about a sample business application.
-
-## Corrections to earlier discussions
-
-1. **State-machine-first → schema-first:** a state machine is **one optional** domain modeling tool, not ANWA's mandatory authoring entrypoint.
-2. **Guard predicates in YAML → references to application code:** ANWA may define a binding contract, not a new language for arbitrary guard logic.
-3. **Affordance = currently possible → WoT Interaction Affordance + optional contextual applicability:** definition and dynamic hint are separate; neither is an authorization grant.
-4. **Recovery-after-failure → any-interaction navigation:** a result may carry relevant next-interaction references after success or domain failure.
-5. **"Decide Thing granularity" → developer choice:** ANWA only needs an expressive mechanism that can support relevant modeling styles.
-6. **"ANWA must generate next steps/state transitions" → "ANWA must enable authors to expose them":** automatic derivation is an optional feature to justify separately.
-
-[README](../README.md) · [Scope](scope-and-boundaries.md) · [Architecture](architecture.md) · [Glossary](glossary.md)
+[Main README](../README.md) · [Scope](scope-and-boundaries.md)
