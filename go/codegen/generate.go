@@ -248,19 +248,18 @@ func contains(xs []string, x string) bool {
 	return false
 }
 func exported(s string) string {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
 	var result strings.Builder
-	capNext := true
-	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
-			capNext = true
-			continue
+	for _, part := range parts {
+		// Uppercase domain error codes become idiomatic Go names.
+		if strings.ToUpper(part) == part {
+			part = strings.ToLower(part)
 		}
-		if capNext {
-			result.WriteRune(unicode.ToUpper(r))
-			capNext = false
-		} else {
-			result.WriteRune(r)
-		}
+		runes := []rune(part)
+		runes[0] = unicode.ToUpper(runes[0])
+		result.WriteString(string(runes))
 	}
 	value := result.String()
 	if value == "" || unicode.IsDigit([]rune(value)[0]) {
