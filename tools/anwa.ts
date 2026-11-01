@@ -52,7 +52,8 @@ try {
         console.log("GENERATED " + args[1]);
       } else process.stdout.write(code);
     } else if (command === "generate-manifest") {
-      if (!args[1]) throw Error("generate-manifest requires an output .ts path");
+      if (!args[1])
+        throw Error("generate-manifest requires an output .ts path");
       writeFileSync(args[1], generateManifestModule(manifest), "utf8");
       const formatted = Bun.spawnSync({
         cmd: ["bun", "fmt", args[1]],

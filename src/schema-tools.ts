@@ -313,11 +313,13 @@ export function generateTypes(manifest: Manifest): string {
 export function generateManifestModule(manifest: Manifest): string {
   const problems = validateManifest(manifest);
   if (problems.length)
-    throw new Error(problems.map(x => x.path + ": " + x.message).join("\n"));
+    throw new Error(problems.map((x) => x.path + ": " + x.message).join("\n"));
   return [
     "// AUTO-GENERATED from anwa.json; do not edit. Run bun run codegen.",
     'import type { Manifest } from "../../src/schema-tools.ts";',
-    "export const schema = " + JSON.stringify(manifest, null, 2) + " as const satisfies Manifest;",
-    ""
+    "export const schema = " +
+      JSON.stringify(manifest, null, 2) +
+      " as const satisfies Manifest;",
+    "",
   ].join("\n");
 }

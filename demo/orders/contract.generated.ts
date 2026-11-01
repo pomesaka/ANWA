@@ -1,116 +1,102 @@
 // AUTO-GENERATED from anwa.json; do not edit. Run bun run codegen.
 import type { Manifest } from "../../src/schema-tools.ts";
 export const schema = {
-  "anwa": "0.2",
-  "entrypoints": [
-    "order.get",
-    "order.cancel",
-    "shipment.track"
-  ],
-  "interactions": {
+  anwa: "0.2",
+  entrypoints: ["order.get", "order.cancel", "shipment.track"],
+  interactions: {
     "order.get": {
-      "kind": "query",
-      "description": "Read the current state of an order by its ID.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "string",
-            "description": "Order identifier"
-          }
-        },
-        "required": [
-          "orderId"
-        ],
-        "additionalProperties": false
-      },
-      "output": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "Current fulfillment state of this order."
+      kind: "query",
+      description: "Read the current state of an order by its ID.",
+      input: {
+        type: "object",
+        properties: {
+          orderId: {
+            type: "string",
+            description: "Order identifier",
           },
-          "id": {
-            "type": "string",
-            "description": "Application-assigned order identifier."
-          }
         },
-        "required": [
-          "status",
-          "id"
-        ]
+        required: ["orderId"],
+        additionalProperties: false,
       },
-      "errors": {
-        "NOT_FOUND": "The order could not be found."
-      }
+      output: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            description: "Current fulfillment state of this order.",
+          },
+          id: {
+            type: "string",
+            description: "Application-assigned order identifier.",
+          },
+        },
+        required: ["status", "id"],
+      },
+      errors: {
+        NOT_FOUND: "The order could not be found.",
+      },
     },
     "order.cancel": {
-      "kind": "action",
-      "description": "Request cancellation of an order.",
-      "guard": "canCancel",
-      "input": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "string",
-            "description": "Order identifier"
+      kind: "action",
+      description: "Request cancellation of an order.",
+      guard: "canCancel",
+      input: {
+        type: "object",
+        properties: {
+          orderId: {
+            type: "string",
+            description: "Order identifier",
           },
-          "reason": {
-            "type": "string",
-            "description": "Human-provided explanation for requesting cancellation."
-          }
+          reason: {
+            type: "string",
+            description:
+              "Human-provided explanation for requesting cancellation.",
+          },
         },
-        "required": [
-          "orderId",
-          "reason"
-        ],
-        "additionalProperties": false
+        required: ["orderId", "reason"],
+        additionalProperties: false,
       },
-      "output": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "New order status after successful cancellation."
-          }
+      output: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            description: "New order status after successful cancellation.",
+          },
         },
-        "required": [
-          "status"
-        ]
+        required: ["status"],
       },
-      "errors": {
-        "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
-        "NOT_FOUND": "The order was not found.",
-        "ALREADY_CANCELLED": "The order has already been cancelled.",
-        "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
+      errors: {
+        ORDER_ALREADY_SHIPPED: "Cancellation is not available after dispatch.",
+        NOT_FOUND: "The order was not found.",
+        ALREADY_CANCELLED: "The order has already been cancelled.",
+        ORDER_STATE_CHANGED:
+          "The order changed while cancellation was being attempted.",
       },
-      "hasSideEffects": true,
-      "idempotent": false
+      hasSideEffects: true,
+      idempotent: false,
     },
     "shipment.track": {
-      "kind": "query",
-      "description": "Read current shipment tracking state by shipment ID.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "shipmentId": {
-            "type": "string",
-            "description": "Shipment identifier"
-          }
+      kind: "query",
+      description: "Read current shipment tracking state by shipment ID.",
+      input: {
+        type: "object",
+        properties: {
+          shipmentId: {
+            type: "string",
+            description: "Shipment identifier",
+          },
         },
-        "required": [
-          "shipmentId"
-        ],
-        "additionalProperties": false
+        required: ["shipmentId"],
+        additionalProperties: false,
       },
-      "output": {
-        "type": "string",
-        "description": "Current tracking state."
+      output: {
+        type: "string",
+        description: "Current tracking state.",
       },
-      "errors": {
-        "NOT_FOUND": "The shipment could not be found."
-      }
-    }
-  }
+      errors: {
+        NOT_FOUND: "The shipment could not be found.",
+      },
+    },
+  },
 } as const satisfies Manifest;

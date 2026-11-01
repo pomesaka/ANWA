@@ -49,7 +49,9 @@ export function createOrders(): AnwaApp<typeof schema> {
           const order = orders.get(input.orderId);
           // Atomic state validation remains an application/storage responsibility.
           if (!order || order.status !== "pending")
-            return reply(fail("ORDER_STATE_CHANGED", "Order changed during cancellation"));
+            return reply(
+              fail("ORDER_STATE_CHANGED", "Order changed during cancellation"),
+            );
           order.status = "cancelled";
           return reply(ok({ status: order.status }), [
             {
@@ -63,11 +65,13 @@ export function createOrders(): AnwaApp<typeof schema> {
         onDenied: ({ input }) => {
           const order = orders.get(input.orderId);
           const next: NextInteraction[] = order
-            ? [{
-                ref: "order.get",
-                input: { orderId: order.id },
-                guidance: { level: "available" },
-              }]
+            ? [
+                {
+                  ref: "order.get",
+                  input: { orderId: order.id },
+                  guidance: { level: "available" },
+                },
+              ]
             : [];
           if (order?.status === "shipped")
             next.push({

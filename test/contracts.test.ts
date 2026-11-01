@@ -108,26 +108,37 @@ test("Runtime enforces named guard before run and uses per-Interaction onDenied"
   } as const satisfies Manifest;
   let executed = 0;
   let checks = 0;
-  const app = new AnwaApp(doc).bind({
-    "test.run": {
-      run: async () => {
-        executed++;
-        return reply(ok(null));
-      },
-      onDenied: ({ error }) => {
-        assert.equal(error.code, "EXPECTED_FAILURE");
-        return [{ ref: "test.run", guidance: { kind: "retry", level: "available" },
-          when: { after: "PT30S" } }];
+  const app = new AnwaApp(doc).bind(
+    {
+      "test.run": {
+        run: async () => {
+          executed++;
+          return reply(ok(null));
+        },
+        onDenied: ({ error }) => {
+          assert.equal(error.code, "EXPECTED_FAILURE");
+          return [
+            {
+              ref: "test.run",
+              guidance: { kind: "retry", level: "available" },
+              when: { after: "PT30S" },
+            },
+          ];
+        },
       },
     },
-  }, {
-    guards: {
-      check: async () => {
-        checks++;
-        return { allowed: false, error: { code: "EXPECTED_FAILURE", effects: "none" } };
+    {
+      guards: {
+        check: async () => {
+          checks++;
+          return {
+            allowed: false,
+            error: { code: "EXPECTED_FAILURE", effects: "none" },
+          };
+        },
       },
     },
-  });
+  );
   const result = await app.interact("test.run");
   assert.equal(executed, 0);
   assert.equal(checks, 1);
@@ -139,17 +150,29 @@ test("Runtime enforces named guard before run and uses per-Interaction onDenied"
 
 test("Missing denial callback is rejected instead of silently bypassing policy", () => {
   const doc = {
-    anwa: "0.2", entrypoints: ["test.run"],
+    anwa: "0.2",
+    entrypoints: ["test.run"],
     interactions: {
-      "test.run": {kind: "action", description: "Guarded action", guard: "check",
-        errors: {EXPECTED_FAILURE: "Denied"}}
+      "test.run": {
+        kind: "action",
+        description: "Guarded action",
+        guard: "check",
+        errors: { EXPECTED_FAILURE: "Denied" },
+      },
     },
   } as const satisfies Manifest;
   const app = new AnwaApp(doc);
-  assert.throws(() => app.bind({
-    // @ts-expect-error deliberate invalid binding checked again at runtime
-    "test.run": { run: async () => reply(ok(null)) }
-  }, {guards: {check: async () => ({allowed: true})}}), /onDenied/);
+  assert.throws(
+    () =>
+      app.bind(
+        {
+          // @ts-expect-error deliberate invalid binding checked again at runtime
+          "test.run": { run: async () => reply(ok(null)) },
+        },
+        { guards: { check: async () => ({ allowed: true }) } },
+      ),
+    /onDenied/,
+  );
 });
 
 test("Undeclared errors are mapped to opaque framework errors", async () => {

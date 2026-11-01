@@ -1,94 +1,87 @@
 // AUTO-GENERATED from anwa.json; do not edit. Run bun run codegen.
 import type { Manifest } from "../../src/schema-tools.ts";
 export const schema = {
-  "anwa": "0.2",
-  "entrypoints": [
-    "report.generate"
-  ],
-  "interactions": {
+  anwa: "0.2",
+  entrypoints: ["report.generate"],
+  interactions: {
     "report.generate": {
-      "kind": "action",
-      "description": "Accept a report generation request and return an execution reference.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "topic": {
-            "type": "string",
-            "description": "Subject of the report to generate."
-          }
+      kind: "action",
+      description:
+        "Accept a report generation request and return an execution reference.",
+      input: {
+        type: "object",
+        properties: {
+          topic: {
+            type: "string",
+            description: "Subject of the report to generate.",
+          },
         },
-        "required": [
-          "topic"
-        ]
+        required: ["topic"],
       },
-      "hasSideEffects": true,
-      "idempotent": false
+      hasSideEffects: true,
+      idempotent: false,
     },
     "execution.status": {
-      "kind": "query",
-      "description": "Read an execution lifecycle state by execution ID.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "executionId": {
-            "type": "string",
-            "description": "Execution identifier"
-          }
+      kind: "query",
+      description: "Read an execution lifecycle state by execution ID.",
+      input: {
+        type: "object",
+        properties: {
+          executionId: {
+            type: "string",
+            description: "Execution identifier",
+          },
         },
-        "required": [
-          "executionId"
-        ],
-        "additionalProperties": false
+        required: ["executionId"],
+        additionalProperties: false,
       },
-      "output": {
-        "type": "string",
-        "description": "Current execution lifecycle state."
+      output: {
+        type: "string",
+        description: "Current execution lifecycle state.",
       },
-      "errors": {
-        "NOT_FOUND": "The execution could not be found."
-      }
+      errors: {
+        NOT_FOUND: "The execution could not be found.",
+      },
     },
     "execution.result": {
-      "kind": "query",
-      "description": "Read the final report by execution ID, or receive NOT_READY.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "executionId": {
-            "type": "string",
-            "description": "Execution identifier"
-          }
+      kind: "query",
+      description:
+        "Read the final report by execution ID, or receive NOT_READY.",
+      input: {
+        type: "object",
+        properties: {
+          executionId: {
+            type: "string",
+            description: "Execution identifier",
+          },
         },
-        "required": [
-          "executionId"
-        ],
-        "additionalProperties": false
+        required: ["executionId"],
+        additionalProperties: false,
       },
-      "output": {
-        "type": "string",
-        "description": "Completed report text when the execution succeeds."
+      output: {
+        type: "string",
+        description: "Completed report text when the execution succeeds.",
       },
-      "errors": {
-        "NOT_FOUND": "The execution could not be found.",
-        "NOT_READY": "The execution has not completed. Inspect status or wait before trying again."
-      }
+      errors: {
+        NOT_FOUND: "The execution could not be found.",
+        NOT_READY:
+          "The execution has not completed. Inspect status or wait before trying again.",
+      },
     },
     "execution.updates": {
-      "kind": "event",
-      "description": "Observe execution progress and report content deltas.",
-      "input": {
-        "type": "object",
-        "properties": {
-          "executionId": {
-            "type": "string",
-            "description": "Execution identifier"
-          }
+      kind: "event",
+      description: "Observe execution progress and report content deltas.",
+      input: {
+        type: "object",
+        properties: {
+          executionId: {
+            type: "string",
+            description: "Execution identifier",
+          },
         },
-        "required": [
-          "executionId"
-        ],
-        "additionalProperties": false
-      }
-    }
-  }
+        required: ["executionId"],
+        additionalProperties: false,
+      },
+    },
+  },
 } as const satisfies Manifest;

@@ -1,6 +1,12 @@
 // Compile-time regression checks. This module is included in bun check, not bun test.
 import { AnwaApp, fail, ok, reply } from "../src/anwa.ts";
-import type { BindingsFor, GuardsFor, InputOf, OutputOf, ErrorCodes } from "../src/contracts.ts";
+import type {
+  BindingsFor,
+  GuardsFor,
+  InputOf,
+  OutputOf,
+  ErrorCodes,
+} from "../src/contracts.ts";
 import { schema as orders } from "../demo/orders/contract.generated.ts";
 import { schema as calculator } from "../demo/calculator/contract.generated.ts";
 
@@ -12,24 +18,35 @@ type GuardedHandler = BindingsFor<typeof orders>["order.cancel"];
 type CancelReturn = Awaited<ReturnType<GuardedHandler["run"]>>;
 type CancelGuard = GuardsFor<typeof orders>["canCancel"];
 type GuardInput = Parameters<CancelGuard>[0]["input"];
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends
-  (<T>() => T extends B ? 1 : 2) ? true : false;
+type Equal<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
 type Assert<T extends true> = T;
-export type CheckInput = Assert<Equal<CancelInput, {orderId: string; reason: string}>>;
-export type CheckOutput = Assert<Equal<CancelOutput, {status: string}>>;
-export type CheckErrors = Assert<Equal<CancelError,
-  "ORDER_ALREADY_SHIPPED" | "NOT_FOUND" | "ALREADY_CANCELLED" | "ORDER_STATE_CHANGED">>;
+export type CheckInput = Assert<
+  Equal<CancelInput, { orderId: string; reason: string }>
+>;
+export type CheckOutput = Assert<Equal<CancelOutput, { status: string }>>;
+export type CheckErrors = Assert<
+  Equal<
+    CancelError,
+    | "ORDER_ALREADY_SHIPPED"
+    | "NOT_FOUND"
+    | "ALREADY_CANCELLED"
+    | "ORDER_STATE_CHANGED"
+  >
+>;
 export type CheckGuardInput = Assert<Equal<GuardInput, CancelInput>>;
 
-const validInput: CancelInput = {orderId:"123", reason:"test"};
+const validInput: CancelInput = { orderId: "123", reason: "test" };
 void validInput;
 
 // @ts-expect-error orderId comes from schema and must be a string
-const badInput: CancelInput = {orderId:123, reason:"test"};
+const badInput: CancelInput = { orderId: 123, reason: "test" };
 void badInput;
 
 // @ts-expect-error output.status comes from schema and must be a string
-const badOutput: CancelReturn = reply(ok({status:123}));
+const badOutput: CancelReturn = reply(ok({ status: 123 }));
 void badOutput;
 
 // @ts-expect-error SECRET is not one of order.cancel's declared domain errors
@@ -38,10 +55,12 @@ void undeclaredError;
 
 const app = new AnwaApp(calculator);
 // @ts-expect-error the generated type requires both a and b to be numeric
-void app.interact("calculator.add", {a:1,b:"oops"});
+void app.interact("calculator.add", { a: 1, b: "oops" });
 
 // @ts-expect-error there is no calculator.unknown InteractionRef
-void app.interact("calculator.unknown", {a:1,b:2});
+void app.interact("calculator.unknown", { a: 1, b: 2 });
 
 // @ts-expect-error schema-driven bind requires the calculator.divide handler
-void app.bind({"calculator.add": async ({input})=>reply(ok(input.a + input.b))});
+void app.bind({
+  "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
+});
