@@ -78,10 +78,11 @@ The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and
 
 ### Go reference adapter
 
-The experimental v0.2 manifest can also be consumed by an in-process [Go module](go/README.md) with no third-party dependencies. It includes JSON contract validation (including local `$defs` / `$ref`), standalone Interaction handlers, Guard-enforced invocation and Discovery, Outcome + Context, accepted Actions and Event observation. The Go calculator example uses the same public `anwa.json` as the TypeScript demo. Go tests read all four existing manifests, including Advanced Todo. Go does **not** yet generate strongly typed Handler signatures from a manifest and is not a network server or an implementation of the Todo business logic.
+The experimental v0.2 manifest can also be consumed by an in-process [Go module](go/README.md) with no third-party dependencies. It includes JSON contract validation (including local `$defs` / `$ref`), standalone Interaction handlers, Guard-enforced invocation and Discovery, Outcome + Context, accepted Actions and Event observation. The Go calculator example uses the same public `anwa.json` as the TypeScript demo. Go tests read and generate code for all four existing manifests, including Advanced Todo. **Go now generates model types, a compile-time `ServerInterface`, typed response variants, and a runtime binding adapter**; application authors implement the generated interface instead of manually mapping Interaction names to handlers. It is not a network server or a port of Todo business logic.
 
 ```bash
 cd go
+go run ./cmd/anwa-codegen -in ../demo/calculator/anwa.json -out examples/calculator/contract.gen.go -package main
 go test ./...
 go run ./examples/calculator
 ```
