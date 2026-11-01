@@ -61,8 +61,8 @@ func cleanTitle(title string) (string, bool) {
 
 func taskGetNext(id string) anwa.Next {
 	return anwa.Next{
-		Ref: "task.get",
-		Input: map[string]any{"taskId": id},
+		Ref:      "task.get",
+		Input:    map[string]any{"taskId": id},
 		Guidance: &anwa.Guidance{Level: "recommended"},
 	}
 }
