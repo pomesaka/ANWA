@@ -1,22 +1,30 @@
-# Executable ANWA v0.1 demos
+# ANWA v0.2 — Executable Interaction-first demos
 
-**Small in-process applications, not deployed services or a production framework.** Run with Node.js 20+; no dependencies or API keys:
+These are dependency-free Node.js **in-process** applications, not network services or a released framework.
 
 ```bash
+npm run validate
+npm run types:orders
 npm test
 npm run demo
 ```
 
-| Application | Thing granularity chosen by author | What is demonstrated |
+| Demo | Declared Interactions | Things |
 | --- | --- | --- |
-| [Calculator](calculator/) | One service-level Thing, Calculator/main | Stateless handlers, typed Result/error and empty Context |
-| [Orders](orders/) | One Thing per order and shipment | Application-coded guard, domain state, `context.next` tracking recommendation |
-| [Reports](reports/) | Service Thing plus per-run Execution Things | Accepted execution, `context.next` observation choices, timed retry for `NOT_READY`, final settled Result |
+| [Calculator](calculator/) | `calculator.add`, `calculator.divide` | **None**: pure service operations with typed results |
+| [Orders](orders/) | `order.get`, `order.cancel`, `shipment.track` | **Optional metadata** for Order/Shipment; handlers receive orderId/shipmentId as normal input |
+| [Reports](reports/) | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | **None**: accepted execution ID is data, not an Execution Thing |
 
-Each app has its own `anwa.json` and ordinary JavaScript handlers in `index.mjs`. All use the [small reference adapter](../src/anwa.mjs).
+Each example has an `anwa.json` manifest and an `index.mjs` implementation, bound directly by InteractionRef using [the runtime](../src/anwa.mjs).
 
-Runtime context examples now use `next: []` rather than separate Links/Affordances. A retry is a `next` candidate with `guidance.kind: "retry"` and optionally `when.after`; the error itself only describes the failed attempt.
+### What this demonstrates
 
-These examples are **different on purpose**. ANWA does not mandate their Thing granularity, workflow, database, or next-step guidance. Orders uses an in-memory Map (no transactional durability). Reports runs an ephemeral local asynchronous task and exposes an AsyncIterable (not SSE or a production queue).
+- `app.bind({"report.generate": handler, ...})` — no Thing parent is necessary.
+- `catalog()` and `discover("execution.status")` describe individual Interactions.
+- `interact("execution.result", {executionId})` reads a result; `observe("execution.updates", {executionId})` observes events.
+- Both success and failure have `Outcome + Context`.
+- A `context.next` candidate can include an InteractionRef plus the input needed to target an instance. A retry is the **same ref** with `guidance.kind: "retry"` and optional `when.after`.
 
-[0.1 contract](../spec/anwa-0.1.md) · [Project README](../README.md)
+The Orders demo uses an in-memory Map rather than transactional storage. Reports uses ephemeral asynchronous work with no restart safety or guaranteed delivery. Guards and Context are implemented in ordinary code; ANWA does not infer the workflow.
+
+[v0.2 contract](../spec/anwa-0.2.md) · [Machine-readable schema](../spec/anwa-0.2.schema.json) · [README](../README.md)
