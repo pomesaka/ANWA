@@ -6,7 +6,7 @@
 
 Human-facing web applications communicate domain meaning and next actions through pages, forms and navigation. AI-agent consumers need a directly discoverable application contract and interaction outputs that help them decide what to inspect or do next.
 
-ANWA is a **schema-first application framework concept**, not a replacement for GraphQL, MCP, REST or a UI toolkit. The goal is an authoring experience in which developers decide **what their application exposes**, implement **how it behaves**, and tooling provides mechanisms to publish and consume those semantics. **ANWA does not decide the application's domain model or its next business actions.**
+ANWA is an **Interaction-first, schema-first application framework concept**, not a replacement for GraphQL, MCP, REST or a UI toolkit. The goal is an authoring experience in which developers decide **what their application exposes**, implement **how it behaves**, and tooling provides mechanisms to publish and consume those semantics. **ANWA does not decide the application's domain model or its next business actions.**
 
 ## Product thesis
 
@@ -14,7 +14,7 @@ ANWA is a **schema-first application framework concept**, not a replacement for 
 
 ### Workflow
 
-1. **Schema first** — public descriptions of chosen Things, Links and Property/Action/Event Affordances, inputs/outputs and optional errors, named Guards or state/transition metadata, when an application needs them.
+1. **Schema first** — top-level `query` / `action` / `event` Interaction descriptions, inputs/outputs, declared errors and optional Guard references; Thing metadata is **not required**.
 2. **Implementation second** — ordinary handlers/resolvers and guard code, with authorization, side effects and atomic transitions enforced on the server.
 3. **Runtime exposure** — logical Discovery and Interaction mechanisms. The latter carries **Outcome + Context**, with links and follow-up affordance references supplied or configured by the application (possibly none).
 
