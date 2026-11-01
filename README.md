@@ -2,118 +2,129 @@
 
 **Agent-Native Web Applications**
 
-> A framework concept for building web applications that AI agents can discover, understand, and interact with.
+> A schema-first framework concept for web applications that AI agents can discover, understand, and interact with — without requiring a predefined human-facing UI.
 
-**Status: Early exploration** · No implementation or stable API yet.
+**Status: Early design / research.** No package, stable schema, runtime, compatibility guarantee, or published standard exists yet.
 
-ANWA explores a different starting point for web application development: **what if the primary client is an AI agent, rather than a human-facing UI?**
+## Why ANWA?
 
-Instead of requiring a client to understand a predefined page structure, an ANWA-style application would expose its domain semantics, relationships, capabilities, and contextual affordances in a machine-discoverable form. Agents could then retrieve data, invoke operations, and—when useful—compose a human-facing view.
+A human can discover what a web application does by navigating pages and forms. An AI agent should instead be able to **discover application semantics and interactions**, retrieve state, invoke operations, and get enough context to decide where to go next.
 
-This repository is currently a **design and research workspace**, not a published standard or production-ready library.
+ANWA explores an **OpenAPI-like, schema-first development experience**: define the public contract, implement business logic in normal code, and let the framework expose both discovery and interaction interfaces.
 
-## The idea
+**Core principle:** *Every delivered application-level interaction result contains an outcome and the context for what can come next.*
 
-A traditional web application often communicates what is possible through pages, navigation, and forms. ANWA investigates how an application can communicate similar information directly to software agents.
+The application provides options and constraints; the agent chooses what to do according to the user's intent.
 
-The proposed model separates two *logical* concerns:
-
-| Interface | Purpose | Questions it answers |
-| --- | --- | --- |
-| **Discovery** | Explore meaning, relations, capabilities, and affordances | What is this? What is related? What could I do next? |
-| **Interaction** | Retrieve state, invoke business operations, and observe results | What is its current state? Can I perform this action? What happened? |
-
-These are **not necessarily two network protocols or a mandatory two-step sequence**. An agent might follow `discover → read → discover → invoke → observe` while working toward a goal.
+## How it would work
 
 ```mermaid
 flowchart TB
-    A[AI Agent] --> D[Discovery]
-    A --> I[Interaction]
-    D --> M[Application Model]
-    I --> M
-    M --> B[State & Business Logic]
-    D -.-> S[Semantics / Relations / Capabilities / Affordances]
+    S[1. Define public ANWA schema] --> F[ANWA Runtime]
+    C[2. Implement guards / actions / resolvers] --> F
+    F --> D[Discovery: meanings / links / affordances]
+    F --> I[Interaction: Result + Context / Events]
+    D --> A[AI Agent]
+    I --> A
 ```
 
-### Working vocabulary (WoT-aligned)
+### 1. Define the public contract
 
-ANWA currently uses **W3C WoT terminology as its starting point**, rather than redefining established concepts:
+Describe **Things**, Properties, Actions, Events, Links, input/output types, possible states/transitions, documented errors, and named Guard references.
 
-- **Thing / Thing Description** — an entity (physical or virtual) and its machine-readable interaction description.
-- **Interaction Affordance** — a described interaction, specialized as **Property**, **Action**, or **Event Affordance**.
-- **Link** — a typed connection to a related resource.
-- **Form / Protocol Binding** — how a specific interaction is actually performed.
+**The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
 
-**Contextual availability** (whether a particular caller can act on an entity *now*) is an **ANWA research concern**, not the official meaning of WoT Affordance. Describing an interaction does not guarantee authorization or successful execution.
+### 2. Implement behavior
 
-See the [WoT-aligned glossary](docs/glossary.md) and [WoT error-handling research](docs/research/wot-errors.md).
+Developers implement handlers, relation resolvers, state updates, and guards in regular code. The **same guard implementation** may power Discovery-time applicability hints and Invocation-time checks. Real authorization and transactional enforcement still happen on the server.
 
-### Example scenario
+### 3. Serve a navigable application
 
-An agent is asked to cancel an order it has never seen before.
+Two **logical** interfaces—not necessarily two wire protocols:
 
-1. Discover the order's meaning and related shipment information.
-2. Discover the cancellation capability, its inputs, conditions, and potential side effects.
-3. Read the specific state required to make a decision.
-4. Request any required human approval, then attempt the operation.
-5. Inspect the result or observe the resulting state.
-
-The agent would not need the application's bespoke UI. A human-facing view could still be generated or provided when needed.
-
-## Design directions (hypotheses, not decisions)
-
-- **Protocol-independent application model.** GraphQL, RPC, REST, MCP, or other interfaces may be adapters rather than the core abstraction.
-- **Progressive discovery.** An agent should be able to explore relevant parts of an application without receiving the entire schema up front.
-- **Self-description.** A resource or operation should carry sufficient structured information and explanation to help clients interpret it.
-- **Context-sensitive affordances.** A capability's general existence is distinct from whether it appears available for a specific object and user.
-- **Separation of hints and enforcement.** Discovery metadata never replaces authorization, validation, or other server-side safeguards.
-- **Optional presentation.** Human-facing UI is supported, but not the fundamental unit of the application.
-
-No wire format, framework API, programming language, datastore, or adapter has been selected.
-
-## Prior art & references
-
-ANWA builds on decades of work in hypermedia, typed APIs, and machine-readable interaction descriptions. The objective is **not to rebrand existing ideas as novel**, but to test whether an agent-oriented application framework can make them easier to combine and use.
-
-| Project / standard | Relevant ideas | Official source |
-| --- | --- | --- |
-| **Hypermedia / Web Linking** | Typed links and discoverable relationships between resources | [RFC 8288 — Web Linking](https://www.rfc-editor.org/info/rfc8288) |
-| **Hydra** | Hypermedia-driven APIs, supported operations, machine-readable API documentation | [Hydra Core Vocabulary](https://www.hydra-cg.com/spec/latest/core/) |
-| **W3C Web of Things (WoT)** | Interaction Affordances, properties/actions/events, data schemas, protocol bindings | [Thing Description 1.1](https://www.w3.org/TR/wot-thing-description11/) |
-| **GraphQL** | Typed application graph, schema descriptions, introspection, queries and mutations | [GraphQL Specification](https://spec.graphql.org/September2025/) |
-| **Model Context Protocol (MCP)** | Exposing tools and resources to AI applications through an interoperable protocol | [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25) |
-| **Agent2Agent (A2A)** | Agent discovery, agent capabilities, delegation, and task lifecycle | [A2A Specification](https://a2a-protocol.org/latest/specification/) |
-
-The links above point to primary specifications. They represent **related work**, not ANWA dependencies or endorsements. In particular, W3C WoT and Hydra already address much of the affordance/discovery space. ANWA must establish its value through comparison, not vocabulary alone.
-
-See [Prior Art](docs/prior-art.md) for the distinctions and research questions associated with each. Detailed primary-source research: [Hydra](docs/research/hydra.md) and [W3C WoT](docs/research/wot.md) (including its Discovery specification, 2026–2028 roadmap, and Eclipse node-wot).
-
-Additional research: [Async execution, state machines & streaming](docs/research/async-state-streaming.md).
-
-## Documentation
-
-| Document | Contents |
+| Interface | Responsibility |
 | --- | --- |
-| [Vision](docs/vision.md) | Problem framing, scope, proposed direction |
-| [Glossary](docs/glossary.md) | Working definitions and important distinctions |
-| [Prior Art](docs/prior-art.md) | Primary sources and overlaps with existing standards |
-| [Open Questions](docs/open-questions.md) | What is not decided and how to evaluate the idea |
+| **Discovery** | Find Thing descriptions, semantics, related Links and Property/Action/Event Interaction Affordances, optionally with state/caller-specific applicability hints |
+| **Interaction** | Read, invoke and observe; return **Outcome + Context** (links and next-interaction references), on domain success or failure |
 
-## Project status & contributing
+Interaction may complete immediately with a typed `Result<Success, Error>`, or accept a durable execution to observe later. **Async execution and streaming observation are different concerns.**
 
-This repository currently contains **concept notes only**. There is no package to install, protocol to implement, or compatibility promise. Feedback, corrections to terminology, and references to relevant prior art are welcome through GitHub issues or pull requests.
+[Architecture and developer workflow](docs/architecture.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
 
-Before proposing an API shape, please consult the [open questions](docs/open-questions.md). In particular, distinguish an experimentally useful framework abstraction from a feature already provided by an existing specification.
+## Vocabulary and relationship to WoT
 
-**License:** Not yet selected. Until a license is added, do not assume rights to redistribute or reuse the repository's contents outside applicable law.
+ANWA currently adopts the **W3C Web of Things (WoT)** vocabulary as a starting point:
+
+| WoT term | Working use in ANWA |
+| --- | --- |
+| Thing / Thing Model / Thing Description | A domain-facing object, reusable description and published interaction metadata |
+| Property / Action / Event Affordance | Describes how data is read, an operation invoked, or notifications observed |
+| Link | Related resource/Thing |
+| DataSchema / Form | Typed data and a protocol-specific interaction binding |
+
+**WoT Interaction Affordance describes an offered interaction; it does not mean an action is currently authorized or guaranteed to succeed.** ANWA is investigating separate **contextual applicability** hints, plus a common Result + Context response. These are proposed ANWA abstractions, **not WoT TD 1.1 fields**.
+
+ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP and related technologies remain possible adapters rather than required foundations.
+
+[WoT-aligned Glossary](docs/glossary.md) · [Current decisions and non-decisions](docs/decisions.md)
+
+## Documentation map
+
+| Start here | Document |
+| --- | --- |
+| Vision & scope | [Vision](docs/vision.md) |
+| Working decisions / unresolved choices | [Decision status](docs/decisions.md) |
+| Schema-first architecture | [Architecture](docs/architecture.md) |
+| Step-by-step schema + code example | [Order cancellation](docs/examples/order-cancellation.md) |
+| Result, async execution, streaming | [Interaction model](docs/interaction-model.md) |
+| Established and proposed terminology | [Glossary](docs/glossary.md) |
+| Risks, next tests, unresolved design | [Open questions](docs/open-questions.md) |
+| Comparison against existing work | [Prior art](docs/prior-art.md) |
+| Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
+
+### Research notes
+
+- [Hydra / Hypermedia](docs/research/hydra.md)
+- [W3C WoT, WoT Discovery and node-wot](docs/research/wot.md)
+- [WoT error handling](docs/research/wot-errors.md)
+- [Async, state machines and streaming](docs/research/async-state-streaming.md)
+
+## Prior art & primary references
+
+ANWA is **not claiming that machine-readable operations or navigable responses are new inventions**. These ideas already exist across Hypermedia, WoT and agent protocols.
+
+| Standard / project | Relevance | Official source |
+| --- | --- | --- |
+| REST / Web Linking | Navigable representations and typed link relations | [RFC 8288](https://www.rfc-editor.org/info/rfc8288) |
+| Hydra | Hypermedia links, operations and generic clients | [Hydra Core Vocabulary](https://docs.hydra-cg.com/spec/latest/core/) |
+| W3C WoT | Thing Description, Interaction Affordances, Forms and protocol bindings | [TD 1.1](https://www.w3.org/TR/wot-thing-description11/) |
+| W3C WoT Discovery | Introduction, Exploration and Thing Description directories | [Discovery](https://www.w3.org/TR/wot-discovery/) |
+| OpenAPI | Machine-readable API contract and schema-first tooling | [OpenAPI Specification](https://spec.openapis.org/oas/latest.html) |
+| GraphQL | Typed schema, introspection, data selection and mutations | [GraphQL Specification](https://spec.graphql.org/September2025/) |
+| SCXML | State machines and transitions | [W3C Recommendation](https://www.w3.org/TR/scxml/) |
+| MCP | Agent-facing tools and resources | [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25) |
+| A2A | Task states, updates and output streaming | [A2A Specification](https://a2a-protocol.org/latest/specification/) |
+| CloudEvents | Common event envelope | [CloudEvents Specification](https://github.com/cloudevents/spec) |
+
+These are **references, not mandatory dependencies or endorsements**. Hydra's community specification is unfinished; WoT TD 1.1 is a W3C Recommendation, while WoT Profiles remains a Working Draft. See [Prior Art](docs/prior-art.md).
+
+## Status and contributing
+
+The repository currently hosts **working documents only**. Schema syntax, runtime, protocol bindings, versioning and licensing are not selected. The immediate goal is to test whether schema-first authoring plus contextual Interaction Results lets agents navigate unfamiliar applications more reliably, without excessive annotation or tool-call costs.
+
+Corrections, competing prior art and design feedback are welcome via issues or PRs. Please distinguish **established standard behavior** from **ANWA proposals**.
+
+**License:** Not yet selected. No open-source license is granted merely by making a repository public.
 
 ---
 
 <details>
-<summary>日本語での概要</summary>
+<summary>日本語概要</summary>
 
-ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探索・理解・操作できるWebアプリケーション**のためのフレームワーク構想です。画面やGraphQL/MCPなどの特定の技術を中心に据えるのではなく、アプリケーションの意味（Semantics）、関係（Relations）、能力（Capabilities）、状態に応じた操作の手がかり（Affordances）を、段階的に発見できる抽象化を検討しています。
+ANWA（Agent-Native Web Applications）は、**AIエージェントが直接探索・理解・操作できるWebアプリケーション**を作るための、Schema-firstなフレームワーク構想です。
 
-現段階では設計前の思考実験・一次資料調査を記録しており、APIやプロトコルは確定していません。
+開発者はOpenAPIのような公開スキーマでThing、Action、状態遷移、関連リソース、Guardの契約を宣言し、GuardやActionのビジネスロジックは通常のコードで実装します。ANWAがDiscoveryとInteractionを公開し、成功・失敗どちらの結果にも関連するリソースと次に検討できる操作の情報を付けることを目指します。
+
+WoTの語彙を優先しますが、ANWA独自のResult形式や状態依存の案内はまだ設計仮説です。実装も仕様も未確定です。
 
 </details>
