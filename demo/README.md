@@ -12,6 +12,7 @@ bunx oxlint src demo test tools
 bun check
 bun test
 bun run demo
+bun run demo:todo
 ```
 
 | Demo                      | First-class Interactions                                                       | What it demonstrates                                                                                  |
@@ -19,12 +20,13 @@ bun run demo
 | [Calculator](calculator/) | `calculator.add`, `calculator.divide`                                          | Standalone pure operations, empty Context and typed domain errors                                     |
 | [Orders](orders/)         | `order.get`, `order.cancel`, `shipment.track`                                  | Runtime-enforced named Guard; `onDenied` returns contextual alternatives without running cancellation |
 | [Reports](reports/)       | `report.generate`, `execution.status`, `execution.result`, `execution.updates` | Async execution without a Thing, Event observation, a contextual timed retry                          |
+| [Advanced Todo](todo/)    | **27 Interactions**: workspace/project/task/search/view/event operations       | Multi-user ACL, DAG dependencies, recurrence, bulk updates, optimistic versioning, saved views, planner |
 
 Every app has an `anwa.json` schema, a generated **`contract.generated.ts`**, and an **`index.ts`** implementation. The [TypeScript runtime](../src/anwa.ts) binds operations by InteractionRef. No `things` or `subjectType` declarations are present.
 
 Ordinary Handlers return `reply(result, next)`; guarded Actions expose `run` and `onDenied`. The Runtime always evaluates their declared Guard before `run`. A simple operation uses `reply(ok(value))`, which contains `next: []`. A domain failure can provide recommended next Interactions or a timed retry. There is no application-wide Context resolver.
 
-Orders uses in-memory Maps rather than transactions; Reports uses short-lived async work rather than durable jobs. These are examples of expressive power, not ANWA-mandated application architectures.
+Orders and Advanced Todo use in-memory Maps rather than persistent transactions; Reports uses short-lived async work rather than durable jobs. These are examples of expressive power, not ANWA-mandated application architectures.
 
 Orders now demonstrates Caller-aware access: `order.get`, `order.cancel`, and `shipment.track` are guarded, while Calculator and Reports explicitly opt into public access for their demo data. The `caller` parameter is supplied by a simulated trusted Adapter; no authentication provider exists here.
 
