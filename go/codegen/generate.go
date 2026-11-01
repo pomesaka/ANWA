@@ -165,13 +165,13 @@ func Generate(m anwa.Manifest, packageName string) ([]byte, error) {
 func writeDecode(out *strings.Builder, name string, hasInput bool, nilErrorReturn bool) {
 	fmt.Fprintf(out, " request := %sRequest{Caller: args.Caller}\n", name)
 	if hasInput {
-		fmt.Fprintf(out, " if err := args.DecodeInput(&request.Input); err != nil {\\n")
+		fmt.Fprintf(out, " if err := args.DecodeInput(&request.Input); err != nil {\n")
 		if nilErrorReturn {
-			fmt.Fprintf(out, " return nil, err\\n")
+			fmt.Fprintf(out, " return nil, err\n")
 		} else {
-			fmt.Fprintf(out, " return anwa.Response{}, err\\n")
+			fmt.Fprintf(out, " return anwa.Response{}, err\n")
 		}
-		fmt.Fprintf(out, " }\\n")
+		fmt.Fprintf(out, " }\n")
 	}
 }
 
