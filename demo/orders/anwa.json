@@ -1,103 +1,126 @@
 {
-  "anwa": "0.1",
+  "anwa": "0.2",
   "entrypoints": [
-    {
-      "type": "Order",
-      "id": "pending"
-    },
-    {
-      "type": "Order",
-      "id": "shipped"
-    }
+    "order.get",
+    "order.cancel",
+    "shipment.track"
   ],
   "things": {
     "Order": {
       "title": "Purchase order",
-      "description": "An order with application-defined status and cancellation policy.",
-      "properties": {
-        "summary": {
-          "description": "Read the current order summary.",
-          "output": {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "description": "Current fulfillment state of this order."
-              },
-              "id": {
-                "type": "string",
-                "description": "Application-assigned order identifier."
-              }
-            },
-            "required": [
-              "status",
-              "id"
-            ]
-          },
-          "errors": {
-            "NOT_FOUND": "The order could not be found."
-          }
-        }
-      },
-      "actions": {
-        "cancel": {
-          "description": "Request cancellation of an order.",
-          "guard": "canCancel",
-          "input": {
-            "type": "object",
-            "properties": {
-              "reason": {
-                "type": "string",
-                "description": "Human-provided explanation for requesting cancellation."
-              }
-            },
-            "required": [
-              "reason"
-            ]
-          },
-          "output": {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "description": "New order status after successful cancellation."
-              }
-            },
-            "required": [
-              "status"
-            ]
-          },
-          "errors": {
-            "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
-            "NOT_FOUND": "The order was not found.",
-            "ALREADY_CANCELLED": "The order has already been cancelled.",
-            "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
-          },
-          "hasSideEffects": true,
-          "idempotent": false
-        }
-      },
-      "links": {
-        "shipment": {
-          "description": "Related shipment information",
-          "target": "Shipment"
-        }
-      }
+      "description": "An order with application-defined status and cancellation policy."
     },
     "Shipment": {
       "title": "Shipment",
-      "description": "Shipment tracking data associated with an order.",
-      "properties": {
-        "tracking": {
-          "description": "Read the current shipment status.",
-          "output": {
+      "description": "Shipment tracking data associated with an order."
+    }
+  },
+  "interactions": {
+    "order.get": {
+      "kind": "query",
+      "subjectType": "Order",
+      "description": "Read the current state of an order by its ID.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orderId": {
             "type": "string",
-            "description": "Current tracking state."
-          },
-          "errors": {
-            "NOT_FOUND": "The shipment could not be found."
+            "description": "Order identifier"
           }
-        }
+        },
+        "required": [
+          "orderId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Current fulfillment state of this order."
+          },
+          "id": {
+            "type": "string",
+            "description": "Application-assigned order identifier."
+          }
+        },
+        "required": [
+          "status",
+          "id"
+        ]
+      },
+      "errors": {
+        "NOT_FOUND": "The order could not be found."
+      }
+    },
+    "order.cancel": {
+      "kind": "action",
+      "subjectType": "Order",
+      "description": "Request cancellation of an order.",
+      "guard": "canCancel",
+      "input": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "Order identifier"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Human-provided explanation for requesting cancellation."
+          }
+        },
+        "required": [
+          "orderId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "New order status after successful cancellation."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "errors": {
+        "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
+        "NOT_FOUND": "The order was not found.",
+        "ALREADY_CANCELLED": "The order has already been cancelled.",
+        "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
+      },
+      "hasSideEffects": true,
+      "idempotent": false
+    },
+    "shipment.track": {
+      "kind": "query",
+      "subjectType": "Shipment",
+      "description": "Read current shipment tracking state by shipment ID.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "shipmentId": {
+            "type": "string",
+            "description": "Shipment identifier"
+          }
+        },
+        "required": [
+          "shipmentId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "string",
+        "description": "Current tracking state."
+      },
+      "errors": {
+        "NOT_FOUND": "The shipment could not be found."
       }
     }
   }
