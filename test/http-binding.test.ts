@@ -228,3 +228,22 @@ test("Hono + Fetch binding accepts real loopback HTTP traffic", async () => {
     server.stop(true);
   }
 });
+
+test("Explicit null does not become an omitted request input", async () => {
+  const { AnwaApp, ok, reply } = await import("../src/anwa.ts");
+  const schema = {
+    anwa: "0.2",
+    entrypoints: ["ping"],
+    interactions: { ping: { kind: "query", description: "Public ping" } },
+  } as const;
+  const runtime = new AnwaApp(schema).bind(
+    { ping: async () => reply(ok("pong")) },
+    { public: ["ping"] },
+  );
+  const handler = createAnwaFetchHandler(runtime);
+  const omitted = await handler(jsonRequest('{"ref":"ping"}'));
+  assert.equal((await omitted.json()).outcome.result.value, "pong");
+  const explicitNull = await handler(jsonRequest('{"ref":"ping","input":null}'));
+  assert.equal(explicitNull.status, 200);
+  assert.equal((await explicitNull.json()).outcome.result.error.code, "INVALID_INPUT");
+});
