@@ -52,7 +52,8 @@ export type Guard = (
 ) => GuardDecision | Promise<GuardDecision>;
 export type BindingHandler = (
   args: HandlerArgs & { cursor?: number },
-) => InteractionResponse | Promise<InteractionResponse> | AsyncIterable<unknown>;
+) =>
+  InteractionResponse | Promise<InteractionResponse> | AsyncIterable<unknown>;
 export type Bindings = Record<string, BindingHandler>;
 export type GuardBindings = Record<string, Guard>;
 
@@ -73,8 +74,12 @@ export const reply = <T>(
   result: Result<T> | Accepted,
   next: NextInteraction[] = [],
 ): InteractionResponse<T> => {
-  if ("kind" in result) return { outcome: result as Accepted, context: { next } };
-  return { outcome: { kind: "settled", result: result as Result<T> }, context: { next } };
+  if ("kind" in result)
+    return { outcome: result as Accepted, context: { next } };
+  return {
+    outcome: { kind: "settled", result: result as Result<T> },
+    context: { next },
+  };
 };
 const unexpected = (): InteractionResponse =>
   reply(
