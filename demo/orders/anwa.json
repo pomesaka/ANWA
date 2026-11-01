@@ -21,10 +21,12 @@
             "type": "object",
             "properties": {
               "status": {
-                "type": "string"
+                "type": "string",
+                "description": "Current fulfillment state of this order."
               },
               "id": {
-                "type": "string"
+                "type": "string",
+                "description": "Application-assigned order identifier."
               }
             },
             "required": [
@@ -45,7 +47,8 @@
             "type": "object",
             "properties": {
               "reason": {
-                "type": "string"
+                "type": "string",
+                "description": "Human-provided explanation for requesting cancellation."
               }
             },
             "required": [
@@ -56,7 +59,8 @@
             "type": "object",
             "properties": {
               "status": {
-                "type": "string"
+                "type": "string",
+                "description": "New order status after successful cancellation."
               }
             },
             "required": [
@@ -85,7 +89,8 @@
         "tracking": {
           "description": "Read the current shipment status.",
           "output": {
-            "type": "string"
+            "type": "string",
+            "description": "Current tracking state."
           },
           "errors": {
             "NOT_FOUND": "The shipment could not be found."
