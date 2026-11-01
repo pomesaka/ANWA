@@ -191,7 +191,7 @@ test("Undeclared errors are mapped to opaque framework errors", async () => {
 
 test("Handler must return Outcome + Context, not just a bare Result", async () => {
   const app = new AnwaApp(minimal()).bind({
-    "test.run": async () => ok(null) as unknown as InteractionResponse,
+    "test.run": async () => ok(null) as unknown as import("../src/anwa.ts").SettledResponse,
   });
   const result = await app.interact("test.run");
   if (result.outcome.kind === "settled" && !result.outcome.result.ok)
@@ -216,11 +216,9 @@ test("Invalid next candidate prevents success with malformed guidance", async ()
 });
 
 test("Each Handler chooses its own Context independently", async () => {
-  const doc = minimal();
-  doc.interactions["test.read"] = {
-    kind: "query",
-    description: "Read something",
-  };
+  const base = minimal();
+  const doc: Manifest = { ...base, interactions: { ...base.interactions,
+    "test.read": {kind: "query", description: "Read something"} } };
   const app = new AnwaApp(doc).bind({
     "test.run": async () =>
       reply(ok(null), [
