@@ -1,6 +1,10 @@
 {
   "anwa": "0.2",
-  "entrypoints": ["order.get", "order.cancel", "shipment.track"],
+  "entrypoints": [
+    "order.get",
+    "order.cancel",
+    "shipment.track"
+  ],
   "interactions": {
     "order.get": {
       "kind": "query",
@@ -13,7 +17,9 @@
             "description": "Order identifier"
           }
         },
-        "required": ["orderId"],
+        "required": [
+          "orderId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -28,11 +34,17 @@
             "description": "Application-assigned order identifier."
           }
         },
-        "required": ["status", "id"]
+        "required": [
+          "status",
+          "id"
+        ]
       },
       "errors": {
-        "NOT_FOUND": "The order could not be found."
-      }
+        "NOT_FOUND": "The order could not be found.",
+        "AUTH_REQUIRED": "A verified caller is required for this interaction.",
+        "PERMISSION_DENIED": "The caller does not have permission for this resource."
+      },
+      "guard": "canReadOrder"
     },
     "order.cancel": {
       "kind": "action",
@@ -50,7 +62,10 @@
             "description": "Human-provided explanation for requesting cancellation."
           }
         },
-        "required": ["orderId", "reason"],
+        "required": [
+          "orderId",
+          "reason"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -61,13 +76,17 @@
             "description": "New order status after successful cancellation."
           }
         },
-        "required": ["status"]
+        "required": [
+          "status"
+        ]
       },
       "errors": {
         "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
         "NOT_FOUND": "The order was not found.",
         "ALREADY_CANCELLED": "The order has already been cancelled.",
-        "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
+        "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted.",
+        "AUTH_REQUIRED": "A verified caller is required for this interaction.",
+        "PERMISSION_DENIED": "The caller does not have permission for this resource."
       },
       "hasSideEffects": true,
       "idempotent": false
@@ -83,7 +102,9 @@
             "description": "Shipment identifier"
           }
         },
-        "required": ["shipmentId"],
+        "required": [
+          "shipmentId"
+        ],
         "additionalProperties": false
       },
       "output": {
@@ -91,8 +112,11 @@
         "description": "Current tracking state."
       },
       "errors": {
-        "NOT_FOUND": "The shipment could not be found."
-      }
+        "NOT_FOUND": "The shipment could not be found.",
+        "AUTH_REQUIRED": "A verified caller is required for this interaction.",
+        "PERMISSION_DENIED": "The caller does not have permission for this resource."
+      },
+      "guard": "canTrackShipment"
     }
   }
 }
