@@ -3,6 +3,8 @@
 > **Status:** Discussion draft — not adopted, not an implementation, not a conformance specification.  
 > **Updated:** 2026-11-01  
 > **Scope:** Semantic contract, not a transport binding or TypeScript SDK.
+>
+> **Update:** ANWA's authoring direction is **schema-first**: describe the public contract, then implement guards/actions/resolvers in ordinary code. Do **not** treat the statechart or guard expressions as a required declarative programming language. See [current decisions](../../decisions.md), [architecture](../../architecture.md) and [worked example](../../examples/order-cancellation.md) on `main`.
 
 ## 0. Design goal
 
@@ -16,7 +18,7 @@ This proposal is intentionally **WoT-aligned**. It reuses Thing, Property/Action
 
 | Schema family | Purpose | Standard relationship |
 | --- | --- | --- |
-| **Thing Model + ANWA state model** | Author-facing state, properties, actions, events, semantics and transition guards | WoT Thing Model base vocabulary; ANWA statechart is an *extension*, not standard WoT |
+| **Public ANWA schema (WoT-aligned)** | OpenAPI-like public contract for Things, Properties, Actions, Events, Links, named Guards, error types, and possible states/transitions | WoT Thing Model terminology may be reused; ANWA schema syntax and state/guard references are *proposed extensions*, not standard WoT |
 | **Interaction Response** | Always return an outcome plus navigable context, on both domain success and domain failure | ANWA addition; optional serialization through WoT Action output or other transport |
 | **Interaction Event** | Notify execution state changes, progress and artifact deltas | ANWA addition; candidate adapters: WoT Event, A2A-like event split, CloudEvents, SSE, gRPC |
 
@@ -285,43 +287,61 @@ type InteractionEvent<T, E> =
 
 The stream transport must document ordering scope, event retention and replay semantics, cursor use, event duplication, and backpressure. No exactly-once delivery guarantee is implied. If the stream breaks, polling a snapshot/Execution status must remain possible if the service offers durability.
 
-## 7. Thing Model / state model integration (authoring sketch only)
+## 7. Schema-first developer workflow (authoring sketch only)
 
-Prefer established WoT TD/TM terms for `properties`, `actions`, `events`, `links`, `description`, `input`, `output`. **Statecharts and guard expressions are not a standardized part of WoT Thing Model 1.1**; any ANWA extension must have its own namespace/contract and must not break WoT interoperability.
+**The ANWA Schema is a public contract, not business logic.** A developer first describes what the application exposes, then binds that schema to ordinary code. States and transitions may be described in the schema without making a declarative state machine the entire implementation.
+
+Prefer established WoT terms for Thing, Property/Action/Event Affordance, Link, input/output schemas. The proposed YAML below is **not** valid W3C WoT Thing Model syntax and **not** a finalized ANWA format.
 
 ```yaml
-# Illustrative authoring notation, NOT a standard WoT Thing Model:
-thingModel: Order
-description: A customer purchase order
-properties:
-  status: { type: string, description: Current order state }
-actions:
-  pay:
-    description: Initiate payment
-    input: { type: object }
-    execution: asynchronous
-  cancel:
-    description: Cancel the order
-stateMachine:
-  initial: draft
-  states: [draft, paymentPending, processing, paid, cancelled, failed]
-  transitions:
-    - from: draft
-      on: submit
-      to: paymentPending
-    - from: paymentPending
-      on: pay
-      guard: hasPaymentMethod
-      to: processing
-    - from: processing
-      on: paymentSucceeded
-      to: paid
-    - from: processing
-      on: paymentFailed
-      to: failed
+# anwa.yaml — hypothetical
+things:
+  Order:
+    description: A purchase order
+    properties:
+      status: { type: string, enum: [pending, preparing, shipped, cancelled] }
+    links:
+      shipment: { target: Shipment }
+    actions:
+      cancel:
+        description: Cancel an order if permitted
+        input: { type: object }
+        guard: canCancelOrder        # reference, not an inline predicate
+        transitions:
+          - from: [pending, preparing]
+            to: cancelled
+        errors: [PERMISSION_DENIED, ORDER_ALREADY_SHIPPED]
 ```
 
-The DSL must ultimately resolve the guard and its *explainable* requirements through developer-provided metadata. Arbitrary code predicates cannot automatically provide reliable natural-language failure reasons. The published graph can hide internal transitions and guard implementations.
+Actual decisions come from implementation code, which may require database reads, access policies or remote services. The Guard can return structured deny reasons and related hints for Discovery/Interaction to expose as **advisory, permission-filtered** information.
+
+```ts
+// Illustrative pseudo-API, not implemented:
+app.guard("canCancelOrder", async (ctx) => {
+  if (!ctx.auth.can("order:cancel")) {
+    return deny({ code: "PERMISSION_DENIED" });
+  }
+  const shipment = await ctx.shipping.current(ctx.orderId);
+  if (shipment.dispatched) {
+    return deny({
+      code: "ORDER_ALREADY_SHIPPED",
+      links: [{ rel: "shipment", target: shipment.ref }]
+    });
+  }
+  return allow();
+});
+
+app.action("Order.cancel", async (ctx, input) => {
+  // Recheck and use an atomic conditional state change.
+  return ctx.orders.cancelAtomically(ctx.orderId, input);
+});
+```
+
+**Discovery-time** evaluation can use the same named guard (or return `unknown` if evaluation is too expensive/inappropriate). **Invocation-time** enforcement must recheck policy/state and use correct atomicity. Reusing one guard implementation avoids duplicated conditional code but does **not** by itself prevent concurrent state changes or guarantee transaction safety.
+
+The runtime could generate or expose descriptions and interaction contracts, perform schema-to-handler binding checks, and assemble Result + Context. It **cannot infer arbitrary business semantics from handler code**, nor prove a declared transition by type checking alone.
+
+See the canonical [end-to-end order cancellation example](../../examples/order-cancellation.md) and [architecture](../../architecture.md).
 
 ## 8. Non-goals and unresolved choices
 
@@ -329,9 +349,9 @@ The DSL must ultimately resolve the guard and its *explainable* requirements thr
 2. **Affordance freshness:** Is `revision` sufficient for hints computed over multiple linked resources? What about expiry and per-user policy changes?
 3. **Retry semantics:** What precisely certifies `same-request` as safe, particularly for partial effects and idempotency keys?
 4. **Subtypes:** Should the same envelope apply to Property reads, Action invocations, and Event subscription establishment?
-5. **Execution references:** Are Exections first-class Things, or a general resource abstraction mapped to WoT Things by an adapter?
+5. **Execution references:** Are Executions first-class Things, or a general resource abstraction mapped to WoT Things by an adapter?
 6. **Context compaction:** Full context vs. references vs. intent-ranked selection; protect both token budgets and confidential metadata.
-7. **Statechart extension:** Does ANWA need to standardize a machine format, or can multiple authoring engines emit the same Discovery + Interaction contracts?
+7. **State / transition declarations:** Which public state metadata is useful, and what can runtime validation guarantee without duplicating Guard logic or imposing an executable DSL?
 8. **Client trust:** A description and guidance hint must remain untrusted application data, not a higher-priority instruction to the AI.
 9. **Wire identity:** Stable URI/URN identifiers, schema versions, protocol binding metadata, pagination and internationalization remain unspecified.
 10. **Streaming guarantees:** Define observation consistency, replay windows and the semantics of the terminal event before standardizing any event envelope.
@@ -344,4 +364,4 @@ The DSL must ultimately resolve the guard and its *explainable* requirements thr
 - [A2A v1.0.1 — Task and streaming events](https://a2a-protocol.org/v1.0.1/specification/)
 - [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)
 
-[ANWA README](../../README.md) · [Working glossary](../glossary.md) · [Async / streaming research](../research/async-state-streaming.md)
+[ANWA README](../../README.md) · [Current decisions](../../decisions.md) · [Architecture](../../architecture.md) · [Worked example](../../examples/order-cancellation.md) · [Working glossary](../glossary.md) · [Async / streaming research](../research/async-state-streaming.md)
