@@ -8,6 +8,14 @@ const ERROR_CODE = /^[A-Z][A-Z0-9_]*$/;
 const RESERVED = new Set(["INVALID_INPUT", "UNEXPECTED_ERROR"]);
 const DATA_TYPES = new Set(["string", "number", "integer", "boolean", "object", "array", "null"]);
 const SCHEMA_KEYS = new Set(["type", "enum", "properties", "required", "items", "additionalProperties", "description"]);
+// Optional semantic identifiers and effect declarations are application-authored hints.
+// They do not prove permission, applicability, idempotency or absence of side effects.
+const EFFECT_KINDS = new Set(["domain-state", "external-system"]);
+function semanticTypesValid(value) {
+  return Array.isArray(value) && value.length > 0 &&
+    value.every(x => typeof x === "string" && /^(?:https?:\/\/|urn:)[^\s]+$/.test(x)) &&
+    new Set(value).size === value.length;
+}
 
 export function validateManifest(manifest) {
   const errors = [];
@@ -70,7 +78,10 @@ export function validateManifest(manifest) {
     const path = "$.things." + thing;
     if (!IDENTIFIER.test(thing)) issue(path, "Thing name must be an identifier for interface generation");
     if (!record(model)) { issue(path, "Expected Thing object"); continue; }
-    keys(model, ["title", "description", "properties", "actions", "events", "links"], path);
+    keys(model, ["title", "description", "semanticTypes", "properties", "actions", "events", "links"], path);
+    if (model.semanticTypes !== undefined && !semanticTypesValid(model.semanticTypes)) {
+      issue(path + ".semanticTypes", "Expected nonempty unique absolute HTTP(S) or URN identifiers");
+    }
     description(model.title, path + ".title");
     description(model.description, path + ".description");
     for (const bucket of ["properties", "actions", "events"]) {
@@ -82,7 +93,17 @@ export function validateManifest(manifest) {
         const at = path + "." + bucket + "." + name;
         if (!IDENTIFIER.test(name)) issue(at, "Interaction name must be an identifier");
         if (!record(op)) { issue(at, "Expected interaction object"); continue; }
-        keys(op, ["description", "input", "output", "guard", "errors"], at);
+        keys(op, ["description", "semanticTypes", "effectKinds", "input", "output", "guard", "errors"], at);
+        if (op.semanticTypes !== undefined && !semanticTypesValid(op.semanticTypes)) {
+          issue(at + ".semanticTypes", "Expected nonempty unique absolute HTTP(S) or URN identifiers");
+        }
+        if (op.effectKinds !== undefined) {
+          if (bucket !== "actions" || !Array.isArray(op.effectKinds) ||
+              op.effectKinds.some(x => !EFFECT_KINDS.has(x)) ||
+              new Set(op.effectKinds).size !== op.effectKinds.length) {
+            issue(at + ".effectKinds", "Action effectKinds must be unique values from domain-state, external-system");
+          }
+        }
         description(op.description, at + ".description");
         for (const k of ["input", "output"]) if (op[k] !== undefined) dataSchema(op[k], at + "." + k);
         if (op.guard !== undefined && (bucket !== "actions" || typeof op.guard !== "string" || !op.guard)) {
