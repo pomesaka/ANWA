@@ -4,7 +4,7 @@
 
 > A schema-first framework concept for web applications that AI agents can discover, understand, and interact with — without requiring a predefined human-facing UI.
 
-**Status: Interaction-first experimental v0.2 specification + executable demos on `main`.** In-process TypeScript and Go reference adapters exist; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
+**Status: Interaction-first experimental v0.2 specification + executable demos on `main`.** In-process TypeScript and Go reference adapters exist, and an **experimental optional HTTP Binding 0.1** exposes Discovery and Query/Action over HTTP through Go or Fetch-compatible routers. There is no released package, stable API, production security/conformance guarantee, or published standard.
 
 ## Why ANWA?
 
@@ -70,11 +70,20 @@ bun run demo
 bun run demo:todo
 ```
 
-The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, [async Reports](demo/reports/) with opaque execution IDs, and [Advanced Todo](demo/todo/) with 27 guarded Interactions spanning collaborative workspaces, project/task planning, dependency graphs and audit events. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
+The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, [async Reports](demo/reports/) with opaque execution IDs, and [Advanced Todo](demo/todo/) with 27 guarded Interactions spanning collaborative workspaces, project/task planning, dependency graphs and audit events. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the in-process Core does not provide authentication, durable jobs or complete JSON Schema validation. An optional, minimal [HTTP Binding](docs/http-binding.md) adds network transport for Discovery and Query/Action, not Events.
 
 The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and `SavedQuery` schemas through local `$defs` / `$ref`. Codegen expands these into the same literal TypeScript contract as the previously repeated inline definitions; supported references are local, acyclic, and data-only.
 
 **v0.2 is a breaking experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for historical design context.
+
+### HTTP Binding 0.1 — existing routers, no new server abstraction
+
+ANWA can be called remotely using an optional [HTTP binding](docs/http-binding.md): `GET /anwa/catalog`, `GET /anwa/interactions/{ref}` and `POST /anwa/invoke`. It preserves the existing `Outcome + Context` and Guard semantics. The host supplies its own router and authentication middleware/callback; the binding does not authenticate credentials or implement automatic retries.
+
+- **Go**: `go/httpbinding.New(app, opts)` returns `http.Handler` for `http.ServeMux` or compatible Go routers. The Go Calculator can be served with `cd go && go run ./examples/calculator -listen 127.0.0.1:8080`.
+- **TypeScript**: `createAnwaFetchHandler(app, opts)` accepts Web `Request` and returns `Response`. [Hono demo](demo/http/hono.ts): `app.all("/anwa/*", (c) => handler(c.req.raw))` with the rest of Hono unchanged.
+
+Event streams, idempotency-key deduplication, CORS, TLS configuration and production credential verification remain deliberately outside this first binding.
 
 ### Go reference adapter
 
@@ -141,6 +150,7 @@ ANWA is **WoT-informed, not currently WoT-compliant**. GraphQL, REST, RPC, MCP a
 | Generation and validation | [Schema authoring and tooling](docs/schema-authoring.md) |
 | Working demos and tests | [Demo guide](demo/README.md) |
 | Go implementation guide and examples | [Go reference adapter](go/README.md) · [Go Todo](go/examples/todo/README.md) |
+| Optional HTTP transport + framework interfaces | [HTTP Binding](docs/http-binding.md) · [Hono demo](demo/http/hono.ts) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
 
 ### Research notes
