@@ -82,8 +82,8 @@ The experimental v0.2 manifest can also be consumed by an in-process [Go module]
 
 ```bash
 cd go
- go test ./...
- go run ./examples/calculator
+go test ./...
+go run ./examples/calculator
 ```
 
 ## Agent-first schema and contract tooling
