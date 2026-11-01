@@ -1,4 +1,4 @@
-// Run from the go/ directory: go run ./examples/calculator
+// Run from go/: go run ./examples/calculator
 package main
 
 import (
@@ -11,6 +11,23 @@ import (
 	"github.com/pomesaka/ANWA/go/anwa"
 )
 
+// The generated interface requires both methods to exist with typed inputs
+// and typed success/failure responses. No manual map[string]Handler here.
+type CalculatorServer struct{}
+
+var _ ServerInterface = (*CalculatorServer)(nil)
+
+func (*CalculatorServer) CalculatorAdd(_ context.Context, request CalculatorAddRequest) (CalculatorAddResponse, error) {
+	return CalculatorAddOK{Value: CalculatorAddOutput(request.Input.A + request.Input.B)}, nil
+}
+
+func (*CalculatorServer) CalculatorDivide(_ context.Context, request CalculatorDivideRequest) (CalculatorDivideResponse, error) {
+	if request.Input.B == 0 {
+		return CalculatorDivideFailure{Code: CalculatorDivideErrorDivideByZero}, nil
+	}
+	return CalculatorDivideOK{Value: CalculatorDivideOutput(request.Input.A / request.Input.B)}, nil
+}
+
 func main() {
 	data, err := os.ReadFile("../demo/calculator/anwa.json")
 	if err != nil {
@@ -22,40 +39,21 @@ func main() {
 	}
 
 	app, err := anwa.New(manifest, anwa.Config{
-		Public: []string{"calculator.add", "calculator.divide"},
-		Handlers: map[string]anwa.Handler{
-			"calculator.add": {Run: func(_ context.Context, a anwa.Args) (anwa.Response, error) {
-				var input struct{ A, B float64 }
-				if err := a.DecodeInput(&input); err != nil {
-					return anwa.Response{}, err
-				}
-				return anwa.Reply(anwa.OK(input.A + input.B)), nil
-			}},
-			"calculator.divide": {Run: func(_ context.Context, a anwa.Args) (anwa.Response, error) {
-				var input struct{ A, B float64 }
-				if err := a.DecodeInput(&input); err != nil {
-					return anwa.Response{}, err
-				}
-				if input.B == 0 {
-					return anwa.Reply(anwa.Fail("DIVIDE_BY_ZERO")), nil
-				}
-				return anwa.Reply(anwa.OK(input.A / input.B)), nil
-			}},
-		},
+		Public:   []string{"calculator.add", "calculator.divide"},
+		Handlers: Handlers(&CalculatorServer{}),
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	catalog, err := app.Catalog(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	result, err := app.Interact(context.Background(), "calculator.divide", map[string]any{"a": 12, "b": 3}, nil)
+	result, err := app.Interact(context.Background(), "calculator.divide",
+		map[string]any{"a": 12, "b": 3}, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	for _, item := range []any{catalog, result} {
 		out, err := json.MarshalIndent(item, "", "  ")
 		if err != nil {
