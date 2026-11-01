@@ -78,13 +78,14 @@ The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and
 
 ### Go reference adapter
 
-The experimental v0.2 manifest can also be consumed by an in-process [Go module](go/README.md) with no third-party dependencies. It includes JSON contract validation (including local `$defs` / `$ref`), standalone Interaction handlers, Guard-enforced invocation and Discovery, Outcome + Context, accepted Actions and Event observation. The Go calculator example uses the same public `anwa.json` as the TypeScript demo. Go tests read and generate code for all four existing manifests, including Advanced Todo. **Go now generates model types, a compile-time `ServerInterface`, typed response variants, and a runtime binding adapter**; application authors implement the generated interface instead of manually mapping Interaction names to handlers. It is not a network server or a port of Todo business logic.
+The experimental v0.2 manifest can also be consumed by an in-process [Go module](go/README.md) with no third-party dependencies. It includes JSON contract validation (including local `$defs` / `$ref`), standalone Interaction handlers, Guard-enforced invocation and Discovery, Outcome + Context, accepted Actions and Event observation. The Go Calculator uses the same public `anwa.json` as the TypeScript demo, and the [Go Todo](go/examples/todo/README.md) demonstrates six generated Interactions with guarded, owner-scoped state, versioned updates, domain errors and contextual navigation. The generator also handles all four existing TypeScript demo manifests, including Advanced Todo. **Go now generates model types, a compile-time `ServerInterface`, typed response variants, and a runtime binding adapter**; application authors implement the generated interface instead of manually mapping Interaction names to handlers. It is not a network server or a port of Todo business logic.
 
 ```bash
 cd go
 go run ./cmd/anwa-codegen -in ../demo/calculator/anwa.json -out examples/calculator/contract.gen.go -package main
 go test ./...
 go run ./examples/calculator
+go run ./examples/todo
 ```
 
 ## Agent-first schema and contract tooling
@@ -139,7 +140,7 @@ ANWA is **WoT-informed, not currently WoT-compliant**. GraphQL, REST, RPC, MCP a
 | Agent-first semantic design contract | [Agent-native schema](spec/agent-native-schema.md) |
 | Generation and validation | [Schema authoring and tooling](docs/schema-authoring.md) |
 | Working demos and tests | [Demo guide](demo/README.md) |
-| Go implementation guide and example | [Go reference adapter](go/README.md) |
+| Go implementation guide and examples | [Go reference adapter](go/README.md) · [Go Todo](go/examples/todo/README.md) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
 
 ### Research notes
