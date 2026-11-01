@@ -64,6 +64,12 @@ export const accepted = (id: string): Accepted => ({
   kind: "accepted", execution: {id: String(id)}
 });
 
+export function reply<T>(
+  result: {ok: true; value: T}, next?: NextInteraction[]
+): SettledResponse<T, never>;
+export function reply<C extends string>(
+  result: {ok: false; error: DomainError<C>}, next?: NextInteraction[]
+): SettledResponse<never, C>;
 export function reply<T, C extends string>(
   result: Result<T, C>, next?: NextInteraction[]
 ): SettledResponse<T, C>;
