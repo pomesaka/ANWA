@@ -6,7 +6,7 @@
 
 Human-facing web apps rely on pages, links, and forms to help people infer what exists and what they can do. When an AI agent becomes the primary consumer, the same domain knowledge could be offered through a discoverable, machine-readable application interface rather than a predetermined UI.
 
-ANWA explores whether application authors can describe **domain meaning, connected objects, general capabilities, and state-dependent affordances** once, independently of the protocol used to expose them.
+ANWA explores whether application authors can describe **domain meaning, Links between Things, WoT-style Interaction Affordances, and separate state-dependent availability hints** once, independently of the protocol used to expose them.
 
 This is a design hypothesis, not a claim that current web standards are unsuitable.
 
@@ -30,7 +30,7 @@ For example, a `cancelOrder` capability may exist in the application's schema wh
 1. Protocol independence: the domain model should not require GraphQL, REST, RPC, or MCP.
 2. Progressive exploration: clients should not need the full application description upfront.
 3. Explicit meanings: explanations, typed inputs/outputs, relationships, and constraints should be available.
-4. Contextual affordances: guide next steps without claiming a perfect guarantee of availability.
+4. WoT-aligned interaction affordances: describe Properties, Actions and Events. Explore contextual availability as a separate hint, never as an authorization guarantee.
 5. Clear enforcement boundary: authorization, approval, and invariants remain server-side.
 6. Optional UI: dynamic or static presentations are possible but not required.
 7. Honest interoperability: prefer existing specifications when they already solve a problem.
