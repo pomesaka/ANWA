@@ -26,10 +26,10 @@ test("input contract errors do not call a handler",async()=>{
  assert.equal(result.outcome.result.error.code,"INVALID_INPUT");
  assert.deepEqual(result.context,{next:[]});
 });
-test("Orders use optional Thing metadata, not a mandatory ThingRef for invocation",async()=>{
+test("Orders run entirely through Interactions without Thing metadata",async()=>{
  const app=createOrders();
- assert.equal(app.catalog().things.Order.title,"Purchase order");
- assert.equal(app.describe("order.cancel").subjectType,"Order");
+ assert.equal(Object.hasOwn(app.catalog(),"things"),false);
+ assert.equal(Object.hasOwn(app.describe("order.cancel"),"subjectType"),false);
  const result=await app.interact("order.cancel",{orderId:"pending",reason:"Changed mind"});
  assert.equal(result.outcome.result.value.status,"cancelled");
  assert.deepEqual(result.context.next.find(x=>x.ref==="order.get").input,{orderId:"pending"});
