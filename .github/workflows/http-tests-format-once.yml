@@ -1,0 +1,32 @@
+name: One-off HTTP test formatting
+on:
+  push:
+    branches: [feat/http-binding-adapters]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/http-binding-adapters
+          persist-credentials: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache: false
+      - run: bun fmt src demo test tools
+      - run: gofmt -w go/httpbinding/*.go go/examples/calculator/main.go
+      - name: Commit formatting, delete one-off workflow
+        run: |
+          rm .github/workflows/http-tests-format-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src demo test tools go/httpbinding go/examples/calculator .github/workflows/http-tests-format-once.yml
+          git commit -m "style(http): canonical formatting for network integration tests"
+          git push origin HEAD:feat/http-binding-adapters
