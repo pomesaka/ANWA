@@ -68,9 +68,9 @@ The reference validator implements a **constrained subset** of JSON Schema Draft
 
 An `InteractionRef` is an **application-scoped string**, e.g. `order.cancel` or `execution.result`. It resolves directly to a top-level definition and bound handler in the connected app; it is not a globally discoverable URL or a resource-instance identifier.
 
-```js
+```ts
 const app = new AnwaApp(manifest).bind({
-  "calculator.add": async ({ input }) => ok(input.a + input.b)
+  "calculator.add": async ({ input }) => reply(ok(input.a + input.b))
 });
 
 app.catalog();
