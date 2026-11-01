@@ -18,37 +18,40 @@ type InteractionResponse<T, E> = {
     | { kind: "settled"; result: { ok: true; value: T } | { ok: false; error: E } }
     | { kind: "accepted"; execution: ExecutionRef };
   context: {
-    subject: ThingRef;
-    links: LinkRef[];
-    affordances: AffordanceRef[];
-    revision?: string;
+    next: Array<
+      | {
+          ref: InteractionRef;
+          guidance?: { kind?: "retry"; level?: "required" | "recommended" | "available" };
+          when?: { after: string }; // ISO 8601 duration after response receipt
+          applicability?: { state: "available" | "blocked" | "unknown"; reason?: string };
+        }
+      | {
+          kind: "discover";
+          ref: ThingRef;
+          guidance?: { level?: "required" | "recommended" | "available" };
+          when?: { after: string };
+          applicability?: { state: "available" | "blocked" | "unknown"; reason?: string };
+        }
+    >;
   };
 };
 ```
 
-The shape is intentionally transport-neutral. `accepted` means the invocation produced an execution handle—not that the business task succeeded. `settled` refers to the invocation, not necessarily the user's entire business goal.
+These are **conceptual types**. The concrete experimental wire schema is in [ANWA 0.1](../spec/anwa-0.1.md). `next` may be empty after success or failure. The app chooses options, including retries; it does not issue instructions with higher authority than the user's goal.
 
 ### Affordance versus applicability
 
-Use **WoT Interaction Affordance** for the static interaction description (Property, Action, Event). ANWA may attach a *contextual applicability hint* (available / blocked / unknown, with reason). Hints can become stale and **do not authorize** anything.
+A WoT Interaction Affordance describes an offered Property, Action or Event. `context.next` supplies **context-specific references** to such interactions, optionally with applicability hints. `applicability: blocked` may inform a client of a blocked candidate; it **does not authorize** invocation.
 
-See [Errors, retry guidance and next-interaction navigation](error-recovery-navigation.md) for the three distinct responsibilities, a candidate structured Error Definition, per-attempt retry/effect data and the current implementation gap. **Context is available after both successful and failed interactions; it is not limited to error recovery.**
+A description-level **Link** represents a relationship between modeled resources; it is not a separate `context.links` list. A runtime navigation option to explore a Thing is expressed as `kind: "discover"` with a ThingRef.
 
-### Semantic errors
+### Errors, effect certainty and retry are separate
 
-The envisioned domain error is structured, e.g. a stable code, optional details, retry advice and side-effect certainty:
+The domain error contains **what happened and why**, e.g. `{ "code": "NOT_READY", "effects": "none" }`. An error may report the attempted operation's effect certainty as `none`, `occurred` or `unknown`. A lost response may leave it unknown.
 
-```json
-{
-  "code": "ORDER_ALREADY_SHIPPED",
-  "retry": { "mode": "never" },
-  "effects": "none"
-}
-```
+**Retry is not a separate `error.retry` or `context.retry`.** A candidate with the same InteractionRef and `guidance.kind: "retry"` is a retry affordance; `when.after` may advise a wait duration. Static `hasSideEffects` and `idempotent` declarations do not guarantee a retry is safe. Likewise, `guidance.level: "required"` indicates an app-authored prerequisite for some continuation, not an unconditional command.
 
-A lost response may leave effects unknown. For retries, distinguish *time-based advice*, *changed-state requirements* and *actual duplicate-suppression guarantees*. Do not infer idempotence from `retryable: true` alone.
-
-HTTP status codes, Problem Details, gRPC status and similar transport mechanisms remain meaningful for their adapters. ANWA's domain semantics should not be dependent on any one code system.
+See [Error outcomes and navigation](error-recovery-navigation.md) for examples. Transport errors (HTTP/gRPC etc.) remain the adapter's concern, not domain errors.
 
 ## Two state machines
 
