@@ -91,7 +91,7 @@ func TestEventOnlyManifestDoesNotGenerateUnusedImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(source), "\"\"fmt\"\"") {
+	if strings.Contains(string(source), "\"fmt\"") {
 		t.Fatal("event-only generated package must not import fmt")
 	}
 	if !strings.Contains(string(source), "ActivityEvents(ctx context.Context") {
