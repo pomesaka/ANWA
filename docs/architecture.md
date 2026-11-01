@@ -1,46 +1,53 @@
-# ANWA v0.2 architecture — Interaction-first
+# ANWA v0.2 — Interaction-first architecture
 
-> Experimental reference architecture, not a released specification. [Authoritative v0.2 contract](../spec/anwa-0.2.md).
+> Active experimental runtime: [TypeScript source](../src/anwa.ts). [Public schema](../spec/anwa-0.2.md).
 
-ANWA enables **AI-consumable, schema-first applications without requiring a user interface or a Thing model**. The first-class public unit is an Interaction.
+## Responsibilities
 
-## Four responsibilities
+The first-class public object is a **standalone Interaction**. ANWA Core has no Thing, ThingRef, `things` collection, `subjectType`, domain entity registry, or required state machine.
 
-1. **Description:** a public schema with top-level `interactions`, their types, declared domain errors and optional semantic metadata.
-2. **Binding:** associate declared InteractionRefs directly with application-provided handlers, guards and a Context resolver.
-3. **Discovery:** enumerate and describe available InteractionRefs without forcing the agent to choose a Thing first.
-4. **Interaction:** call/observe an Interaction and return `Outcome + Context`. Context advertises application-selected next Interactions, not mandatory commands.
+1. **Description:** an `InteractionRef → InteractionDefinition` map defining input, output, errors, purpose and optional action properties.
+2. **Binding:** bind each declared Interaction to a TypeScript Handler and optional named guard.
+3. **Discovery:** provide a catalog and a typed description for an InteractionRef, without a Thing parent.
+4. **Invocation:** call an Interaction Handler, validate its response, and forward its **Outcome + Context**.
 
-### Current experimental API
+## Handler-owned Context
 
-```js
-const app = new AnwaApp(manifest).bind({
-  "order.get": async ({input}) => getOrder(input.orderId),
-  "order.cancel": async ({input}) => cancelOrder(input.orderId,input.reason)
-}, {
-  guards: { canCancel: async ({input}) => inspectOrder(input.orderId) },
-  context: ({ref,input,outcome}) => ({next: []})
-});
+Each Handler builds its own response. There is **no application-wide Context callback**.
 
-app.catalog();
-await app.discover("order.cancel");
-await app.interact("order.cancel", {orderId:"123", reason:"Changed my mind"});
+```ts
+import { AnwaApp, fail, ok, reply } from "../src/anwa.ts";
+
+const app = new AnwaApp(manifest);
+app.bind({
+  "order.get": async ({ input }) => reply(ok(await loadOrder(input.orderId))),
+  "order.cancel": async ({ input }) => {
+    const decision = await app.assess("order.cancel", input);
+    if (!decision.allowed) {
+      return reply({ ok: false, error: decision.error }, [
+        { ref: "shipment.track", input: { shipmentId: await shipmentIdFor(input.orderId) },
+          guidance: { level: "recommended" } },
+      ]);
+    }
+    const updated = await cancelOrder(input.orderId, input.reason);
+    return reply(ok(updated), [
+      { ref: "order.get", input: { orderId: input.orderId },
+        guidance: { level: "recommended" } },
+    ]);
+  },
+}, { guards: { canCancel: async ({ input }) => checkCancellation(input.orderId) } });
 ```
 
-### What is optional
+The functions above are illustrative application code. A named Guard is **bound and validated by the framework, but must be explicitly evaluated by the owning Handler**. The framework does not automatically check policy. Authorization and atomic data updates remain implementation responsibilities.
 
-`things` is optional metadata about domain concepts. An Interaction can optionally declare `subjectType` for semantic context, but **no ThingRef is required for invocation**. The application chooses how dynamic IDs are represented in input. Even async executions can be identified using a string execution ID and queried through `execution.status`.
+`reply(ok(value))` produces an empty `context.next` when there is no useful next step. `reply(fail(code), next)` does the same for domain failures. `reply(accepted(executionId), next)` supports asynchronous acceptance. A Handler returning a bare `ok(...)` rather than a complete response is a contract error.
 
-Guards, state machines, streaming, persistence, approvals, relation modeling, authorization, retry strategy and side-effect implementations remain application-defined. ANWA provides common representations and integration surfaces, not an application designer.
+## Next Interactions
 
-### Navigation semantics
+`context.next` is a single list of references to published Interactions, optionally with bound `input`, advisory `guidance`, `when.after` timing and `applicability`. A retry is the same InteractionRef with `guidance.kind: "retry"`. The framework validates refs and supported input schemas but **does not select the next business step**.
 
-`Outcome` conveys success, domain failure (declared code) or async acceptance. `context.next` contains references to subsequent operations and optional prebound input, applicability, importance and timing. Retry is a candidate with the same InteractionRef, optionally marked `guidance.kind: "retry"`. The app may provide none.
+## Implementation
 
-A WoT Thing Description binds Interaction Affordances to Things. This v0.2 ANWA model is **not WoT TD-compatible by construction**; a future adapter might synthesize a service Thing when appropriate, but the core does not need one.
+The reference is written in **TypeScript** and runs under **Bun ^1.4.4**. CI checks `bun fmt --check`, `bun lint`, `bun check`, manifest validation, `bun test`, and all demos. It is not a production network framework; no transport, authentication, durable job engine, distributed transaction or full JSON Schema validation is provided.
 
-## Limitations
-
-The reference runtime is in-process and has no network adapters, authentication, persistence, distributed transaction guarantees or complete JSON Schema 2020-12 support. Runtime validation cannot prove that business-rule decisions or effect declarations are true.
-
-[Main README](../README.md) · [v0.2 schema](../spec/anwa-0.2.schema.json) · [Executable examples](../demo/README.md)
+[README](../README.md) · [Demos](../demo/README.md) · [Error/next semantics](error-recovery-navigation.md)
