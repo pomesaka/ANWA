@@ -1,3 +1,4 @@
+import { validateManifest } from "./schema-tools.mjs";
 /** Dependency-free ANWA 0.1 in-memory reference adapter; NOT production ready. */
 export const thing = (type, id) => ({ type, id: String(id) });
 export const interaction = (target, kind, name) => ({ thing: target, kind, name });
@@ -55,15 +56,10 @@ function assertRef(ref) {
 
 export class AnwaApp {
   constructor(schema) {
-    if (schema?.anwa !== "0.1" || !schema.things || typeof schema.things !== "object") {
-      throw new Error("Expected ANWA 0.1 schema with things");
-    }
-    if (!Array.isArray(schema.entrypoints) || schema.entrypoints.length === 0) {
-      throw new Error("Expected at least one entrypoint");
-    }
-    for (const entry of schema.entrypoints) {
-      assertRef(entry);
-      if (!schema.things[entry.type]) throw new Error("Undeclared entrypoint type: " + entry.type);
+    const diagnostics = validateManifest(schema);
+    if (diagnostics.length) {
+      throw new Error("ANWA schema validation failed:\n" +
+        diagnostics.map(d => d.path + ": " + d.message).join("\n"));
     }
     this.schema = schema;
     this.bindings = new Map();
