@@ -31,6 +31,9 @@
               "status",
               "id"
             ]
+          },
+          "errors": {
+            "NOT_FOUND": "The order could not be found."
           }
         }
       },
@@ -62,7 +65,9 @@
           },
           "errors": {
             "ORDER_ALREADY_SHIPPED": "Cancellation is not available after dispatch.",
-            "NOT_FOUND": "The order was not found."
+            "NOT_FOUND": "The order was not found.",
+            "ALREADY_CANCELLED": "The order has already been cancelled.",
+            "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
           }
         }
       },
@@ -81,6 +86,9 @@
           "description": "Read the current shipment status.",
           "output": {
             "type": "string"
+          },
+          "errors": {
+            "NOT_FOUND": "The shipment could not be found."
           }
         }
       }
