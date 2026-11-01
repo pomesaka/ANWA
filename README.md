@@ -57,7 +57,7 @@ Authentication is delegated to a trusted Adapter that supplies verified caller i
 
 ## Executable v0.2 interaction-first contract lab
 
-The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [schema tooling](src/schema-tools.ts) and [three runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
+The working [v0.2 contract](spec/anwa-0.2.md), [machine-readable schema](spec/anwa-0.2.schema.json), [TypeScript runtime](src/anwa.ts), [schema tooling](src/schema-tools.ts) and [four runnable demos](demo/README.md) are on `main`. [v0.1](spec/anwa-0.1.md) is retained as historical research.
 
 ```bash
 # Bun ^1.4.4
@@ -67,9 +67,10 @@ bunx oxlint src demo test tools
 bun check
 bun test
 bun run demo
+bun run demo:todo
 ```
 
-The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, and [async Reports](demo/reports/) with opaque execution IDs. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
+The demos use only first-class InteractionRefs: [Calculator](demo/calculator/), [Orders](demo/orders/) with typed IDs, [async Reports](demo/reports/) with opaque execution IDs, and [Advanced Todo](demo/todo/) with 27 guarded Interactions spanning collaborative workspaces, project/task planning, dependency graphs and audit events. No Thing declarations remain. They demonstrate expressive power, not prescribed app architecture or production runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
 
 **v0.2 is a breaking experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for historical design context.
 
