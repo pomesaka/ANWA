@@ -15,7 +15,7 @@
 | Errors | Expected domain codes exhaustively declared; unexpected errors opaque | Actual side-effect certainty belongs to the outcome |
 | Side effects | Optional Action `hasSideEffects` / `idempotent` | Declared hints, not enforcement or safe retry certification |
 | Async | `accepted` with opaque execution ID, status/event as ordinary Interactions | No required Execution Thing or workflow engine |
-| Runtime | **Bun ^1.4.4 / TypeScript** | `bun fmt`, `bun lint`, `bun check`, `bun test` and schema validation in CI |
+| Runtime | **Bun ^1.4.4 / TypeScript** | `bun fmt`, `bunx oxlint`, `bun check`, `bun test` and schema validation in CI |
 | Agents | Implementing and consuming agents are primary schema clients | Human editing convenience is not a design requirement |
 
 ## Explicitly delegated to application authors
