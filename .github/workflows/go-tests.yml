@@ -22,6 +22,8 @@ jobs:
           cache: false
       - run: test -z "$(gofmt -l anwa codegen cmd examples)"
       - run: go run ./cmd/anwa-codegen -in ../demo/calculator/anwa.json -out examples/calculator/contract.gen.go -package main -check
+      - run: go run ./cmd/anwa-codegen -in examples/todo/anwa.json -out examples/todo/contract.gen.go -package main -check
       - run: go vet ./...
       - run: go test -race ./...
       - run: go run ./examples/calculator > /dev/null
+      - run: go run ./examples/todo > /dev/null
