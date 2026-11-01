@@ -18,22 +18,25 @@ const simple=(errors={EXPECTED_FAILURE:"Expected failure"},guard)=>({
 test("All interaction-first manifests validate",()=>{
  for(const m of manifests)assert.deepEqual(validateManifest(m),[]);
 });
-test("Thing metadata is optional; entrypoints must name Interactions",()=>{
- assert.equal(manifests[0].things,undefined);
+test("Only standalone Interactions belong to the core; entrypoints must name Interactions",()=>{
+ for(const m of manifests)assert.deepEqual(Object.keys(m).sort(),["anwa","entrypoints","interactions"]);
  const bad=structuredClone(manifests[0]);
  bad.entrypoints=[{type:"Calculator",id:"main"}];
  assert.ok(validateManifest(bad).some(x=>x.path.includes("entrypoints")));
  assert.throws(()=>new AnwaApp(bad),/schema invalid/);
 });
-test("Schema validates first-class refs, optional metadata links and payloads",()=>{
+test("Schema rejects Thing/subjectType fields and unsupported payload keywords",()=>{
  const bad=structuredClone(manifests[1]);
- bad.interactions["order.cancel"].subjectType="UnknownThing";
+ bad.things={Order:{title:"Order",description:"Not part of ANWA core"}};
+ bad.interactions["order.cancel"].subjectType="Order";
  bad.interactions["order.get"].input.properties.orderId.pattern="x";
  const issues=validateManifest(bad).map(x=>x.path);
+ assert.ok(issues.some(x=>x==="$.things"));
  assert.ok(issues.some(x=>x.includes("subjectType")));
  assert.ok(issues.some(x=>x.includes("pattern")));
+ assert.throws(()=>new AnwaApp(bad),/schema invalid/);
 });
-test("Type generation is based on Interaction refs, not Thing nesting",()=>{
+test("Type generation is based on first-class InteractionRefs",()=>{
  const types=generateTypes(manifests[1]);
  assert.match(types,/OrderCancelInput/);
  assert.match(types,/OrderCancelHandler/);
@@ -73,7 +76,7 @@ test("A context retry is a next candidate with same InteractionRef",async()=>{
  assert.equal(r.context.next[0].when.after,"PT30S");
  assert.equal(Object.hasOwn(r.outcome.result.error,"retry"),false);
 });
-test("Context input can bind a dynamic execution ID without an Execution Thing",async()=>{
+test("Context input binds a dynamic execution ID without requiring a domain object model",async()=>{
  const app=new AnwaApp(manifests[2]).bind({
   "report.generate":async()=>({kind:"accepted",execution:{id:"42"}}),
   "execution.status":async()=>ok("accepted"),
