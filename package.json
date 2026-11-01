@@ -16,9 +16,10 @@
     "format": "bun fmt src demo test tools",
     "format:check": "bun fmt --check src demo test tools",
     "typecheck": "bun check",
-    "lint:check": "bun lint src demo test tools"
+    "lint:check": "bunx oxlint src demo test tools"
   },
   "devDependencies": {
-    "@types/bun": "1.4.4"
+    "@types/bun": "1.4.4",
+    "oxlint": "1.90.0"
   }
 }
