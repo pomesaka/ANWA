@@ -17,9 +17,9 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 
 | Question ANWA owns | Why it matters |
 | --- | --- |
-| What is the minimal **public schema contract**? | Discoverable types, interaction definitions, descriptions, schemas, references; avoid baking in app policy |
+| What should the minimal **top-level Interaction schema contract** guarantee? | An app can publish standalone Interactions without declaring Things; schemas and refs must remain interoperable |
 | What is the minimal **Interaction Response**? | Stable Outcome + Context semantics on success/domain failure/accepted execution, with flexible/empty navigation hints |
-| How do we validate **`context.next` Interaction/Discovery refs**, guidance and timing? | Single list of app-supplied candidate follow-ups, including retries, without choosing the business step |
+| How do we validate **`context.next` InteractionRefs**, optional inputs, guidance and timing? | Single list of app-supplied candidate Interactions, including retries, without choosing the business step |
 | How should schema entries bind to **application-provided handlers, guards and resolvers**? | Authoring ergonomics and reliable declarations without duplicating business logic |
 | How much does ANWA actually validate, expose or guarantee? | Distinguish representable, runtime-supported, automatically-derived and conformant behavior |
 | How does **extensibility** work without turning every domain concern into a new core field? | Avoid prematurely standardizing use-case-specific policy |
