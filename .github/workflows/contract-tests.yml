@@ -29,7 +29,7 @@ jobs:
             git push
           fi
       - run: bun fmt --check src demo test tools
-      - run: bun lint src demo test tools
+      - run: bunx oxlint src demo test tools
       - run: bun run validate
       - run: bun run types:orders
       - run: bun check
