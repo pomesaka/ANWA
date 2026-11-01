@@ -6,17 +6,24 @@ import {
 } from "./schema-tools.ts";
 export type { Manifest } from "./schema-tools.ts";
 
-export interface DomainError {
-  code: string;
+import type {
+  BindingsFor, GuardsFor, GuardNames, GuardDecision, Refs,
+  InputOf, Operation, OutputOf, ErrorCodes
+} from "./contracts.ts";
+
+export interface DomainError<C extends string = string> {
+  code: C;
   message?: string;
   details?: unknown;
   effects?: "none" | "occurred" | "unknown";
 }
-export type Result<T = unknown> =
-  { ok: true; value: T } | { ok: false; error: DomainError };
+export type Result<T = unknown, C extends string = string> =
+  | { ok: true; value: T }
+  | { ok: false; error: DomainError<C> };
 export type Accepted = { kind: "accepted"; execution: { id: string } };
-export type Outcome<T = unknown> =
-  { kind: "settled"; result: Result<T> } | Accepted;
+export type Outcome<T = unknown, C extends string = string> =
+  | { kind: "settled"; result: Result<T, C> }
+  | Accepted;
 export interface NextInteraction {
   ref: string;
   input?: unknown;
@@ -25,62 +32,49 @@ export interface NextInteraction {
     level?: "required" | "recommended" | "available";
   };
   when?: { after: string };
-  applicability?: {
-    state: "available" | "blocked" | "unknown";
-    reason?: string;
-  };
+  applicability?: { state: "available" | "blocked" | "unknown"; reason?: string };
 }
-export interface InteractionResponse<T = unknown> {
-  outcome: Outcome<T>;
+export interface SettledResponse<T = unknown, C extends string = string> {
+  outcome: { kind: "settled"; result: Result<T, C> };
   context: { next: NextInteraction[] };
 }
-export interface HandlerArgs {
-  ref: string;
-  input: any;
-  app: AnwaApp;
+export interface AcceptedResponse {
+  outcome: Accepted;
+  context: { next: NextInteraction[] };
 }
-export type InteractionHandler = (
-  args: HandlerArgs,
-) => InteractionResponse | Promise<InteractionResponse>;
-export type EventHandler = (
-  args: HandlerArgs & { cursor?: number },
-) => AsyncIterable<unknown>;
-export type GuardDecision =
-  { allowed: true } | { allowed: false; error: DomainError };
-export type Guard = (
-  args: HandlerArgs,
-) => GuardDecision | Promise<GuardDecision>;
-export type BindingHandler = (
-  args: HandlerArgs & { cursor?: number },
-) =>
-  InteractionResponse | Promise<InteractionResponse> | AsyncIterable<unknown>;
-export type Bindings = Record<string, BindingHandler>;
-export type GuardBindings = Record<string, Guard>;
+export type InteractionResponse<T = unknown, C extends string = string> =
+  | SettledResponse<T, C> | AcceptedResponse;
 
-export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
-export const fail = (
-  code: string,
-  message?: string,
-  extra: Partial<DomainError> = {},
-): Result<never> => ({
-  ok: false,
-  error: { code, ...(message ? { message } : {}), ...extra },
+type RuntimeArgs = {ref: string; input: any; app: AnwaApp<any>};
+type RuntimeRun = (args: RuntimeArgs & {cursor?: number}) => unknown;
+type RuntimeBinding = RuntimeRun | {
+  run: RuntimeRun;
+  onDenied: (args: RuntimeArgs & {error: DomainError}) =>
+    NextInteraction[] | Promise<NextInteraction[]>;
+};
+type RuntimeGuard = (args: RuntimeArgs) => GuardDecision | Promise<GuardDecision>;
+
+export const ok = <T>(value: T): {ok: true; value: T} => ({ok: true, value});
+export const fail = <C extends string>(
+  code: C, message?: string, extra: Partial<DomainError<C>> = {}
+): {ok: false; error: DomainError<C>} => ({
+  ok: false, error: {code, ...(message ? {message} : {}), ...extra}
 });
 export const accepted = (id: string): Accepted => ({
-  kind: "accepted",
-  execution: { id: String(id) },
+  kind: "accepted", execution: {id: String(id)}
 });
-export const reply = <T>(
-  result: Result<T> | Accepted,
-  next: NextInteraction[] = [],
-): InteractionResponse<T> => {
-  if ("kind" in result)
-    return { outcome: result as Accepted, context: { next } };
-  return {
-    outcome: { kind: "settled", result: result as Result<T> },
-    context: { next },
-  };
-};
+
+export function reply<T, C extends string>(
+  result: Result<T, C>, next?: NextInteraction[]
+): SettledResponse<T, C>;
+export function reply(result: Accepted, next?: NextInteraction[]): AcceptedResponse;
+export function reply(
+  result: Result<unknown> | Accepted, next: NextInteraction[] = []
+): InteractionResponse {
+  return "kind" in result
+    ? {outcome: result, context: {next}}
+    : {outcome: {kind: "settled", result}, context: {next}};
+}
 const unexpected = (): InteractionResponse =>
   reply(
     fail("UNEXPECTED_ERROR", "Unexpected application failure", {
@@ -137,56 +131,59 @@ function checkPayload(
   return null;
 }
 
-export class AnwaApp {
-  readonly schema: Manifest;
-  private readonly handlers = new Map<string, BindingHandler>();
-  private guards: GuardBindings = {};
+export class AnwaApp<const M extends Manifest = Manifest> {
+  readonly schema: M;
+  private readonly handlers = new Map<string, RuntimeBinding>();
+  private guards: Record<string, RuntimeGuard> = {};
 
-  constructor(schema: Manifest) {
+  constructor(schema: M) {
     const errors = validateManifest(schema);
     if (errors.length)
-      throw Error(
-        "ANWA schema invalid:\n" +
-          errors.map((x) => x.path + ": " + x.message).join("\n"),
-      );
+      throw Error("ANWA schema invalid:\n" +
+        errors.map(x => x.path + ": " + x.message).join("\n"));
     this.schema = schema;
   }
 
   bind(
-    handlers: Bindings,
-    { guards = {} }: { guards?: GuardBindings } = {},
+    handlers: BindingsFor<M>,
+    ...settings: GuardNames<M> extends never
+      ? [options?: {guards?: GuardsFor<M>}]
+      : [options: {guards: GuardsFor<M>}]
   ): this {
+    const options = (settings[0] ?? {}) as {guards?: GuardsFor<M>};
+    const guards = options.guards ?? {} as GuardsFor<M>;
+    const rawHandlers = handlers as Record<string, unknown>;
+    const rawGuards = guards as Record<string, unknown>;
     for (const [ref, spec] of Object.entries(this.schema.interactions)) {
-      if (typeof handlers[ref] !== "function")
-        throw Error("Unbound interaction: " + ref);
-      if (spec.guard && typeof guards[spec.guard] !== "function")
-        throw Error("Missing Guard: " + spec.guard);
+      const binding = rawHandlers[ref];
+      if (spec.guard) {
+        if (typeof rawGuards[spec.guard] !== "function")
+          throw Error("Missing Guard: " + spec.guard);
+        if (!binding || typeof binding !== "object" || Array.isArray(binding) ||
+            typeof (binding as any).run !== "function" ||
+            typeof (binding as any).onDenied !== "function")
+          throw Error("Guarded Interaction requires {run, onDenied}: " + ref);
+      } else if (typeof binding !== "function") {
+        throw Error("Unbound or invalid Interaction: " + ref);
+      }
     }
-    for (const [ref, handler] of Object.entries(handlers)) {
-      if (!own(this.schema.interactions, ref) || typeof handler !== "function")
+    for (const ref of Object.keys(rawHandlers))
+      if (!own(this.schema.interactions, ref))
         throw Error("Unknown or invalid interaction binding: " + ref);
-    }
     this.handlers.clear();
-    for (const [ref, handler] of Object.entries(handlers))
-      this.handlers.set(ref, handler);
-    this.guards = guards;
+    for (const [ref, value] of Object.entries(rawHandlers))
+      this.handlers.set(ref, value as RuntimeBinding);
+    this.guards = rawGuards as Record<string, RuntimeGuard>;
     return this;
   }
 
   private resolve(ref: string): {
-    spec: InteractionDefinition;
-    handler: BindingHandler;
+    spec: InteractionDefinition; handler: RuntimeBinding
   } {
-    if (
-      typeof ref !== "string" ||
-      !own(this.schema.interactions, ref) ||
-      !this.handlers.has(ref)
-    )
+    if (typeof ref !== "string" || !own(this.schema.interactions, ref) ||
+        !this.handlers.has(ref))
       throw Error("Unknown or unbound InteractionRef");
-    return {
-      spec: this.schema.interactions[ref],
-      handler: this.handlers.get(ref)!,
-    };
+    return {spec: this.schema.interactions[ref], handler: this.handlers.get(ref)!};
   }
 
   catalog() {
@@ -218,20 +215,6 @@ export class AnwaApp {
     ) {
       throw Error("Undeclared domain error");
     }
-  }
-
-  /** Guard evaluation is explicitly called by the owning handler so it can return its own Context. */
-  async assess(ref: string, input: unknown): Promise<GuardDecision> {
-    const { spec } = this.resolve(ref);
-    if (!spec.guard) return { allowed: true };
-    const decision = await this.guards[spec.guard]({ ref, input, app: this });
-    if (
-      typeof decision?.allowed !== "boolean" ||
-      (!decision.allowed && !decision.error?.code)
-    )
-      throw Error("Invalid Guard decision");
-    if (!decision.allowed) this.declaredError(spec, decision.error);
-    return decision;
   }
 
   private validateContext(context: unknown, source: string): void {
@@ -307,29 +290,53 @@ export class AnwaApp {
     }
   }
 
-  /** Each handler owns its Context; there is no application-wide context resolver. */
-  async interact(ref: string, input?: unknown): Promise<InteractionResponse> {
-    const { spec, handler } = this.resolve(ref);
-    if (spec.kind === "event")
-      throw Error("Use observe for event interactions");
+  /** Runtime enforces the named Guard before run; onDenied only builds this Interaction's Context. */
+  async interact<R extends Refs<M>>(
+    ref: R,
+    ...args: string extends Refs<M> ? [input?: unknown]
+      : InputOf<Operation<M, R>> extends undefined
+        ? [input?: undefined] : [input: InputOf<Operation<M, R>>]
+  ): Promise<InteractionResponse<OutputOf<Operation<M, R>>, ErrorCodes<Operation<M, R>>>> {
+    return this.interactInternal(ref, args[0]) as Promise<
+      InteractionResponse<OutputOf<Operation<M, R>>, ErrorCodes<Operation<M, R>>>>;
+  }
+
+  /** Follow a runtime-selected candidate. Dynamic inputs are checked against the public schema. */
+  async follow(candidate: NextInteraction): Promise<InteractionResponse> {
+    return this.interactInternal(candidate.ref, candidate.input);
+  }
+
+  private async interactInternal(ref: string, input?: unknown): Promise<InteractionResponse> {
+    const {spec, handler} = this.resolve(ref);
+    if (spec.kind === "event") throw Error("Use observe for Event Interactions");
     const error = spec.input
       ? checkPayload(spec.input, input)
-      : input === undefined
-        ? null
-        : "Unexpected input";
+      : input === undefined ? null : "Unexpected input";
     if (error) return reply(fail("INVALID_INPUT", error));
     try {
-      const response = await (handler as InteractionHandler)({
-        ref,
-        input,
-        app: this,
-      });
-      if (!response || !response.outcome)
-        throw Error("Handler must return reply(...)");
+      const params = {ref, input, app: this};
+      let response: InteractionResponse;
+      if (spec.guard) {
+        const decision = await this.guards[spec.guard](params);
+        if (typeof decision?.allowed !== "boolean" ||
+            (!decision.allowed && !decision.error?.code))
+          throw Error("Invalid Guard decision");
+        const guarded = handler as Extract<RuntimeBinding, {run: RuntimeRun}>;
+        if (!decision.allowed) {
+          this.declaredError(spec, decision.error);
+          const next = await guarded.onDenied({...params, error: decision.error});
+          response = reply({ok: false, error: decision.error}, next);
+        } else {
+          response = await guarded.run(params) as InteractionResponse;
+        }
+      } else {
+        response = await (handler as RuntimeRun)(params) as InteractionResponse;
+      }
+      if (!response || !response.outcome) throw Error("Handler must return reply(...)");
       const outcome = response.outcome;
       if (outcome.kind === "accepted") {
-        if (typeof outcome.execution?.id !== "string" || !outcome.execution.id)
-          throw Error("Invalid ExecutionRef");
+        if (spec.kind !== "action" || typeof outcome.execution?.id !== "string" ||
+            !outcome.execution.id) throw Error("Invalid accepted outcome");
       } else if (outcome.kind === "settled") {
         const result = outcome.result;
         if (typeof result?.ok !== "boolean") throw Error("Invalid Result");
@@ -345,11 +352,14 @@ export class AnwaApp {
     }
   }
 
-  observe(
-    ref: string,
-    input?: unknown,
-    options: { cursor?: number } = {},
+  observe<R extends Refs<M>>(
+    ref: R,
+    ...args: string extends Refs<M> ? [input?: unknown, options?: {cursor?: number}]
+      : InputOf<Operation<M, R>> extends undefined
+        ? [input?: undefined, options?: {cursor?: number}]
+        : [input: InputOf<Operation<M, R>>, options?: {cursor?: number}]
   ): AsyncIterable<unknown> {
+    const [input, options = {}] = args;
     const { spec, handler } = this.resolve(ref);
     if (spec.kind !== "event")
       throw Error("Only event Interactions may be observed");
@@ -359,14 +369,14 @@ export class AnwaApp {
         ? null
         : "Unexpected event input";
     if (error) throw Error("Invalid event input");
-    const stream = (handler as EventHandler)({
+    const stream = (handler as RuntimeRun)({
       ref,
       input,
       app: this,
       ...options,
     });
-    if (!stream?.[Symbol.asyncIterator])
+    if (!stream || typeof (stream as AsyncIterable<unknown>)[Symbol.asyncIterator] !== "function")
       throw Error("Event must return AsyncIterable");
-    return stream;
+    return stream as AsyncIterable<unknown>;
   }
 }
