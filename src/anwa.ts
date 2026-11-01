@@ -604,19 +604,18 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         ? null
         : "Unexpected event input";
     if (invalid) throw Error("Invalid event input");
-    const self = this;
-    return (async function* (): AsyncGenerator<unknown> {
-      const params = { ref, input, app: self, caller };
+    return (async function* (runtime: AnwaApp<M>): AsyncGenerator<unknown> {
+      const params = { ref, input, app: runtime, caller };
       if (spec.guard) {
         let decision: GuardDecision;
         try {
-          decision = await self.guards[spec.guard](params);
+          decision = await runtime.guards[spec.guard](params);
           if (
             typeof decision?.allowed !== "boolean" ||
             (!decision.allowed && !decision.error?.code)
           )
             throw Error("Invalid Guard decision");
-          if (!decision.allowed) self.declaredError(spec, decision.error);
+          if (!decision.allowed) runtime.declaredError(spec, decision.error);
         } catch {
           throw new ObservationDenied("UNEXPECTED_ERROR");
         }
@@ -631,6 +630,6 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       )
         throw Error("Event must return AsyncIterable");
       yield* stream as AsyncIterable<unknown>;
-    })();
+    })(this);
   }
 }
