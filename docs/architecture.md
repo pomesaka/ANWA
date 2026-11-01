@@ -5,9 +5,9 @@
 
 ## Core thesis
 
-**ANWA is a schema-first application framework for AI agents.**
+**ANWA is a schema-first application framework for AI agents, not a framework that designs the application's business domain.**
 
-A developer describes the **public contract** of an application in a machine-readable schema, then implements the behavior in ordinary application code. The ANWA runtime uses that contract and the implementation to expose:
+A developer chooses the application's domain model and describes its **public contract** in a machine-readable schema, then implements behavior in ordinary application code. ANWA should offer reusable means to publish what the developer chooses to expose:
 
 1. **Discovery** — understand Things, their meanings, Links, Property/Action/Event Interaction Affordances, input/output types, and relevant choices.
 2. **Interaction** — read state, invoke actions, and observe results. A delivered application response contains **Outcome + Context** (related resources and next-interaction hints), whether the domain action succeeded or failed.
@@ -30,7 +30,7 @@ flowchart TD
 
 ### Step 1 — Declare the contract
 
-OpenAPI-style schema authoring: define **Thing models**, properties, actions, events, links, descriptions, input/output schemas, error categories, and *possible* states/transitions where useful. An action may **reference a named guard**. The schema does **not** express arbitrary business rules as a new guard programming language.
+OpenAPI-style schema authoring: declare the application's chosen **Thing models**, properties, actions, events, links, descriptions and input/output schemas. The author *may* also declare error categories, possible states/transitions and named guard references where useful. ANWA should **provide those mechanisms without requiring them of every application**. It does **not** express arbitrary business rules as a new guard programming language.
 
 ### Step 2 — Implement behavior
 
@@ -45,7 +45,7 @@ A guard can query databases, remote services, permissions and current domain sta
 
 ### Step 3 — Bind, validate, expose
 
-The framework can validate declared names/types against implementations, expose authorized descriptions, evaluate dynamic applicability, invoke handlers, and assemble an Interaction Response with follow-up hints.
+The framework may validate declared names/types against implementations, expose authorized descriptions, bind/invoke handlers, and carry author-supplied Interaction Context. Optional integrations may evaluate dynamic applicability or derive some hints where reliably possible. **Neither choosing which hints matter nor inferring a business workflow is a core responsibility by default.**
 
 This is a **goal**, not yet a proven automated capability. Code-level type checking does not establish that a side effect actually obeys a declared transition. A runtime must check invariants and the storage layer must protect atomicity/consistency.
 
@@ -64,7 +64,7 @@ This is a **goal**, not yet a proven automated capability. Code-level type check
 
 ## State model: contract, not a second implementation
 
-Consider `Order.cancel`:
+**Illustrative use case only, not a prescriptive ANWA domain model.** Consider `Order.cancel`:
 
 - Schema says `cancel` is an Action, may cause `pending/preparing → cancelled`, and refers to `canCancelOrder`.
 - Code implements `canCancelOrder` **once** and implements the cancellation with a transactional/conditional update.
@@ -73,7 +73,7 @@ Consider `Order.cancel`:
 
 No independent `availableWhen: status=pending` formula is kept in the schema if the real guard is more complicated. Some state transition metadata remains declarative (documentation/validation), but **guard conditions are authored as code**, not duplicated in a YAML DSL.
 
-**Caveat:** using the same guard function twice does not eliminate a time-of-check/time-of-use race. Conditional updates, locks or transactions are still required.
+**Caveat:** using the same guard function twice does not eliminate a time-of-check/time-of-use race. Conditional updates, locks or transactions are still required, and are an application/infrastructure concern. An application is free to use **no state machine or guard**, if those models are not appropriate.
 
 ## Outcome and contextual navigation
 
@@ -99,7 +99,7 @@ type InteractionResponse<T, E> = {
 - WoT **Interaction Affordance** is an interaction description; ANWA **contextual applicability** (e.g. blocked because already shipped) is a separate, non-WoT concept.
 - Semantically meaningful error details (reason, retry guidance, side-effect uncertainty) are preferred to relying on HTTP status alone. The underlying transport still follows its own protocol requirements.
 
-See [Interaction and observation](interaction-model.md).
+See [Interaction and observation](interaction-model.md) and [scope and responsibility boundaries](scope-and-boundaries.md).
 
 ## Non-blocking and streaming
 
@@ -124,4 +124,4 @@ A schema-first framework can generate protocol bindings later; it must not assum
 - [GraphQL Specification](https://spec.graphql.org/September2025/)
 - [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)
 
-[README](../README.md) · [Decisions](decisions.md) · [Example](examples/order-cancellation.md) · [Open questions](open-questions.md)
+[README](../README.md) · [Scope](scope-and-boundaries.md) · [Decisions](decisions.md) · [Example](examples/order-cancellation.md) · [Open questions](open-questions.md)
