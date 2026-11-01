@@ -1,6 +1,6 @@
 # ANWA v0.2 — Interaction-first architecture
 
-> Experimental reference runtime: [TypeScript](../src/anwa.ts). [Public schema](../spec/anwa-0.2.md).
+> Experimental in-process reference runtimes: [TypeScript](../src/anwa.ts) and [Go](../go/README.md). [Public schema](../spec/anwa-0.2.md).
 
 ANWA Core publishes standalone Interactions. No Thing, ThingRef, domain-instance registry, global Context resolver or mandatory state machine is required.
 
@@ -58,6 +58,10 @@ A trusted transport Adapter authenticates the caller and passes `{caller:{subjec
 Named Guards now protect **Queries, Actions and Events**. Binding is default-deny: unguarded Interactions require an explicit `public` allowlist. Queries/Actions use `{run,onDenied}` and Event subscriptions use guarded `{run}`. `catalog(request)` and `discover(ref,request)` filter descriptions using a coarse `discoverable` policy; actual per-resource decisions remain in the Guard at invocation.
 
 [Authentication and authorization details](authentication-authorization.md).
+
+## Language adapters
+
+ANWA's public JSON manifest is language-neutral. The Go adapter reads the same manifest and implements the same standalone Interaction, Guard, Discovery, and Outcome + Context model using explicit Go Handler bindings. It validates the constrained payload schema subset and resolves local reusable definitions. Unlike the TypeScript code-generated literal manifest, Go bindings do not currently have compile-time manifest-derived types. See the [Go guide](../go/README.md).
 
 ## Schema-derived TypeScript types
 
