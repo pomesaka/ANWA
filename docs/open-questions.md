@@ -1,67 +1,71 @@
-# Open questions and evaluation plan
+# Open questions — framework-level only
 
-> **Current as of 2026-11-01** · Non-normative. Start with [decision status](decisions.md) to distinguish current direction from pending choices.
+> **As of 2026-11-01.** See [scope and responsibility boundaries](scope-and-boundaries.md). We evaluate **what ANWA needs to let implementers build**, not how an example app ought to be modeled.
 
-## Agreed direction, not questions we need to re-litigate now
+## How to evaluate any proposed concern
 
-- **Schema-first:** author an OpenAPI-like *public contract*, then implement guards, handlers and resolvers in ordinary code.
-- **Guards are code:** the schema refers to a guard name/contract; it does **not** reimplement arbitrary business conditions as a declarative predicate DSL.
-- **WoT vocabulary baseline:** Thing, Property/Action/Event Interaction Affordance, Link, DataSchema, Form; **contextual applicability** is separate from the WoT meaning of Affordance.
-- **Common interaction concept:** a delivered application response provides an **Outcome + Context**, for both business success and failure.
-- **Protocols are bindings:** do not select GraphQL, RPC, HTTP or MCP as the essence of the model.
-- **Async ≠ streaming:** domain state, execution state and observation/delivery are distinct.
+For a use case, ask:
 
-These are *design intent*, not a ratified technical standard.
+1. **Representability:** Can the implementer express it through existing core primitives, extensions or adapters?
+2. **Ownership:** Is any missing behavior a concern of ANWA, application code, infrastructure or the agent?
+3. **Minimal mechanism:** If ANWA must cover the gap, what is the smallest reusable contract / extension point?
+4. **Verification:** How can we test the capability without prescribing the domain solution?
 
-## P0 — Make the schema-first contract precise
+See the [evaluation template and examples](scope-and-boundaries.md).
 
-1. **Schema expression:** YAML/JSON/IDL/TypeScript? Is there a canonical intermediate representation independent of user authoring style?
-2. **Thing granularity:** one business entity per Thing, or a service with actions over many entities? How should related resource instances be identified?
-3. **Transition contract:** which states/transitions should be publicly declared? How are multiple outcomes, internal events, and side effects represented without duplicating logic?
-4. **Guard contract:** input type, structured `allow/deny` result, explanation, error codes, Links and Affordance references. When is evaluation optional/expensive? How do we filter sensitive reasons?
-5. **Schema/implementation drift:** build-time binding validation vs runtime state validation vs storage transactions. How can we report violations and version changes?
+## P0 — Core expressive model
 
-## P1 — Make Interaction Response usable
+| Question ANWA owns | Why it matters |
+| --- | --- |
+| What is the minimal **public schema contract**? | Discoverable types, interaction definitions, descriptions, schemas, references; avoid baking in app policy |
+| What is the minimal **Interaction Response**? | Stable Outcome + Context semantics on success/domain failure/accepted execution, with flexible/empty navigation hints |
+| How can authors expose **Links / Affordance references** and optional applicability information? | Follow-up navigation without framework choosing the next business step |
+| How should schema entries bind to **application-provided handlers, guards and resolvers**? | Authoring ergonomics and reliable declarations without duplicating business logic |
+| How much does ANWA actually validate, expose or guarantee? | Distinguish representable, runtime-supported, automatically-derived and conformant behavior |
+| How does **extensibility** work without turning every domain concern into a new core field? | Avoid prematurely standardizing use-case-specific policy |
 
-6. Exact logical type: `Outcome` settled Result or accepted Execution; always a `Context` object, with potentially empty/restricted hints.
-7. How much Context is returned: full list, refs only, pagination, relevance filtering by intent, consistency/freshness/revision?
-8. Should an unavailable Action appear as a **blocked** contextual hint, be omitted, or both according to policy?
-9. What does `retry` mean in presence of side effects, timeouts, deduplication keys and unknown outcomes?
-10. What ensures every **application-level** response includes Context without promising anything on network failure?
-11. How to map typed domain errors and Result to protocol errors such as HTTP/gRPC while preserving transport semantics?
+## P1 — Cross-cutting framework capabilities
 
-## P2 — Async execution, observation and state machines
+| Question ANWA owns | What not to prescribe |
+| --- | --- |
+| How to express optional **states/transitions** and their public meanings? | Which states/transition graph the implementer chooses, or that all apps must use one |
+| How to describe typed **domain errors**, retry hints and side-effect uncertainty? | Which failures an app produces or whether clients actually retry |
+| What common representation is useful for **async accepted/execution/final outcomes**? | Durable engine, queue, data persistence or business execution semantics |
+| How to expose optional **observation / streaming** semantics? | SSE vs WebSocket vs polling, unless implementing a particular adapter |
+| How to support **safe exposure** of descriptions and contextual hints? | Application-specific authorization rules, permissions or business policies |
+| How to **adapt protocols** (WoT, MCP, GraphQL, RPC) without semantic loss? | Forcing all implementations into one backend architecture |
 
-12. Is an Execution a WoT Thing or a transport-neutral resource adapted to Things?
-13. Distinguish accepted / running / awaiting input / completed / failed / cancelled. When is `Result` final and when can a domain state change afterward?
-14. Which data should be persisted: domain transitions, execution state, progress, artifact chunks? Which are ephemeral?
-15. Snapshot/stream race, cursor/sequence numbers, replay windows, ordering scope, duplicates and backpressure?
-16. What is the contract for cancel and human approval? Neither guarantees undoing external effects.
+## Not ANWA design questions
 
-## P3 — Interoperability, safety and evaluation
+- Should every Order be a Thing? What is the best business entity granularity?
+- What are the actual payment/order states or cancellation preconditions?
+- Does the app use a state machine, events, queues, a database or a particular cloud?
+- Which return-link is best for a specific end user's goal?
+- Should an app use SSE, gRPC or a webhook for its own deployment?
+- How is a specific `canCancelOrder` check implemented?
 
-17. Is WoT Thing Model/TD sufficient with extensions, or is a separate internal ANWA model preferable?
-18. How are WoT/MCP/A2A/GraphQL/OpenAPI adapters generated without claiming capabilities unsupported by their protocols?
-19. Untrusted descriptions/guard reasons should not become executable instructions for an AI. How should policy enforcement and provenance work?
-20. Would an agent really navigate unfamiliar apps more accurately, with less latency/tokens and less developer annotation than existing tools?
+These may be **test scenarios**, but their answers belong to the app developer or its runtime/platform.
 
-## Experiment proposal
+## Use cases are test vectors, not requirements
 
-Use one order-management domain (Order, Payment, Shipment, cancellation). Hold business behavior, permissions, explanation quality, model, task prompts and test budget constant.
+| Example test | What ANWA's expressiveness should be evaluated for | What remains app-defined |
+| --- | --- | --- |
+| Order Thing vs OrderService Thing | Can both declare interactions and relevant result context? | Which grain to use |
+| Shipping blocks cancellation | Can a guard/result convey structured reason and follow-up link? | How shipping state is checked; actual policy |
+| Async payment | Can an app return execution reference and later outcome? | Durability, payment execution, lifecycle details |
+| Report streaming | Can an app expose incremental output and a final result? | Content generator, storage and delivery backend |
+| No useful follow-up actions | Can a response represent an empty/redacted Context? | Whether anything is relevant or disclosed |
 
-Compare:
-- conventional OpenAPI / RPC descriptions;
-- GraphQL schema/introspection;
-- MCP Tools/Resources;
-- WoT TD/Thing Model or node-wot;
-- ANWA-style *Outcome + Context* and code-backed applicability.
+A failure in a test case should trigger a **scope review**, not automatic addition of a domain-specific primitive.
 
-Measures: task completion, invalid/risky action attempts, successful recovery after blocked operations, unnecessary calls, input tokens, latency, guard/handler duplication, and drift between declared transition and observed state.
+## Comparative validation
 
-**Confound to avoid:** making ANWA's descriptive text more complete than every baseline and attributing the win to the response model.
+Compare the same domain functionality through traditional OpenAPI/RPC, WoT TD, MCP tools, and ANWA-style optional extensions/Result + Context. Hold business logic, model, descriptions, permissions and test budgets comparable.
 
-## Explicitly not decided
+Evaluate expressive coverage, schema/implementation duplication, correctness, task completion, wrong calls, token/call cost and interoperability. A valid outcome is to discover that existing standards are sufficient and ANWA can stay a thin authoring/runtime layer.
 
-Exact schema syntax, execution runtime, durable workflow engine, full WoT conformance, auth scheme, retry guarantee, stream protocol, adapter set, versioning, licensing and packaging.
+## Still undecided
 
-[README](../README.md) · [Architecture](architecture.md) · [Decision status](decisions.md) · [Draft Proposal 0001](https://github.com/pomesaka/ANWA/pull/1)
+Canonical schema/IDL, binding mechanism, required/optional Result fields, conformance and extension system, WoT interoperability strategy, adapters, runtime validation guarantees, async and observation abstractions, versioning and licensing.
+
+[README](../README.md) · [Scope](scope-and-boundaries.md) · [Decisions](decisions.md) · [Architecture](architecture.md)
