@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/pomesaka/ANWA/main/spec/anwa-0.2.schema.json",
+  "title": "ANWA 0.2 Interaction-first experimental manifest",
+  "type": "object",
+  "required": [
+    "anwa",
+    "entrypoints",
+    "interactions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "anwa": {
+      "const": "0.2"
+    },
+    "entrypoints": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/InteractionRef"
+      }
+    },
+    "interactions": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[A-Za-z_$][\\w$]*(?:[.-][A-Za-z_$][\\w$]*)*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Interaction"
+      }
+    },
+    "things": {
+      "type": "object",
+      "description": "Optional domain metadata, not a required parent of Interactions",
+      "additionalProperties": {
+        "$ref": "#/$defs/Thing"
+      }
+    }
+  },
+  "$defs": {
+    "InteractionRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "App-scoped reference into top-level interactions"
+    },
+    "ExecutionRef": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "SemanticTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:https?://|urn:)[^\\s]+$"
+      }
+    },
+    "Interaction": {
+      "type": "object",
+      "required": [
+        "kind",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "query",
+            "action",
+            "event"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticTypes": {
+          "$ref": "#/$defs/SemanticTypes"
+        },
+        "subjectType": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional link to a Thing metadata type, not a mandatory owner or instance binding"
+        },
+        "input": {
+          "type": "object",
+          "description": "Typed input. Runtime implements only a documented JSON Schema subset"
+        },
+        "output": {
+          "type": "object",
+          "description": "Typed success output"
+        },
+        "errors": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!INVALID_INPUT$|UNEXPECTED_ERROR$)[A-Z][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "guard": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hasSideEffects": {
+          "type": "boolean"
+        },
+        "idempotent": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "not": {
+                  "const": "action"
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "guard"
+                  ]
+                },
+                {
+                  "required": [
+                    "hasSideEffects"
+                  ]
+                },
+                {
+                  "required": [
+                    "idempotent"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Thing": {
+      "type": "object",
+      "required": [
+        "title",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticTypes": {
+          "$ref": "#/$defs/SemanticTypes"
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {},
+        "effects": {
+          "enum": [
+            "none",
+            "occurred",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "ok",
+            "value"
+          ],
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "value": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "ok",
+            "error"
+          ],
+          "properties": {
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/Error"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Next": {
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "description": "Optional application-supplied input to bind a next Interaction"
+        },
+        "guidance": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "retry"
+            },
+            "level": {
+              "enum": [
+                "required",
+                "recommended",
+                "available"
+              ]
+            }
+          }
+        },
+        "when": {
+          "type": "object",
+          "required": [
+            "after"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "type": "string",
+              "pattern": "^P(?=.*\\d)(?:\\d+D)?(?:T(?:(?:\\d+)H)?(?:(?:\\d+)M)?(?:(?:\\d+(?:\\.\\d+)?)S)?)?$"
+            }
+          }
+        },
+        "applicability": {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "available",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "Context": {
+      "type": "object",
+      "required": [
+        "next"
+      ],
+      "properties": {
+        "next": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Next"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "InteractionResponse": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "context"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "result"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "settled"
+                },
+                "result": {
+                  "$ref": "#/$defs/Result"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "execution"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "accepted"
+                },
+                "execution": {
+                  "$ref": "#/$defs/ExecutionRef"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/Context"
+        }
+      }
+    }
+  }
+}
