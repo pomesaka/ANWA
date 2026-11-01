@@ -1,17 +1,38 @@
-name: ANWA contract demos
+name: ANWA Bun TypeScript contract checks
+
 on:
   push:
-    branches: [main, feat/anwa-0.1-spec-and-demos]
+    branches: [main, refactor/remove-thing-from-core]
   pull_request:
+
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-      - run: npm run validate
-      - run: npm run types:orders
-      - run: npm test
-      - run: npm run demo > /dev/null
+          bun-version: '1.4.4'
+      - run: bun --version
+      - name: Apply Bun formatter
+        run: bun fmt --no-script src demo test tools
+      - name: Commit formatted TypeScript on migration branch
+        if: github.ref == 'refs/heads/refactor/remove-thing-from-core'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src demo test tools
+          if ! git diff --cached --quiet; then
+            git commit -m "style: apply Bun 1.4.4 formatter"
+            git push
+          fi
+      - run: bun fmt --no-script --check src demo test tools
+      - run: bun lint --no-script src demo test tools
+      - run: bun run validate
+      - run: bun run types:orders
+      - run: bun check --no-script
+      - run: bun test
+      - run: bun run demo > /dev/null
