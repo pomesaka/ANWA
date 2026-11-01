@@ -21,6 +21,16 @@
         "$ref": "#/$defs/InteractionRef"
       }
     },
+    "$defs": {
+      "type": "object",
+      "description": "Optional local reusable payload data schemas (not Thing descriptions). References use #/$defs/Name.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_$][\\w$]*$"
+      },
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
     "interactions": {
       "type": "object",
       "minProperties": 1,
@@ -84,11 +94,11 @@
         },
         "input": {
           "type": "object",
-          "description": "Typed input. Runtime implements only a documented JSON Schema subset"
+          "description": "Typed input. Local $ref to root #/$defs/Name is supported; full JSON Schema is not implemented"
         },
         "output": {
           "type": "object",
-          "description": "Typed success output"
+          "description": "Typed success output; may reference a local reusable payload schema"
         },
         "errors": {
           "type": "object",
