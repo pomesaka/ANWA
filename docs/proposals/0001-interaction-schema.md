@@ -4,7 +4,7 @@
 > **Updated:** 2026-11-01  
 > **Scope:** Semantic contract, not a transport binding or TypeScript SDK.
 >
-> **Update:** ANWA's authoring direction is **schema-first**: describe the public contract, then implement guards/actions/resolvers in ordinary code. Do **not** treat the statechart or guard expressions as a required declarative programming language. See [current decisions](../../decisions.md), [architecture](../../architecture.md) and [worked example](../../examples/order-cancellation.md) on `main`.
+> **Update:** ANWA's authoring direction is **schema-first**: describe the public contract, then implement guards/actions/resolvers in ordinary code. Do **not** treat the statechart or guard expressions as a required declarative programming language. See [current decisions](../decisions.md), [architecture](../architecture.md) and [worked example](../examples/order-cancellation.md) on `main`.
 
 ## 0. Design goal
 
@@ -341,7 +341,7 @@ app.action("Order.cancel", async (ctx, input) => {
 
 The runtime could generate or expose descriptions and interaction contracts, perform schema-to-handler binding checks, and assemble Result + Context. It **cannot infer arbitrary business semantics from handler code**, nor prove a declared transition by type checking alone.
 
-See the canonical [end-to-end order cancellation example](../../examples/order-cancellation.md) and [architecture](../../architecture.md).
+See the canonical [end-to-end order cancellation example](../examples/order-cancellation.md) and [architecture](../architecture.md).
 
 ## 8. Non-goals and unresolved choices
 
@@ -364,4 +364,4 @@ See the canonical [end-to-end order cancellation example](../../examples/order-c
 - [A2A v1.0.1 — Task and streaming events](https://a2a-protocol.org/v1.0.1/specification/)
 - [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)
 
-[ANWA README](../../README.md) · [Current decisions](../../decisions.md) · [Architecture](../../architecture.md) · [Worked example](../../examples/order-cancellation.md) · [Working glossary](../glossary.md) · [Async / streaming research](../research/async-state-streaming.md)
+[ANWA README](../../README.md) · [Current decisions](../decisions.md) · [Architecture](../architecture.md) · [Worked example](../examples/order-cancellation.md) · [Working glossary](../glossary.md) · [Async / streaming research](../research/async-state-streaming.md)
