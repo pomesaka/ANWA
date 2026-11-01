@@ -181,7 +181,7 @@ func New(runtime Runtime, options Options) (http.Handler, error) {
 		}
 		var input any
 		if envelope.Input != nil {
-			if string(envelope.Input) == "null" {
+			if strings.TrimSpace(string(envelope.Input)) == "null" {
 				input = explicitNullInput{}
 			} else {
 				dec := json.NewDecoder(strings.NewReader(string(envelope.Input)))
