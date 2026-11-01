@@ -19,7 +19,7 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 | --- | --- |
 | What is the minimal **public schema contract**? | Discoverable types, interaction definitions, descriptions, schemas, references; avoid baking in app policy |
 | What is the minimal **Interaction Response**? | Stable Outcome + Context semantics on success/domain failure/accepted execution, with flexible/empty navigation hints |
-| How can authors expose **Links / Affordance references** and optional applicability information? | Follow-up navigation without framework choosing the next business step |
+| How do we validate **`context.next` Interaction/Discovery refs**, guidance and timing? | Single list of app-supplied candidate follow-ups, including retries, without choosing the business step |
 | How should schema entries bind to **application-provided handlers, guards and resolvers**? | Authoring ergonomics and reliable declarations without duplicating business logic |
 | How much does ANWA actually validate, expose or guarantee? | Distinguish representable, runtime-supported, automatically-derived and conformant behavior |
 | How does **extensibility** work without turning every domain concern into a new core field? | Avoid prematurely standardizing use-case-specific policy |
@@ -38,7 +38,7 @@ See the [evaluation template and examples](scope-and-boundaries.md).
 | Question ANWA owns | What not to prescribe |
 | --- | --- |
 | How to express optional **states/transitions** and their public meanings? | Which states/transition graph the implementer chooses, or that all apps must use one |
-| How to describe typed **domain errors**, retry hints and side-effect uncertainty? | Which failures an app produces or whether clients actually retry |
+| How to describe typed **domain errors**, effect uncertainty, and `next` retry guidance? | Which failures an app produces or which next actions a client chooses |
 | What common representation is useful for **async accepted/execution/final outcomes**? | Durable engine, queue, data persistence or business execution semantics |
 | How to expose optional **observation / streaming** semantics? | SSE vs WebSocket vs polling, unless implementing a particular adapter |
 | How to support **safe exposure** of descriptions and contextual hints? | Application-specific authorization rules, permissions or business policies |
