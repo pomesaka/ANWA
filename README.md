@@ -35,15 +35,18 @@ flowchart TB
     D -.-> S[Semantics / Relations / Capabilities / Affordances]
 ```
 
-### Working vocabulary
+### Working vocabulary (WoT-aligned)
 
-- **Resource** — a meaningful, identifiable domain object or state representation.
-- **Semantics** — what a resource, relation, or operation means, including relevant constraints.
-- **Relation** — a typed, meaningful connection between resources.
-- **Capability** — an operation or ability the application exposes *in general*.
-- **Affordance** — an indication of which actions may be relevant or available for a *particular resource in a particular context*.
+ANWA currently uses **W3C WoT terminology as its starting point**, rather than redefining established concepts:
 
-An affordance is **not an authorization decision or a promise that an action will succeed**. Permission, preconditions, and state must still be checked when the action executes. These definitions are provisional; see the [glossary](docs/glossary.md).
+- **Thing / Thing Description** — an entity (physical or virtual) and its machine-readable interaction description.
+- **Interaction Affordance** — a described interaction, specialized as **Property**, **Action**, or **Event Affordance**.
+- **Link** — a typed connection to a related resource.
+- **Form / Protocol Binding** — how a specific interaction is actually performed.
+
+**Contextual availability** (whether a particular caller can act on an entity *now*) is an **ANWA research concern**, not the official meaning of WoT Affordance. Describing an interaction does not guarantee authorization or successful execution.
+
+See the [WoT-aligned glossary](docs/glossary.md) and [WoT error-handling research](docs/research/wot-errors.md).
 
 ### Example scenario
 
