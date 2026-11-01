@@ -287,3 +287,16 @@ func TestRealHTTPServerRoundTrip(t *testing.T) {
 		t.Fatalf("real network round trip: status=%d result=%+v", response.StatusCode, result)
 	}
 }
+
+func TestExplicitNullDoesNotMeanOmittedInput(t *testing.T) {
+	mux := server(t)
+	noInput := send(mux, "POST", "/anwa/invoke", `{"ref":"private.read"}`, "Bearer valid-test-token")
+	if noInput.Code != 200 || !strings.Contains(noInput.Body.String(), `"value":"alice"`) {
+		t.Fatalf("omitted input: %d %s", noInput.Code, noInput.Body.String())
+	}
+	explicitNull := send(mux, "POST", "/anwa/invoke",
+		`{"ref":"private.read","input":null}`, "Bearer valid-test-token")
+	if explicitNull.Code != 200 || resultCode(t, explicitNull) != "INVALID_INPUT" {
+		t.Fatalf("explicit null must not be treated as omitted: %d %s", explicitNull.Code, explicitNull.Body.String())
+	}
+}
