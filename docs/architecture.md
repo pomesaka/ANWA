@@ -63,6 +63,16 @@ Named Guards now protect **Queries, Actions and Events**. Binding is default-den
 
 ANWA's public JSON manifest is language-neutral. The Go adapter reads the same manifest, resolves local reusable definitions, and generates a strict `ServerInterface` with typed request/output structures and response variants. An application-defined Go struct must implement every generated Interaction method at compile time; the generated adapter bridges this interface to the Guard-enforced in-process runtime. Auth and discovery policies remain explicit application inputs, and the runtime still validates untrusted JSON, declared errors, and `context.next`. Go types are not a substitute for runtime schema enforcement. See the [Go guide](../go/README.md).
 
+## Optional HTTP Binding
+
+The in-process ANWA runtime is not tied to a wire protocol. The experimental
+[HTTP Binding 0.1](http-binding.md) attaches a thin host-specific adapter:
+Go exposes `http.Handler` to `net/http`-compatible routers; TypeScript
+exposes Fetch-standard `Request → Response`, usable directly in Hono and
+Fetch-native runtimes. Both expose catalog, individual Discovery and Invoke
+without adding HTTP fields to the ANWA manifest or changing Handler ownership
+of `Outcome + Context`. Event streaming is a separate protocol decision.
+
 ## Schema-derived TypeScript types
 
 The author-maintained `anwa.json` is the source of truth. Shared payload shapes may live in `$defs` and be referenced with local `$ref` (without introducing Thing semantics). `bun run codegen` expands those references and produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
