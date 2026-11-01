@@ -1,0 +1,26 @@
+name: ANWA Go reference checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache: false
+      - run: test -z "$(gofmt -l anwa examples)"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go run ./examples/calculator > /dev/null
