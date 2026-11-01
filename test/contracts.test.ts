@@ -23,10 +23,49 @@ const minimal = (): Manifest => ({
   interactions: {
     "test.run": {
       kind: "action",
+        hasSideEffects: true,
+        idempotent: false,
       description: "Test a domain operation",
       errors: { EXPECTED_FAILURE: "Declared failure" },
     },
   },
+});
+
+test("Action effect declarations are required and never inferred", () => {
+  const withBoth = minimal();
+  assert.deepEqual(validateManifest(withBoth), []);
+
+  for (const field of ["hasSideEffects", "idempotent"] as const) {
+    const missing = structuredClone(withBoth);
+    delete (missing.interactions["test.run"] as unknown as Record<string, unknown>)[field];
+    const issues = validateManifest(missing);
+    assert.ok(
+      issues.some((x) => x.path.endsWith("." + field)),
+      "Missing " + field + " must be rejected",
+    );
+    assert.throws(() => new AnwaApp(missing), /schema invalid/);
+  }
+
+  const explicitFalse = structuredClone(withBoth);
+  (explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>).hasSideEffects = false;
+  (explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>).idempotent = false;
+  assert.deepEqual(validateManifest(explicitFalse), []);
+
+  const illegalQuery = {
+    anwa: "0.2",
+    entrypoints: ["test.read"],
+    interactions: {
+      "test.read": {
+        kind: "query",
+        description: "Read",
+        hasSideEffects: false,
+        idempotent: true,
+      },
+    },
+  };
+  const issues = validateManifest(illegalQuery);
+  assert.ok(issues.some((x) => x.path.endsWith(".hasSideEffects")));
+  assert.ok(issues.some((x) => x.path.endsWith(".idempotent")));
 });
 
 test("Four demo manifests validate without Thing declarations", () => {
@@ -107,6 +146,8 @@ test("Runtime enforces named guard before run and uses per-Interaction onDenied"
     interactions: {
       "test.run": {
         kind: "action",
+        hasSideEffects: true,
+        idempotent: false,
         description: "Guarded operation",
         guard: "check",
         errors: { EXPECTED_FAILURE: "Guard rejected" },
@@ -164,6 +205,8 @@ test("Invalid input never reaches the Guard or protected business run", async ()
     interactions: {
       "test.run": {
         kind: "action",
+        hasSideEffects: true,
+        idempotent: false,
         description: "Guarded validation test",
         guard: "check",
         input: {
@@ -215,6 +258,8 @@ test("Undeclared Guard errors are opaque and never execute the protected run", a
     interactions: {
       "test.run": {
         kind: "action",
+        hasSideEffects: true,
+        idempotent: false,
         description: "Guard check",
         guard: "check",
         errors: { EXPECTED_FAILURE: "Expected" },
@@ -254,6 +299,8 @@ test("Missing denial callback is rejected instead of silently bypassing policy",
     interactions: {
       "test.run": {
         kind: "action",
+        hasSideEffects: true,
+        idempotent: false,
         description: "Guarded action",
         guard: "check",
         errors: { EXPECTED_FAILURE: "Denied" },
