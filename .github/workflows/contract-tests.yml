@@ -17,6 +17,7 @@ jobs:
         with:
           bun-version: '1.4.4'
       - run: bun --version
+      - run: bun install
       - name: Apply Bun formatter
         run: bun fmt --no-script src demo test tools
       - name: Commit formatted TypeScript on migration branch
