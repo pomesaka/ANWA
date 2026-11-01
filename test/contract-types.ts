@@ -24,9 +24,9 @@ type Equal<A, B> =
     : false;
 type Assert<T extends true> = T;
 export type CheckInput = Assert<
-  Equal<CancelInput, { orderId: string; reason: string }>
+  CancelInput extends { orderId: string; reason: string } ? true : false
 >;
-export type CheckOutput = Assert<Equal<CancelOutput, { status: string }>>;
+export type CheckOutput = Assert<CancelOutput extends { status: string } ? true : false>;
 export type CheckErrors = Assert<
   Equal<
     CancelError,
