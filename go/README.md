@@ -15,6 +15,8 @@ go run ./cmd/anwa-codegen \
   -out examples/calculator/contract.gen.go \
   -package main
 go run ./examples/calculator
+go run ./cmd/anwa-codegen -in examples/todo/anwa.json -out examples/todo/contract.gen.go -package main -check
+go run ./examples/todo
 go test ./...
 go vet ./...
 ```
@@ -69,16 +71,20 @@ return `<-chan any` and are protected before observation starts.
 
 The Go generator supports the v0.2 payload subset with local, noncyclic
 `$defs` and `$ref`. It validates and generates Go syntax for all four
-existing ANWA manifests, including the 27-Interaction Todo. The calculator
-is the runnable example of a completed Go implementation.
+existing ANWA manifests, including the 27-Interaction Todo. Both [Calculator](examples/calculator/main.go) and the [six-Interaction Todo](examples/todo/README.md) are runnable Go implementations. The Todo exercises guarded discovery, caller isolation, versioned updates, domain errors and `context.next` navigation.
 
-Generated files should be committed. CI checks the committed calculator
-contract against re-generation with:
+Generated files should be committed. CI checks the committed Calculator and Todo
+contracts against re-generation with:
 
 ```bash
 go run ./cmd/anwa-codegen \
   -in ../demo/calculator/anwa.json \
   -out examples/calculator/contract.gen.go \
+  -package main -check
+
+go run ./cmd/anwa-codegen \
+  -in examples/todo/anwa.json \
+  -out examples/todo/contract.gen.go \
   -package main -check
 ```
 
@@ -90,11 +96,11 @@ go run ./cmd/anwa-codegen \
 - Go enforces typed method signatures, required model fields, and the declared
   success type. JSON Schema enum constraints, semantic rules, untrusted data,
   guard decisions, and allowed next references **still require runtime checks**.
-- This does not port Todo's business logic to Go or certify interoperability
+- This does not port the **advanced 27-Interaction Todo** business logic to Go or certify interoperability
   with every JSON Schema or ANWA implementation. Event payloads remain
   application-defined `any` values.
 - Code generation only covers the explicitly supported v0.2 schema subset;
   it is not a general-purpose OpenAPI code generator or an adopted standard.
 
-[ANWA v0.2](../spec/anwa-0.2.md) · [Go Calculator](examples/calculator/main.go) ·
+[ANWA v0.2](../spec/anwa-0.2.md) · [Go Calculator](examples/calculator/main.go) · [Go Todo](examples/todo/README.md) ·
 [Authentication boundary](../docs/authentication-authorization.md)
