@@ -1,4 +1,5 @@
 import { validateManifest, type DataSchema, type Manifest, type InteractionDefinition } from "./schema-tools.ts";
+export type { Manifest } from "./schema-tools.ts";
 
 export interface DomainError {
   code: string;
