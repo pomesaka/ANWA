@@ -45,7 +45,7 @@ Two **logical** interfaces—not necessarily two wire protocols:
 | Interface | Responsibility |
 | --- | --- |
 | **Discovery** | Expose declared Interactions, types, semantic annotations and optionally Thing metadata, without requiring a Thing parent |
-| **Interaction** | Read, invoke and observe; return **Outcome + Context**, with a single `context.next` list of available next interactions/discovery targets and optional guidance/timing |
+| **Interaction** | Read, invoke and observe; return **Outcome + Context**, with a single `context.next` list of next standalone Interactions and optional prebound inputs, guidance/timing |
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
 
