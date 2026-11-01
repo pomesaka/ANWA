@@ -73,9 +73,8 @@
             "ALREADY_CANCELLED": "The order has already been cancelled.",
             "ORDER_STATE_CHANGED": "The order changed while cancellation was being attempted."
           },
-          "effectKinds": [
-            "domain-state"
-          ]
+          "hasSideEffects": true,
+          "idempotent": false
         }
       },
       "links": {
