@@ -33,10 +33,10 @@ test("Calculator handlers construct their own Outcome + Context", async () => {
 });
 
 test("Input contract validation returns INVALID_INPUT", async () => {
-  const response = await createCalculator().interact("calculator.add", {
-    a: "bad",
-    b: 3,
-  });
+  // Dynamic agent input still undergoes runtime validation.
+  const response = await createCalculator().follow({ref: "calculator.add", input: {
+    a: "bad", b: 3,
+  }});
   assert.equal(response.outcome.kind, "settled");
   if (response.outcome.kind === "settled" && !response.outcome.result.ok)
     assert.equal(response.outcome.result.error.code, "INVALID_INPUT");
