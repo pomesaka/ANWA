@@ -48,11 +48,11 @@ type Schema struct {
 }
 
 var (
-	refPattern        = regexp.MustCompile(`^#/\$defs/([A-Za-z_$][A-Za-z0-9_$]*)$`)
-	definitionPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
+	refPattern         = regexp.MustCompile(`^#/\$defs/([A-Za-z_$][A-Za-z0-9_$]*)$`)
+	definitionPattern  = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 	interactionPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*(?:[.-][A-Za-z_$][A-Za-z0-9_$]*)*$`)
-	errorPattern      = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
-	semanticPattern   = regexp.MustCompile(`^(https?://|urn:)[^\s]+$`)
+	errorPattern       = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+	semanticPattern    = regexp.MustCompile(`^(https?://|urn:)[^\s]+$`)
 )
 
 var supportedTypes = map[string]bool{

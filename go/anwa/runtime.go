@@ -66,7 +66,7 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	}{OK: false, Error: r.Error})
 }
 
-func OK(value any) Result { return Result{OK: true, Value: value} }
+func OK(value any) Result     { return Result{OK: true, Value: value} }
 func Fail(code string) Result { return Result{Error: &DomainError{Code: code}} }
 
 type Execution struct {
@@ -388,6 +388,7 @@ func (a *App) declaredError(spec Interaction, err *DomainError) bool {
 func validEffects(value string) bool {
 	return value == "" || value == "none" || value == "occurred" || value == "unknown"
 }
+
 var durationPattern = regexp.MustCompile(`^P(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)
 
 func (a *App) validNext(source string, next []Next) bool {
@@ -531,6 +532,7 @@ func (a *App) Follow(ctx context.Context, choice Next, request *RequestContext) 
 
 // ObservationDenied is a pre-subscription refusal, not an Interaction Result.
 type ObservationDenied struct{ Code string }
+
 func (e ObservationDenied) Error() string { return "Event subscription denied: " + e.Code }
 
 // Observe checks the Guard before starting the application event stream.
