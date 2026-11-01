@@ -69,7 +69,8 @@ export class AnwaApp {
     return {
       anwa: this.schema.anwa,
       things: Object.entries(this.schema.things).map(([type, model]) => ({
-        type, title: model.title, description: model.description
+        type, title: model.title, description: model.description,
+        ...(model.semanticTypes ? { semanticTypes: model.semanticTypes } : {})
       })),
       entrypoints: this.schema.entrypoints
     };
@@ -125,10 +126,13 @@ export class AnwaApp {
     const { model } = this.#lookup(target);
     return {
       thing: target, title: model.title, description: model.description,
+      ...(model.semanticTypes ? { semanticTypes: model.semanticTypes } : {}),
       interactions: Object.entries({ properties: "property", actions: "action", events: "event" })
         .flatMap(([bucket, kind]) => Object.entries(model[bucket] ?? {}).map(([name, spec]) => ({
           ref: interaction(target, kind, name),
           description: spec.description,
+          ...(spec.semanticTypes ? { semanticTypes: spec.semanticTypes } : {}),
+          ...(spec.effectKinds ? { effectKinds: spec.effectKinds } : {}),
           ...(spec.input ? { input: spec.input } : {}),
           ...(spec.output ? { output: spec.output } : {}),
           ...(spec.errors ? { errors: spec.errors } : {})
