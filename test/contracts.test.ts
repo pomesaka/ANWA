@@ -135,6 +135,8 @@ test("Runtime enforces named guard before run and uses per-Interaction onDenied"
       },
     },
     {
+      // A retry candidate is disclosed only when the discovery policy permits it.
+      discoverable: () => true,
       guards: {
         check: async () => {
           checks++;
