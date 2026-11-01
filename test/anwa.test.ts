@@ -82,7 +82,7 @@ test("Shipped-order failure offers tracking without a central context resolver",
   assert.ok(next);
   assert.deepEqual(next.input, { shipmentId: "shipped-ship" });
   assert.equal(next.guidance?.level, "recommended");
-  const tracking = await app.interact(next.ref, next.input);
+  const tracking = await app.follow(next);
   if (tracking.outcome.kind === "settled" && tracking.outcome.result.ok)
     assert.equal(tracking.outcome.result.value, "delivered");
   assert.equal(
