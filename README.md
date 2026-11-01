@@ -32,7 +32,7 @@ flowchart TB
 
 Declare top-level **Interactions** (`query`, `action`, `event`), inputs/outputs, expected errors and optional guards. **No `things` or `subjectType` field exists in the active schema**; domain identifiers are ordinary typed input/output values.
 
-**The optional root `$defs` map allows shared payload shapes such as `Task` to be referenced by multiple standalone Interactions with `$ref`; this does **not** introduce Thing or shared resource identity. The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
+**The optional root `$defs` map allows shared payload shapes such as `Task` to be referenced by multiple standalone Interactions with `$ref`; this does **not** introduce Thing or shared resource identity. Every Action requires explicit `hasSideEffects` and `idempotent` booleans, although these are declarations rather than runtime-enforced retry guarantees. The schema is not business-logic code.** A guard is declared by name and contract, not reimplemented as a condition language in YAML.
 
 ### 2. Implement behavior
 
