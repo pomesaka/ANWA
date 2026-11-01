@@ -1,0 +1,30 @@
+name: Format refactor branch once
+
+on:
+  push:
+    branches: [refactor/todo-shared-data-schemas]
+
+permissions:
+  contents: write
+
+jobs:
+  format-once:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/todo-shared-data-schemas
+          persist-credentials: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - run: bun fmt src demo test tools
+      - name: Commit formatting and remove one-off workflow
+        run: |
+          rm .github/workflows/format-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src demo test tools .github/workflows/format-once.yml
+          git commit -m "style: apply canonical Bun formatting"
+          git push origin HEAD:refactor/todo-shared-data-schemas
