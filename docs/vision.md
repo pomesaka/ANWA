@@ -6,7 +6,7 @@
 
 Human-facing web applications communicate domain meaning and next actions through pages, forms and navigation. AI-agent consumers need a directly discoverable application contract and interaction outputs that help them decide what to inspect or do next.
 
-ANWA is a **schema-first application framework concept**, not a replacement for GraphQL, MCP, REST or a UI toolkit. The goal is an authoring experience in which developers describe **what an application exposes**, implement **how it behaves**, and let tooling consistently expose those semantics.
+ANWA is a **schema-first application framework concept**, not a replacement for GraphQL, MCP, REST or a UI toolkit. The goal is an authoring experience in which developers decide **what their application exposes**, implement **how it behaves**, and tooling provides mechanisms to publish and consume those semantics. **ANWA does not decide the application's domain model or its next business actions.**
 
 ## Product thesis
 
@@ -14,11 +14,11 @@ ANWA is a **schema-first application framework concept**, not a replacement for 
 
 ### Workflow
 
-1. **Schema first** — public descriptions of Things, Links, Property/Action/Event Affordances, input/output and errors, named Guard contracts and possible states/transitions.
+1. **Schema first** — public descriptions of chosen Things, Links and Property/Action/Event Affordances, inputs/outputs and optional errors, named Guards or state/transition metadata, when an application needs them.
 2. **Implementation second** — ordinary handlers/resolvers and guard code, with authorization, side effects and atomic transitions enforced on the server.
-3. **Runtime exposure** — logical Discovery and Interaction interfaces. The latter produces **Outcome + Context**, including links and relevant follow-up affordance references.
+3. **Runtime exposure** — logical Discovery and Interaction mechanisms. The latter carries **Outcome + Context**, with links and follow-up affordance references supplied or configured by the application (possibly none).
 
-State machines are a useful **part of the declared contract**, **not** an alternative authoring language that must encode every business rule. A Guard is a reference to code that can use data and external services; a schema can describe its intended outputs but not infer its complete logic.
+State machines are an **optional** application modeling technique, **not** ANWA's mandatory abstraction or authoring language. A Guard is a reference to code that can use data and external services; a schema can describe its intended outputs but not infer its complete logic.
 
 ## Design principles being explored
 
@@ -30,6 +30,7 @@ State machines are a useful **part of the declared contract**, **not** an altern
 - **Structured error semantics** with retry and side-effect uncertainty, beyond HTTP codes alone.
 - **Domain state separate from execution state**; streaming is a way of observing changes and partial outputs.
 - **Optional human UI** rather than screen-first architecture.
+- **Responsibility boundaries:** distinguish a scenario ANWA can represent, a reusable mechanism ANWA should supply, and the domain-specific behavior an application author controls.
 
 ## What ANWA is not claiming
 
@@ -45,4 +46,4 @@ Compare the same small domain application exposed via ordinary typed APIs/tool d
 
 Novelty, developer ergonomics and performance remain **hypotheses to test**, not demonstrated properties.
 
-[README](../README.md) · [Decision status](decisions.md) · [Architecture](architecture.md) · [Open questions](open-questions.md)
+[README](../README.md) · [Scope](scope-and-boundaries.md) · [Decision status](decisions.md) · [Architecture](architecture.md) · [Open questions](open-questions.md)
