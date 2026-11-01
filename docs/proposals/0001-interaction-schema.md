@@ -1,0 +1,379 @@
+# Proposal 0001: ANWA Interaction Schema v0.1
+
+> **Status:** Discussion draft — not adopted, not an implementation, not a conformance specification.  
+> **Updated:** 2026-11-01  
+> **Scope:** Semantic contract, not a transport binding or TypeScript SDK.
+>
+> **Update:** ANWA's authoring direction is **schema-first**: describe the public contract, then implement guards/actions/resolvers in ordinary code. Do **not** treat the statechart or guard expressions as a required declarative programming language. See [current decisions](../decisions.md), [architecture](../architecture.md) and [worked example](../examples/order-cancellation.md) on `main`.
+
+## Responsibility boundary (2026-11-01 clarification)
+
+This draft proposes an **expressive framework contract**, not an application architecture mandated by ANWA. A developer chooses the Thing granularity, whether state machines or guards are used, which interactions and relations exist, and which next-step references to return. The runtime can expose/validate what is declared, but **does not automatically infer the right business workflow or next action** from arbitrary code.
+
+In particular:
+- **Result + Context** is the proposed common envelope; Context may contain empty lists or author-supplied/context-filtered affordances.
+- **Guard references and state-transition declarations are optional authoring facilities** where relevant, not required on every Action/Thing.
+- A business example is a **test of whether ANWA can express a choice**, not a reason to make that choice mandatory across applications.
+- Durable execution, event replay, storage, permissions, concurrency, and transport remain the application/runtime/adapter responsibility according to separately-defined contracts.
+
+See [Scope and responsibility boundaries](../scope-and-boundaries.md) and [Working decisions](../decisions.md) in the mainline documentation.
+
+## 0. Design goal
+
+An agent interacting with an unfamiliar application should receive not only the current outcome, but also enough **typed, discoverable context** to choose what to inspect or invoke next.
+
+**Every delivered application-level Interaction Response carries an Outcome and a Context.** The Context may contain no next interactions. A lost network response cannot satisfy this contract.
+
+This proposal is intentionally **WoT-aligned**. It reuses Thing, Property/Action/Event Interaction Affordance, Link, and Thing Model vocabulary. It proposes **new ANWA concepts** for a common Result envelope, context-specific affordance references, and optional execution/state-machine integration. These additions are *not defined by WoT TD 1.1*.
+
+## 1. Three distinct schema families
+
+| Schema family | Purpose | Standard relationship |
+| --- | --- | --- |
+| **Public ANWA schema (WoT-aligned)** | OpenAPI-like public contract for Things, Properties, Actions, Events, Links, named Guards, error types, and possible states/transitions | WoT Thing Model terminology may be reused; ANWA schema syntax and state/guard references are *proposed extensions*, not standard WoT |
+| **Interaction Response** | Always return an outcome plus navigable context, on both domain success and domain failure | ANWA addition; optional serialization through WoT Action output or other transport |
+| **Interaction Event** | Notify execution state changes, progress and artifact deltas | ANWA addition; candidate adapters: WoT Event, A2A-like event split, CloudEvents, SSE, gRPC |
+
+**Authoring-time metadata ≠ public Discovery document.** Do not expose arbitrary guard code, internal state, sensitive relations, or private action definitions to clients. Generate an authorized, minimized view from the underlying model.
+
+## 2. Core logical types (illustrative TypeScript)
+
+The TypeScript below is **a design notation**, not a commitment to TypeScript, JSON, or a wire protocol.
+
+```ts
+type ThingRef = {
+  id: string;                   // stable identity in an application
+  model?: string;               // type/model reference
+};
+
+type InteractionRef = {
+  thing: ThingRef;
+  name: string;                 // e.g. "pay"
+  kind: "property" | "action" | "event";
+  descriptionRef?: string;      // more details / schema to discover
+};
+
+type LinkRef = {
+  rel: string;                  // typed semantic relation
+  target: ThingRef;
+  description?: string;
+};
+
+type Applicability =
+  | { state: "available" }
+  | { state: "blocked"; reason: { code: string; description?: string } }
+  | { state: "unknown" };
+
+type AffordanceRef = {
+  interaction: InteractionRef;
+  applicability: Applicability;
+  // Advisory only. NEVER an authorization grant.
+};
+
+type InteractionContext = {
+  subject: ThingRef;
+  revision?: string;            // version of the observed subject snapshot
+  links: LinkRef[];             // may be empty
+  affordances: AffordanceRef[]; // may be empty
+};
+
+type RetryAdvice =
+  | { mode: "never" }
+  | { mode: "same-request" }     // only if safe duplicate protection is guaranteed
+  | { mode: "after"; after: string }  // duration, e.g. ISO-8601 "PT30S"
+  | { mode: "after-state-change" }
+  | { mode: "inspect-first" };
+
+type InteractionError<D = unknown> = {
+  code: string;                // domain-owned, stable machine-readable code
+  message?: string;            // display/debug, NOT a programmatic discriminator
+  details?: D;
+  retry: RetryAdvice;
+  effects: "none" | "occurred" | "unknown";
+};
+
+type Result<T, E> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+type InteractionResponse<T, E> = {
+  outcome:
+    | { kind: "settled"; result: Result<T, E> }
+    | { kind: "accepted"; execution: ThingRef };
+  context: InteractionContext;  // required in either case
+};
+```
+
+### Scope of the response promise
+
+- **Settled** means this particular invocation is complete. `ok:true` means the operation produced its declared successful outcome; it does **not** necessarily imply the user's larger business goal is complete.
+- **Accepted** means a server-managed execution has been created; it does not assert the business operation has succeeded.
+- The execution itself is a discoverable Thing-like object with its own state and possible get/observe/cancel/provide-input interactions.
+- The server MUST enforce authorization and preconditions again on actual invocation. `applicability:available` is *not* permission.
+- `context` is guaranteed **as a field**, but arrays may be empty. Access-control policies may suppress sensitive context.
+- Ordinary network/transport failures may occur without an `InteractionResponse`.
+- `effects:unknown` is important when an error is reported after some side effect may have happened; retrying blindly may duplicate work.
+- `retry.mode` is an advisory *semantic* statement. Transport adapters may still use HTTP status codes / Retry-After headers for compatibility.
+
+## 3. Example: successful synchronous interaction
+
+```json
+{
+  "outcome": {
+    "kind": "settled",
+    "result": {
+      "ok": true,
+      "value": { "id": "order:123", "status": "paymentPending" }
+    }
+  },
+  "context": {
+    "subject": { "id": "order:123", "model": "model:Order" },
+    "revision": "7",
+    "links": [
+      { "rel": "payment", "target": { "id": "payment:456" } }
+    ],
+    "affordances": [
+      {
+        "interaction": {
+          "thing": { "id": "order:123" },
+          "name": "pay",
+          "kind": "action",
+          "descriptionRef": "model:Order#actions/pay"
+        },
+        "applicability": { "state": "available" }
+      },
+      {
+        "interaction": {
+          "thing": { "id": "order:123" },
+          "name": "cancel",
+          "kind": "action"
+        },
+        "applicability": { "state": "available" }
+      }
+    ]
+  }
+}
+```
+
+The response gives an **option set**, not a privileged command to follow `pay`. The user's delegated intent determines the next step.
+
+## 4. Example: failed domain action with next choices
+
+```json
+{
+  "outcome": {
+    "kind": "settled",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "ORDER_ALREADY_SHIPPED",
+        "message": "This order can no longer be cancelled.",
+        "retry": { "mode": "never" },
+        "effects": "none"
+      }
+    }
+  },
+  "context": {
+    "subject": { "id": "order:123" },
+    "revision": "9",
+    "links": [
+      { "rel": "shipment", "target": { "id": "shipment:456" } }
+    ],
+    "affordances": [
+      {
+        "interaction": {
+          "thing": { "id": "shipment:456" },
+          "name": "status",
+          "kind": "property"
+        },
+        "applicability": { "state": "available" }
+      },
+      {
+        "interaction": {
+          "thing": { "id": "order:123" },
+          "name": "requestReturn",
+          "kind": "action"
+        },
+        "applicability": {
+          "state": "blocked",
+          "reason": {
+            "code": "AWAIT_DELIVERY",
+            "description": "Returns can be requested after delivery."
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+The `requestReturn` affordance is a **blocked option**, not a current permission. Its definition is discoverable, but invocation must be independently rejected unless conditions hold.
+
+## 5. Example: async acceptance and execution
+
+An asynchronous `pay` may return:
+
+```json
+{
+  "outcome": {
+    "kind": "accepted",
+    "execution": { "id": "execution:pay:xyz", "model": "model:Execution" }
+  },
+  "context": {
+    "subject": { "id": "execution:pay:xyz" },
+    "revision": "1",
+    "links": [
+      { "rel": "target", "target": { "id": "order:123" } }
+    ],
+    "affordances": [
+      {
+        "interaction": {
+          "thing": { "id": "execution:pay:xyz" },
+          "name": "status",
+          "kind": "property"
+        },
+        "applicability": { "state": "available" }
+      },
+      {
+        "interaction": {
+          "thing": { "id": "execution:pay:xyz" },
+          "name": "updates",
+          "kind": "event"
+        },
+        "applicability": { "state": "available" }
+      }
+    ]
+  }
+}
+```
+
+An Execution can have its own lifecycle (`accepted`, `running`, `awaitingInput`, `completed`, `failed`, ...), **separate** from the Order's state lifecycle (`paymentPending`, `paid`, ...).
+
+The final execution result is a `settled` `InteractionResponse<T,E>` with the appropriate context. This does not guarantee that the order has reached the user's intended terminal state.
+
+## 6. Stream/event envelope (preliminary)
+
+Stream updates are **observations**, not repeated complete results. This reconciles a common Result envelope with efficient incremental streaming. A client can re-fetch a current snapshot when a delta is missed.
+
+```ts
+type InteractionEvent<T, E> =
+  | {
+      type: "snapshot";
+      sequence: number;
+      response: InteractionResponse<T, E>;
+    }
+  | {
+      type: "state.changed";
+      sequence: number;
+      thing: ThingRef;
+      revision: string;
+      state: string;
+    }
+  | {
+      type: "progress";
+      sequence: number;
+      execution: ThingRef;
+      message?: string;
+      fraction?: number;
+    }
+  | {
+      type: "artifact.delta";
+      sequence: number;
+      execution: ThingRef;
+      artifactId: string;
+      data: unknown;
+      append: boolean;
+    }
+  | {
+      type: "context.changed";
+      sequence: number;
+      subject: ThingRef;
+      revision: string;
+    }
+  | {
+      type: "settled";
+      sequence: number;
+      response: InteractionResponse<T, E>;
+    };
+```
+
+The stream transport must document ordering scope, event retention and replay semantics, cursor use, event duplication, and backpressure. No exactly-once delivery guarantee is implied. If the stream breaks, polling a snapshot/Execution status must remain possible if the service offers durability.
+
+## 7. Schema-first developer workflow (authoring sketch only)
+
+**The ANWA Schema is a public contract, not business logic.** A developer first describes what the application exposes, then binds that schema to ordinary code. States and transitions may be described in the schema without making a declarative state machine the entire implementation.
+
+Prefer established WoT terms for Thing, Property/Action/Event Affordance, Link, input/output schemas. The proposed YAML below is **not** valid W3C WoT Thing Model syntax and **not** a finalized ANWA format.
+
+```yaml
+# anwa.yaml — hypothetical
+things:
+  Order:
+    description: A purchase order
+    properties:
+      status: { type: string, enum: [pending, preparing, shipped, cancelled] }
+    links:
+      shipment: { target: Shipment }
+    actions:
+      cancel:
+        description: Cancel an order if permitted
+        input: { type: object }
+        guard: canCancelOrder        # reference, not an inline predicate
+        transitions:
+          - from: [pending, preparing]
+            to: cancelled
+        errors: [PERMISSION_DENIED, ORDER_ALREADY_SHIPPED]
+```
+
+Actual decisions come from implementation code, which may require database reads, access policies or remote services. The Guard can return structured deny reasons and related hints for Discovery/Interaction to expose as **advisory, permission-filtered** information.
+
+```ts
+// Illustrative pseudo-API, not implemented:
+app.guard("canCancelOrder", async (ctx) => {
+  if (!ctx.auth.can("order:cancel")) {
+    return deny({ code: "PERMISSION_DENIED" });
+  }
+  const shipment = await ctx.shipping.current(ctx.orderId);
+  if (shipment.dispatched) {
+    return deny({
+      code: "ORDER_ALREADY_SHIPPED",
+      links: [{ rel: "shipment", target: shipment.ref }]
+    });
+  }
+  return allow();
+});
+
+app.action("Order.cancel", async (ctx, input) => {
+  // Recheck and use an atomic conditional state change.
+  return ctx.orders.cancelAtomically(ctx.orderId, input);
+});
+```
+
+**Discovery-time** evaluation can use the same named guard (or return `unknown` if evaluation is too expensive/inappropriate). **Invocation-time** enforcement must recheck policy/state and use correct atomicity. Reusing one guard implementation avoids duplicated conditional code but does **not** by itself prevent concurrent state changes or guarantee transaction safety.
+
+The runtime could generate or expose descriptions and interaction contracts, perform schema-to-handler binding checks, and assemble Result + Context. It **cannot infer arbitrary business semantics from handler code**, nor prove a declared transition by type checking alone.
+
+See the canonical [end-to-end order cancellation example](../examples/order-cancellation.md) and [architecture](../architecture.md).
+
+## 8. Non-goals and unresolved choices
+
+1. **Full WoT reuse vs. extension:** Can the Result envelope be an ordinary WoT Action output, or does it warrant a reusable ANWA convention layered over WoT?
+2. **Affordance freshness:** Is `revision` sufficient for hints computed over multiple linked resources? What about expiry and per-user policy changes?
+3. **Retry semantics:** What precisely certifies `same-request` as safe, particularly for partial effects and idempotency keys?
+4. **Subtypes:** Should the same envelope apply to Property reads, Action invocations, and Event subscription establishment?
+5. **Execution references:** Are Executions first-class Things, or a general resource abstraction mapped to WoT Things by an adapter?
+6. **Context compaction:** Full context vs. references vs. intent-ranked selection; protect both token budgets and confidential metadata.
+7. **State / transition declarations:** Which public state metadata is useful, and what can runtime validation guarantee without duplicating Guard logic or imposing an executable DSL?
+8. **Client trust:** A description and guidance hint must remain untrusted application data, not a higher-priority instruction to the AI.
+9. **Wire identity:** Stable URI/URN identifiers, schema versions, protocol binding metadata, pagination and internationalization remain unspecified.
+10. **Streaming guarantees:** Define observation consistency, replay windows and the semantics of the terminal event before standardizing any event envelope.
+
+## 9. Reference specifications
+
+- [W3C WoT Thing Description 1.1 / Thing Model](https://www.w3.org/TR/wot-thing-description11/)
+- [W3C SCXML](https://www.w3.org/TR/scxml/)
+- [W3C WoT Profiles — Working Draft (ActionStatus)](https://www.w3.org/TR/wot-profile/)
+- [A2A v1.0.1 — Task and streaming events](https://a2a-protocol.org/v1.0.1/specification/)
+- [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457)
+
+[ANWA README](../../README.md) · [Current decisions](../decisions.md) · [Architecture](../architecture.md) · [Worked example](../examples/order-cancellation.md) · [Working glossary](../glossary.md) · [Async / streaming research](../research/async-state-streaming.md)
