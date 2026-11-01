@@ -347,7 +347,10 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         ? [input?: undefined]
         : [input: InputOf<Operation<M, R>>]
   ): Promise<
-    InteractionResponse<OutputOf<Operation<M, R>>, ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR">
+    InteractionResponse<
+      OutputOf<Operation<M, R>>,
+      ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
+    >
   > {
     return this.interactInternal(ref, args[0]) as Promise<
       InteractionResponse<
