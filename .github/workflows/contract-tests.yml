@@ -2,11 +2,11 @@ name: ANWA Bun TypeScript contract checks
 
 on:
   push:
-    branches: [main, refactor/remove-thing-from-core]
+    branches: [main]
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -17,20 +17,7 @@ jobs:
         with:
           bun-version: '1.4.4'
       - run: bun --version
-      - run: bun install
-      - name: Apply Bun formatter on migration branch
-        if: github.ref == 'refs/heads/refactor/remove-thing-from-core'
-        run: bun fmt src demo test tools
-      - name: Commit Bun lockfile on migration branch
-        if: github.ref == 'refs/heads/refactor/remove-thing-from-core'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bun.lock src demo test tools
-          if ! git diff --cached --quiet; then
-            git commit -m "build: lock Bun dependencies"
-            git push
-          fi
+      - run: bun install --frozen-lockfile
       - run: bun fmt --check src demo test tools
       - run: bunx oxlint src demo test tools
       - run: bun run validate
