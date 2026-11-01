@@ -25,9 +25,8 @@
               "topic"
             ]
           },
-          "effectKinds": [
-            "domain-state"
-          ]
+          "hasSideEffects": true,
+          "idempotent": false
         }
       }
     },
