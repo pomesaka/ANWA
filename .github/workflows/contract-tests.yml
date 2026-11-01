@@ -19,7 +19,7 @@ jobs:
       - run: bun --version
       - run: bun install --frozen-lockfile
       - run: bun run codegen
-      - run: git diff --exit-code -- demo/calculator/contract.generated.ts demo/orders/contract.generated.ts demo/reports/contract.generated.ts
+      - run: git diff --exit-code -- demo/calculator/contract.generated.ts demo/orders/contract.generated.ts demo/reports/contract.generated.ts demo/todo/contract.generated.ts
       - run: bun fmt --check src demo test tools
       - run: bunx oxlint src demo test tools
       - run: bun run validate
@@ -27,3 +27,4 @@ jobs:
       - run: bun check
       - run: bun test
       - run: bun run demo > /dev/null
+      - run: bun run demo:todo > /dev/null

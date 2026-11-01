@@ -161,9 +161,9 @@ Named Guards may protect **query**, **action**, and **event** Interactions. Runt
 - [TypeScript reference runtime](../src/anwa.ts)
 - [TypeScript schema validator / generated types](../src/schema-tools.ts)
 - [Machine-readable ANWA 0.2 schema](anwa-0.2.schema.json)
-- [Calculator, Orders and Reports demos](../demo/README.md)
+- [Calculator, Orders, Reports and Advanced Todo demos](../demo/README.md)
 
-Using **Bun ^1.4.4**, run `bun install --frozen-lockfile`, `bun run validate`, `bun run codegen`, `bun run types:orders`, `bun fmt --check src demo test tools`, `bunx oxlint src demo test tools`, `bun check`, `bun test`, and `bun run demo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
+Using **Bun ^1.4.4**, run `bun install --frozen-lockfile`, `bun run validate`, `bun run codegen`, `bun run types:orders`, `bun fmt --check src demo test tools`, `bunx oxlint src demo test tools`, `bun check`, `bun test`, `bun run demo` and `bun run demo:todo`. The demos use only top-level Interactions. Orders and Reports pass dynamic identifiers through typed input.
 
 The reference adapter does **not** provide network bindings, authentication, persistence, production error mapping, full JSON Schema validation, or evidence that an unfamiliar AI agent performs better. **Named Guards declared on Actions run automatically before their business handler**. A guarded binding supplies `{ run, onDenied }`: denial blocks `run`, and `onDenied` provides only the Context next candidates while the Runtime preserves the Guard error outcome. This is a preflight check, not an authorization or atomicity guarantee. Federation/external API delegation and protocol adapters remain future topics.
 
