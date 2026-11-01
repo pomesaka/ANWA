@@ -1,13 +1,7 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import {
-  AnwaApp,
-  fail,
-  ok,
-  reply,
-  type Manifest,
-} from "../src/anwa.ts";
+import { AnwaApp, fail, ok, reply, type Manifest } from "../src/anwa.ts";
 import { validateManifest, generateTypes } from "../src/schema-tools.ts";
 
 const fixture = (path: string): Manifest =>
