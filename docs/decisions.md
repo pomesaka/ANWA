@@ -18,6 +18,17 @@
 | Async / streaming | Provide appropriate representation/integration paths for nonblocking work and observation | Application/infrastructure chooses durable engine, event guarantees, transport |
 | UI | Human UI is not required as primary interface | Generating the actual UI is a client/application choice |
 
+## Error-contract and tooling decisions (2026-11-01 update)
+
+- Expected **domain error codes are exhaustively declared** on each interaction when domain errors are possible.
+- Runtime-reported but undeclared domain codes are classified as the reserved **`UNEXPECTED_ERROR`**, without revealing internal implementation details. **`INVALID_INPUT`** is the separate framework-generated input contract error. The current 0.1 reference has not standardized all transport-level failures.
+- **Schema-first tooling should generate interfaces/type declarations**, not application business logic.
+- Schema shape/known references and implementation outputs should be validated; runtime side-effect correctness cannot be proven by static types.
+- The existing hand-authored JSON manifest is not presumed human-friendly or empirically AI-friendly; the 0.1 prototype provides `validate`, `generate`, and `inspect` commands.
+- **Cross-service/external API delegation is deferred** for a future interoperability proposal; app-scoped references remain the experimental profile.
+
+See [Schema authoring and validation](schema-authoring.md) for the current implementation and limitations.
+
 ## Things explicitly delegated to application developers
 
 These are **not pending ANWA decisions**:
