@@ -249,3 +249,33 @@ func TestCustomPrefixAndNoDefaultAuthentication(t *testing.T) {
 		t.Fatalf("default auth must be anonymous: %d %s", r.Code, r.Body.String())
 	}
 }
+
+func TestRealHTTPServerRoundTrip(t *testing.T) {
+	h, err := New(demo(t), Options{})
+	if err != nil { t.Fatal(err) }
+	mux := http.NewServeMux()
+	mux.Handle("/anwa/", h)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/anwa/invoke",
+		strings.NewReader(`{"ref":"public.add","input":{"a":20,"b":22}}`))
+	if err != nil { t.Fatal(err) }
+	req.Header.Set("Content-Type", "application/json")
+	client := server.Client()
+	response, err := client.Do(req)
+	if err != nil { t.Fatal(err) }
+	defer response.Body.Close()
+	var result struct {
+		Outcome struct {
+			Result struct {
+				OK bool `json:"ok"`
+				Value int `json:"value"`
+			} `json:"result"`
+		} `json:"outcome"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil { t.Fatal(err) }
+	if response.StatusCode != 200 || !result.Outcome.Result.OK || result.Outcome.Result.Value != 42 {
+		t.Fatalf("real network round trip: status=%d result=%+v", response.StatusCode, result)
+	}
+}
