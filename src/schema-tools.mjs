@@ -30,25 +30,16 @@ export function validateManifest(m){
   else if(s.items!==undefined)bad(p+".items","Only for arrays");
  }
  if(!object(m))return[{path:"$",message:"Expected manifest object"}];
- checkKeys(m,["anwa","entrypoints","interactions","things"],"$");
+ checkKeys(m,["anwa","entrypoints","interactions"],"$");
  if(m.anwa!=="0.2")bad("$.anwa","Expected 0.2");
  if(!object(m.interactions)||!Object.keys(m.interactions).length)bad("$.interactions","Expected nonempty map");
- if(m.things!==undefined&&!object(m.things))bad("$.things","Expected optional metadata map");
- for(const [name,t] of Object.entries(object(m.things)?m.things:{})){
-  const p="$.things."+name;
-  if(!validId.test(name))bad(p,"Invalid Thing identifier");
-  if(!object(t)){bad(p,"Expected metadata object");continue;}
-  checkKeys(t,["title","description","semanticTypes"],p);
-  nonempty(t.title,p+".title");nonempty(t.description,p+".description");
- }
  for(const [name,op] of Object.entries(object(m.interactions)?m.interactions:{})){
   const p="$.interactions."+name;
   if(!validId.test(name))bad(p,"Invalid InteractionRef");
   if(!object(op)){bad(p,"Expected definition");continue;}
-  checkKeys(op,["kind","description","semanticTypes","subjectType","input","output","errors","guard","hasSideEffects","idempotent"],p);
+  checkKeys(op,["kind","description","semanticTypes","input","output","errors","guard","hasSideEffects","idempotent"],p);
   if(!["query","action","event"].includes(op.kind))bad(p+".kind","Expected query, action or event");
   nonempty(op.description,p+".description");
-  if(op.subjectType!==undefined&&!has(m.things??{},op.subjectType))bad(p+".subjectType","Unknown optional Thing type");
   if(op.semanticTypes!==undefined&&(!Array.isArray(op.semanticTypes)||!op.semanticTypes.length||
     op.semanticTypes.some(x=>typeof x!=="string"||!/^(https?:\/\/|urn:)[^\s]+$/.test(x))))
     bad(p+".semanticTypes","Expected URI/URN array");
