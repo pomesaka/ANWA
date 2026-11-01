@@ -34,6 +34,8 @@ Discovery and Interaction may occur repeatedly in any order. Merely describing a
 
 ## 3. Candidate semantic contract (illustrative, non-normative)
 
+The [companion minimum-field proposal](0002-contracts.md) refines which elements would be required versus optional, and deliberately leaves instance-level Thing granularity to the application.
+
 We are **not selecting TypeScript as the schema IDL**. The following notation only tests conceptual sufficiency.
 
 ```ts
@@ -61,8 +63,8 @@ type ImplementationBinding = {
 // Interaction-time: common semantic response
 type InteractionResponse<T, E> = {
   outcome:
-    | { kind: "settled"; result: { ok: true; value: T } | { ok: false; error: E } }
-    | { kind: "accepted"; execution: Ref }; // used by apps that support async
+    { kind: "settled"; result: { ok: true; value: T } | { ok: false; error: E } }; // base contract
+  // Async extension may add: { kind: "accepted"; execution: Ref }
   context: {
     links: LinkRef[];                // can be empty
     affordances: AffordanceRef[];   // can be empty
@@ -79,7 +81,7 @@ We should not require a `subject: ThingRef` just because one illustrative app re
 - **Common envelope:** For any delivered application-level Interaction Result, represent **Outcome + Context**. Context exists even with empty or redacted arrays. This is the current working direction.
 - **Description vocabulary:** Prefer existing WoT Thing / Property / Action / Event / Link concepts rather than inventing another ontology. WoT conformance is **not yet claimed**.
 - **Domain errors:** A structured, machine-readable error is a useful candidate common form. Specific codes, recovery explanations, retry advice and certainty about side effects remain application-supplied; exact standard fields are undecided.
-- **Async:** `accepted` is a legal outcome *only when an app offers asynchronous execution*. It does not make all handlers asynchronous or require a durable workflow engine.
+- **Async:** An optional extension may add an `accepted` execution-ref outcome for apps with asynchronous execution. The baseline does not require a durable workflow engine, or even async handlers.
 - **Contextual applicability:** An optional hint about what appears available to the caller at the current moment; **not** the definition of WoT Interaction Affordance and **not** an authorization grant.
 
 ## 4. Explicitly *not* in the mandatory core
@@ -143,6 +145,8 @@ This proof should use more than one app layout (e.g. per-object Thing **and** se
 ANWA must not claim that descriptive APIs or hypermedia navigation are novel. The differentiator to **test** is a reusable authoring/runtime experience around a **common outcome-plus-context contract for agents**.
 
 ## Related project documents
+
+- [Proposal 0002A — minimum fields for Description and Interaction](0002-contracts.md)
 
 - [Responsibility boundaries](../scope-and-boundaries.md)
 - [Current working decisions](../decisions.md)
