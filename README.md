@@ -4,7 +4,7 @@
 
 > A schema-first framework concept for web applications that AI agents can discover, understand, and interact with — without requiring a predefined human-facing UI.
 
-**Status: Experimental specification + executable demos.** A tiny in-process reference adapter exists on the v0.1 development branch; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
+**Status: Experimental specification + executable demos.** A tiny in-process reference adapter exists on `main`; there is no released package, stable API, network protocol, security/conformance guarantee, or published standard.
 
 ## Why ANWA?
 
@@ -63,11 +63,11 @@ npm run demo
 
 The demos deliberately cover different author choices: [stateless Calculator](demo/calculator/), [stateful Orders](demo/orders/), and [async Reports](demo/reports/). They demonstrate **expressiveness**, not prescribed application design or production-grade runtime features. In particular, the adapter does not provide authentication, durable jobs, network transport, or complete JSON Schema validation.
 
-**v0.1 is a concrete experimental profile for discussion, not an adopted standard.** See the open [Minimal Core Draft PR #2](https://github.com/pomesaka/ANWA/pull/2) for a distinct, more abstract discussion of required vs optional fields.
+**v0.1 is a concrete experimental profile for discussion, not an adopted standard.** See the merged [Minimal Core proposal](docs/proposals/0002-minimal-core.md) for a more abstract discussion of required vs optional fields.
 
-## Schema tooling and developer experience
+## Agent-first schema and contract tooling
 
-ANWA's experimental Schema-first workflow now includes **contract validation**, **type/interface generation** and a **readable schema view**. These tools do not generate business logic.
+ANWA's experimental Schema-first workflow now includes **contract validation**, **type/interface generation** and a **diagnostic schema view**. These tools do not generate business logic. **Human ease of writing the manifest is not a design target**: the contract is primarily for implementing agents and consuming agents.
 
 ```bash
 npm run validate       # validates demo manifests against the supported schema subset
@@ -78,7 +78,7 @@ npm test               # validates declared errors against runtime behavior
 
 For an Action that declares `errors`, **all expected domain error codes must be listed**. An undeclared domain error is transformed into the opaque `UNEXPECTED_ERROR`; `INVALID_INPUT` is reserved for framework input validation.
 
-**Readability is a separate issue from AI-friendliness.** JSON is a compact canonical exchange format but verbose to author; an inspection view and generated types help humans. We have **not benchmarked agent understanding** against OpenAPI, WoT or MCP. See [Schema authoring and validation](docs/schema-authoring.md).
+**Machine-readable is not the same as AI-effective.** Optional semantic identifiers and Action effect categories are exposed through Discovery, but are untrusted declarations rather than guarantees. We have **not benchmarked agent task performance** against OpenAPI, WoT or MCP. See [Agent-native schema contract](spec/agent-native-schema.md) and [contract validation](docs/schema-authoring.md).
 
 ## Vocabulary and relationship to WoT
 
@@ -112,6 +112,7 @@ ANWA is **WoT-aligned, not currently WoT-compliant**. GraphQL, REST, RPC, MCP an
 | Comparison against existing work | [Prior art](docs/prior-art.md) |
 | Executable draft profile | [ANWA 0.1 contract](spec/anwa-0.1.md) |
 | Schema reference | [Manifest / Result JSON Schema](spec/anwa-0.1.schema.json) |
+| Agent-first semantic design contract | [Agent-native schema](spec/agent-native-schema.md) |
 | Generation and validation | [Schema authoring and tooling](docs/schema-authoring.md) |
 | Working demos and tests | [Demo guide](demo/README.md) |
 | Proposed concrete shape (not adopted) | [Proposal 0001 — Draft PR](https://github.com/pomesaka/ANWA/pull/1) |
