@@ -132,6 +132,26 @@ const unexpected = (): InteractionResponse =>
   );
 const own = (obj: object, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(obj, key);
+
+function verifiedCaller(request?: RequestContext): VerifiedCaller | null {
+  if (request === undefined) return null;
+  if (!request || typeof request !== "object" || Array.isArray(request) ||
+      Object.keys(request).some(key => key !== "caller"))
+    throw Error("Invalid trusted RequestContext");
+  const caller = request.caller ?? null;
+  if (caller === null) return null;
+  if (typeof caller !== "object" || Array.isArray(caller) ||
+      typeof caller.subject !== "string" || !caller.subject.trim())
+    throw Error("Invalid verified Caller; authentication belongs to the Adapter");
+  if (caller.claims !== undefined &&
+      (!caller.claims || typeof caller.claims !== "object" || Array.isArray(caller.claims)))
+    throw Error("Caller claims must be a record");
+  return Object.freeze({
+    subject: caller.subject,
+    ...(caller.claims ? {claims: Object.freeze({...caller.claims})} : {})
+  });
+}
+
 const duration =
   /^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$/;
 const levels = new Set(["required", "recommended", "available"]);
@@ -273,24 +293,40 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     };
   }
 
-  catalog() {
+  private canDiscover(ref: string, caller: VerifiedCaller | null): boolean {
+    if (this.publicRefs.has(ref)) return true;
+    if (!own(this.schema.interactions, ref) ||
+        !this.schema.interactions[ref].guard) return false;
+    try {
+      return this.discoveryPolicy?.({ref, caller}) === true;
+    } catch {
+      return false; // Fail closed if discovery policy cannot decide.
+    }
+  }
+
+  /** Discovery is filtered separately from invocation Guards; it has no resource input. */
+  catalog(request?: RequestContext) {
+    const caller = verifiedCaller(request);
     return {
       anwa: this.schema.anwa,
-      entrypoints: [...this.schema.entrypoints],
-      interactions: Object.entries(this.schema.interactions).map(
-        ([ref, spec]) => ({
+      entrypoints: this.schema.entrypoints.filter(ref => this.canDiscover(ref, caller)),
+      interactions: Object.entries(this.schema.interactions)
+        .filter(([ref]) => this.canDiscover(ref, caller))
+        .map(([ref, spec]) => ({
           ref,
           kind: spec.kind,
           description: spec.description,
-        }),
-      ),
+        }))
     };
   }
-  describe(ref: string) {
-    return { ref, ...this.resolve(ref).spec };
+  describe(ref: string, request?: RequestContext) {
+    const caller = verifiedCaller(request);
+    if (!this.canDiscover(ref, caller))
+      throw Error("Unknown or undiscoverable Interaction");
+    return {ref, ...this.resolve(ref).spec};
   }
-  discover(ref: string) {
-    return { description: this.describe(ref), context: { next: [] } };
+  discover(ref: string, request?: RequestContext) {
+    return {description: this.describe(ref, request), context: {next: []}};
   }
 
   private declaredError(spec: InteractionDefinition, error: DomainError): void {
