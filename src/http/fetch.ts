@@ -1,4 +1,8 @@
-import { type VerifiedCaller, type RequestContext, type AnwaApp } from "../anwa.ts";
+import {
+  type VerifiedCaller,
+  type RequestContext,
+  type AnwaApp,
+} from "../anwa.ts";
 
 /** Minimal ANWA HTTP Binding 0.1 over the Web Fetch Request/Response API.
  * Frameworks such as Hono and Bun can register this handler directly.
@@ -8,22 +12,32 @@ export interface FetchBindingOptions {
   /** URL path prefix, default /anwa. Must start with /. */
   prefix?: string;
   /** Trusted server-side authentication; caller identity is never read from JSON. */
-  authenticate?: (request: Request) => VerifiedCaller | null | Promise<VerifiedCaller | null>;
+  authenticate?: (
+    request: Request,
+  ) => VerifiedCaller | null | Promise<VerifiedCaller | null>;
   /** Maximum JSON request size in bytes, default 1 MiB. */
   maxBodyBytes?: number;
 }
 
 type Runtime = AnwaApp<any>;
 
-function problem(status: number, code: string, title: string, allow?: string): Response {
-  return new Response(JSON.stringify({ type: "about:blank", title, status, code }), {
-    status,
-    headers: {
-      "content-type": "application/problem+json; charset=utf-8",
-      "cache-control": "no-store",
-      ...(allow ? { allow } : {}),
+function problem(
+  status: number,
+  code: string,
+  title: string,
+  allow?: string,
+): Response {
+  return new Response(
+    JSON.stringify({ type: "about:blank", title, status, code }),
+    {
+      status,
+      headers: {
+        "content-type": "application/problem+json; charset=utf-8",
+        "cache-control": "no-store",
+        ...(allow ? { allow } : {}),
+      },
     },
-  });
+  );
 }
 function json(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -39,20 +53,40 @@ const own = (value: object, key: string): boolean =>
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-async function readEnvelope(request: Request, limit: number): Promise<
+async function readEnvelope(
+  request: Request,
+  limit: number,
+): Promise<
   | { ok: true; value: { ref: string; input?: unknown } }
   | { ok: false; response: Response }
 > {
-  const type = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  const type = request.headers
+    .get("content-type")
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
   if (type !== "application/json") {
-    return { ok: false, response: problem(415, "UNSUPPORTED_MEDIA_TYPE", "Expected application/json") };
+    return {
+      ok: false,
+      response: problem(
+        415,
+        "UNSUPPORTED_MEDIA_TYPE",
+        "Expected application/json",
+      ),
+    };
   }
   const length = request.headers.get("content-length");
   if (length && Number(length) > limit) {
-    return { ok: false, response: problem(413, "PAYLOAD_TOO_LARGE", "Request body too large") };
+    return {
+      ok: false,
+      response: problem(413, "PAYLOAD_TOO_LARGE", "Request body too large"),
+    };
   }
   if (!request.body) {
-    return { ok: false, response: problem(400, "INVALID_REQUEST", "Invalid request envelope") };
+    return {
+      ok: false,
+      response: problem(400, "INVALID_REQUEST", "Invalid request envelope"),
+    };
   }
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -64,12 +98,18 @@ async function readEnvelope(request: Request, limit: number): Promise<
       size += part.value.byteLength;
       if (size > limit) {
         await reader.cancel();
-        return { ok: false, response: problem(413, "PAYLOAD_TOO_LARGE", "Request body too large") };
+        return {
+          ok: false,
+          response: problem(413, "PAYLOAD_TOO_LARGE", "Request body too large"),
+        };
       }
       chunks.push(part.value);
     }
   } catch {
-    return { ok: false, response: problem(400, "INVALID_REQUEST", "Invalid request envelope") };
+    return {
+      ok: false,
+      response: problem(400, "INVALID_REQUEST", "Invalid request envelope"),
+    };
   } finally {
     reader.releaseLock();
   }
@@ -81,9 +121,14 @@ async function readEnvelope(request: Request, limit: number): Promise<
   }
   let value: unknown;
   try {
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(joined));
+    value = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(joined),
+    );
   } catch {
-    return { ok: false, response: problem(400, "INVALID_REQUEST", "Invalid JSON request") };
+    return {
+      ok: false,
+      response: problem(400, "INVALID_REQUEST", "Invalid JSON request"),
+    };
   }
   if (
     !record(value) ||
@@ -91,7 +136,10 @@ async function readEnvelope(request: Request, limit: number): Promise<
     !value.ref ||
     Object.keys(value).some((key) => key !== "ref" && key !== "input")
   ) {
-    return { ok: false, response: problem(400, "INVALID_REQUEST", "Invalid request envelope") };
+    return {
+      ok: false,
+      response: problem(400, "INVALID_REQUEST", "Invalid request envelope"),
+    };
   }
   return { ok: true, value: value as { ref: string; input?: unknown } };
 }
@@ -110,12 +158,19 @@ export function createAnwaFetchHandler(
   options: FetchBindingOptions = {},
 ): (request: Request) => Promise<Response> {
   const prefix = options.prefix ?? "/anwa";
-  if (!prefix.startsWith("/") || prefix === "/" || prefix.endsWith("/") ||
-      prefix.includes("?") || prefix.includes("#") || prefix.includes("//")) {
+  if (
+    !prefix.startsWith("/") ||
+    prefix === "/" ||
+    prefix.endsWith("/") ||
+    prefix.includes("?") ||
+    prefix.includes("#") ||
+    prefix.includes("//")
+  ) {
     throw Error("Invalid ANWA HTTP prefix");
   }
   const limit = options.maxBodyBytes ?? 1024 * 1024;
-  if (!Number.isSafeInteger(limit) || limit < 1) throw Error("Invalid maxBodyBytes");
+  if (!Number.isSafeInteger(limit) || limit < 1)
+    throw Error("Invalid maxBodyBytes");
   return async (request) => {
     const path = new URL(request.url).pathname;
     const isCatalog = path === prefix + "/catalog";
@@ -131,7 +186,10 @@ export function createAnwaFetchHandler(
     let caller: VerifiedCaller | null;
     try {
       caller = (await options.authenticate?.(request)) ?? null;
-      if (caller && (typeof caller.subject !== "string" || !caller.subject.trim())) {
+      if (
+        caller &&
+        (typeof caller.subject !== "string" || !caller.subject.trim())
+      ) {
         return problem(500, "ADAPTER_ERROR", "Invalid authenticated caller");
       }
     } catch {
@@ -166,7 +224,12 @@ export function createAnwaFetchHandler(
       );
       return json(response, response.outcome.kind === "accepted" ? 202 : 200);
     } catch (error) {
-      if (error instanceof Error && /Unknown or unbound InteractionRef|Use observe for Event/.test(error.message)) {
+      if (
+        error instanceof Error &&
+        /Unknown or unbound InteractionRef|Use observe for Event/.test(
+          error.message,
+        )
+      ) {
         return problem(404, "NOT_FOUND", "Interaction not found");
       }
       return problem(500, "INTERNAL_ERROR", "Server error");

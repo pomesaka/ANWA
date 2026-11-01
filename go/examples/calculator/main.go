@@ -3,11 +3,11 @@ package main
 
 import (
 	"context"
-	"flag"
-	"net/http"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/pomesaka/ANWA/go/anwa"
@@ -52,7 +52,9 @@ func main() {
 	}
 	if *listen != "" {
 		adapter, err := httpbinding.New(app, httpbinding.Options{})
-		if err != nil { log.Fatal(err) }
+		if err != nil {
+			log.Fatal(err)
+		}
 		mux := http.NewServeMux()
 		mux.Handle("/anwa/", adapter)
 		log.Printf("ANWA HTTP calculator listening on %s", *listen)

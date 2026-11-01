@@ -61,7 +61,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 // New returns a self-contained http.Handler. Attach it to an existing
 // ServeMux, chi, or any router that accepts net/http handlers:
 //
-//     mux.Handle("/anwa/", handler)
+//	mux.Handle("/anwa/", handler)
 //
 // The HTTP Binding 0.1 exposes Query/Action and Discovery. Event streaming,
 // idempotency-key storage and authentication mechanisms are separate concerns.
