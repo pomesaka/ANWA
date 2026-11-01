@@ -21,7 +21,7 @@ The essential properties are **semantic precision, deterministic resolution, ver
 | Interactions | Declared Property / Action / Event, typed input/output | Implements handlers and effects |
 | Guard | Optional named hook | Actual predicate and authorization / consistency enforcement |
 | Domain errors | Exhaustive application-declared error codes | Chooses which errors exist; implements conditions |
-| Effects | **Optional declared effect categories** to inform clients | Actual state mutations and external side effects |
+| Effects and repeatability | Optional `hasSideEffects` / `idempotent` booleans on Actions | Actual side effects, retries, enforcement and concurrency |
 | Navigation | Typed Links and InteractionRefs, optional applicability hints | Which links/affordances are included for this context |
 | References | App-scoped ThingRef + InteractionRef resolution | Instance existence and resource identity policy |
 | Protocol | Logical Discovery / Interaction contracts, adapters to be defined | Hosting, storage, permissions and transports |
@@ -46,21 +46,23 @@ Allowed on a Thing or interaction. Nonempty, unique absolute HTTP(S) URIs or URN
 
 The vocabulary author is responsible for defining what the identifier means. The field is **not** a JSON-LD `@type` nor proof of W3C WoT conformance. Omitting it is valid: an opaque made-up URI with no shared semantics offers little practical advantage.
 
-### `effectKinds` — declared *possible* action effects
+### `hasSideEffects` and `idempotent` — independent Action properties
 
-Allowed only on Action declarations:
+Both fields are **optional booleans** on Actions, and are application-supplied declarations. The values are not inferred from the Handler.
 
-- `"domain-state"`: may modify application business state.
-- `"external-system"`: may cause effects beyond the local application's authority.
-- `[]`: application explicitly declares no effects in these categories.
-- **Omitted**: effect classification is **unknown**, not `[]`.
+- `hasSideEffects: true`: invoking the Action **may cause business-observable effects**, including domain state mutations or external operations (payments, notifications).
+- `hasSideEffects: false`: the application asserts the Action will **not** cause such business-observable effects.
+- `idempotent: true`: the application asserts repeating the same Action with the same input has the same intended business-observable effects as invoking it once.
+- `idempotent: false`: that repeated-effect guarantee is not asserted.
+- **Omitted:** unknown, distinct from `false`. A client MUST NOT treat missing values as a no-effect or repeat-safe guarantee.
 
-The categories may be combined. This field does **not** describe actual post-invocation effects, transactions, idempotency, approval, retry safety, or permission; the real handler owns those. Clients should treat these as **untrusted declarations**, with independent policy and authorization checks.
+Routine internal logs, tracing and metrics are excluded from `hasSideEffects` unless they themselves form part of the application's advertised domain behavior. The flags do not imply authorization, safe retries after network failure, ability to undo operations, or lack of concurrency concerns. A successful idempotency declaration is not a promise that two invocations produce identical response bodies.
 
 ```json
 {
   "description": "Cancel an order when allowed.",
-  "effectKinds": ["domain-state"],
+  "hasSideEffects": true,
+  "idempotent": false,
   "input": {
     "type": "object",
     "properties": {
@@ -81,7 +83,9 @@ The categories may be combined. This field does **not** describe actual post-inv
 }
 ```
 
-An Action **without** `effectKinds` remains valid. Guard conditions, transition graphs, and recovery flows are not mandatory schema fields.
+These ANWA fields are **not the same as WoT TD 1.1 `safe`**, whose specification concerns the Thing's internal resource state. WoT also defines an `idempotent` flag, but its default/semantics are governed by that specification. **ANWA omission = unknown**, even though WoT TD processors assign defaults to their own fields. Mapping to a conforming WoT TD is a separate adapter concern.
+
+An Action without either flag remains valid. Guards, state transition graphs, and recovery flows are not mandatory.
 
 ## Consumption contract
 
@@ -106,7 +110,7 @@ A `Context` can have zero Links and zero AffordanceRefs. It conveys choices the 
 }
 ```
 
-**Static declarations and dynamic outcomes are different.** `effectKinds` describes possible effects; `result.error.effects` (if provided by an application) concerns effects after an actual attempt. `context.applicability` is an advisory hint, not authorization.
+**Static declarations and dynamic outcomes are different.** `hasSideEffects` is a declaration about whether effects are possible; `result.error.effects` (if provided by an application) concerns effects after an actual attempt. `context.applicability` is an advisory hint, not authorization.
 
 ## Contracts an implementing agent should be able to enforce
 
@@ -116,9 +120,9 @@ The current reference toolchain supports a **subset**, not all envisioned checks
 2. **Bindings:** each published interaction has a user-implemented handler; named Guards resolve.
 3. **Inputs/outputs:** runtime validates the supported JSON Schema subset.
 4. **Domain errors:** expected error codes are exhaustively declared; undeclared implementation errors are mapped to `UNEXPECTED_ERROR`.
-5. **Discovery fidelity:** public metadata, including semantic identifiers and effect categories, is exposed without inventing new actions or domain state.
+5. **Discovery fidelity:** public metadata, including semantic identifiers and the optional Action flags, is exposed without inventing new actions or domain state.
 
-Important limits: **No full JSON Schema 2020-12 runtime validation, static TypeScript conformance of handlers, cross-service refs, security/authorization implementation, or automated proof that declared effect kinds match the actual side effects.** The current JSON Schema file is a meta-schema plus reusable response definitions; it is not itself a complete running network protocol.
+Important limits: **No full JSON Schema 2020-12 runtime validation, static TypeScript conformance of handlers, cross-service refs, security/authorization implementation, or automated proof that declared side-effect/idempotency flags match actual behavior.** The current JSON Schema file is a meta-schema plus reusable response definitions; it is not itself a complete running network protocol.
 
 ## What not to optimize for
 
