@@ -11,8 +11,8 @@
 | Protocol | Application semantics independent of GraphQL/REST/RPC/MCP; adapters possible | Exact adapters and conformance TBD |
 | Vocabulary | Prefer W3C WoT terms (Thing, Interaction Affordances, Link, DataSchema, Form) | Vocabulary alignment ≠ WoT conformance |
 | Discovery | Provide means to expose descriptions, relations, available interactions and contextual hints | Developer decides what is published; ANWA need not enumerate everything |
-| Interaction | Aim for **Outcome + Context** after delivered application-level interactions | Context can be empty/restricted; next steps are **options, not instructions** |
-| Errors | Support structured domain outcomes, meaningful retry/effect information where warranted | Application determines semantics; transport protocols still have errors/status |
+| Interaction | **Outcome + Context** with required `context.next: []` for delivered application-level results | A single list of application-supplied next Interaction/Discovery candidates; may be empty; not instructions |
+| Errors | Exhaustively declared domain codes; per-attempt `effects` remains on the error/outcome | **Retry** is a `context.next` candidate with `guidance.kind: retry`, not an Error field |
 | Guards | If an application uses guards, schema may reference their contract, actual checks live in code | A declarative guard DSL is not required; ANWA does not automatically infer conditions |
 | States/transitions | ANWA should allow state/transition descriptions when useful | **Not required** that every application or Thing be authored as a state machine |
 | Async / streaming | Provide appropriate representation/integration paths for nonblocking work and observation | Application/infrastructure chooses durable engine, event guarantees, transport |
