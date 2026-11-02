@@ -189,7 +189,7 @@ how to handle user-supplied URLs and external-service requests.
 | Host interface | Proposed integration | Current status |
 | --- | --- | --- |
 | Go `net/http`, chi | Mount `*http.ServeMux` as `http.Handler` | Go binding implemented; stdlib tested |
-| Hono | Route calls the Fetch handler with `c.req.raw` | Hono integration tested |
+| Hono | Chained GET/POST routes call Fetch handler via `c.req.raw`, optional RPC type metadata | Hono router and `hc` client tested |
 | Bun / Deno / Cloudflare Workers | Native Fetch Request → Response | Fetch binding implemented |
 | Express / Fastify | Separate thin Node `IncomingMessage` / response bridge | Not implemented |
 | Gin / Echo | Thin wrapper to adapt `http.Handler`, without core changes | Not implemented |
