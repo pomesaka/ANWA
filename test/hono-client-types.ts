@@ -16,7 +16,8 @@ type NotUnknown<T> = unknown extends T ? false : true;
 
 type InvokeInput = InferRequestType<typeof client.anwa.invoke.$post>["json"];
 type CatalogOutput = InferResponseType<typeof client.anwa.catalog.$get>;
-type DiscoveryOutput = InferResponseType<typeof client.anwa.interactions[":ref"].$get>;
+const descriptorMethod = client.anwa.interactions[":ref"].$get;
+type DiscoveryOutput = InferResponseType<typeof descriptorMethod>;
 type InvokeOutput = InferResponseType<typeof client.anwa.invoke.$post>;
 
 export type CheckTypedInput = Assert<NotAny<InvokeInput>>;
