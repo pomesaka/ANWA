@@ -31,15 +31,18 @@ const goodInput: InvokeInput = {
 };
 void goodInput;
 
-// @ts-expect-error The ANWA manifest declares numeric calculator inputs.
 const invalidInput: InvokeInput = {
   ref: "calculator.add",
-  input: { a: "bad", b: 3 },
+  input: {
+    // @ts-expect-error The ANWA manifest declares numeric calculator inputs.
+    a: "bad",
+    b: 3,
+  },
 };
 void invalidInput;
 
-// @ts-expect-error InteractionRefs are limited to calculator.add/divide.
 const unknownRef: InvokeInput = {
+  // @ts-expect-error InteractionRefs are limited to calculator.add/divide.
   ref: "calculator.missing",
   input: { a: 1, b: 2 },
 };
