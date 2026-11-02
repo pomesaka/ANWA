@@ -90,8 +90,10 @@ go run ./cmd/anwa-codegen \
 
 ## Minimal HTTP server adapter
 
-`go/httpbinding.New(app, opts)` returns an ordinary `http.Handler` that
-can be registered on an existing `http.ServeMux` (or compatible router).
+`go/httpbinding.New(app, opts)` returns a `*http.ServeMux` that implements
+`http.Handler` and can be registered on an existing `http.ServeMux` (or
+compatible router). It uses method-aware standard library route patterns
+instead of a custom path dispatcher.
 It introduces **no HTTP dependency** into the Go Core or the generated
 `ServerInterface`.
 
