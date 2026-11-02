@@ -118,15 +118,40 @@ is introduced into ANWA.
 
 ## TypeScript / Hono and Fetch-native runtimes
 
-The [Hono runnable demo](../demo/http/hono.ts) is a regular Hono app.
-It attaches the Fetch handler to **an existing route**:
+The [Hono runnable demo](../demo/http/hono.ts) demonstrates typed Hono
+RPC routes. It chains each endpoint explicitly, then composes the group with
+`route("/anwa", anwaRoutes)` and exports the **resulting** `typeof app`:
 
 ```ts
-const router = new Hono();
 const handler = createAnwaFetchHandler(anwaApp, {
   authenticate: async (request) => verifyCredential(request),
 });
-router.all("/anwa/*", (c) => handler(c.req.raw));
+const anwaRoutes = new Hono()
+  .get("/catalog", (c) => handler(c.req.raw))
+  .get("/interactions/:ref", (c) => handler(c.req.raw))
+  .post("/invoke", (c) => handler(c.req.raw));
+
+export const app = new Hono()
+  .get("/health", (c) => c.text("healthy"))
+  .route("/anwa", anwaRoutes);
+export type AppType = typeof app;
+```
+
+The actual demo additionally annotates the response with Hono's
+`TypedResponse` marker and the `POST /invoke` JSON input type, both derived
+from the ANWA manifest. That preserves the original Fetch `Response` without
+extra request parsing or JSON reserialization while enabling `hc<AppType>`
+route/request/result inference. Types do **not** replace ANWA runtime
+validation. In particular, a generic `invoke` endpoint cannot derive a
+different response type for every possible `ref` from Hono RPC alone:
+its success output is a union of the demo's supported operation outputs.
+
+```ts
+const client = hc<AppType>("http://localhost:3000");
+const catalog = await client.anwa.catalog.$get();
+const result = await client.anwa.invoke.$post({
+  json: { ref: "calculator.add", input: { a: 2, b: 3 } },
+});
 ```
 
 For the public Calculator demo:
