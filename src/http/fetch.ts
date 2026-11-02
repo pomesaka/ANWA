@@ -31,15 +31,21 @@ type Runtime = AnwaApp<any>;
 const own = (value: object, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 const internal = (): HttpFailure => ({ kind: "internal" });
-const missing = (title: "Route not found" | "Interaction not found"): HttpFailure => ({
-  kind: "not-found", title,
+const missing = (
+  title: "Route not found" | "Interaction not found",
+): HttpFailure => ({
+  kind: "not-found",
+  title,
 });
 
 function classifyInvocationFailure(error: unknown): HttpFailure {
   if (
     error instanceof Error &&
-    /Unknown or unbound InteractionRef|Use observe for Event/.test(error.message)
-  ) return missing("Interaction not found");
+    /Unknown or unbound InteractionRef|Use observe for Event/.test(
+      error.message,
+    )
+  )
+    return missing("Interaction not found");
   return internal();
 }
 
@@ -54,7 +60,7 @@ async function authenticate(
   return attempted.andThen((caller) =>
     caller && (typeof caller.subject !== "string" || !caller.subject.trim())
       ? err({ kind: "invalid-caller" } as const)
-      : ok(caller)
+      : ok(caller),
   );
 }
 
@@ -79,7 +85,8 @@ export function createAnwaFetchHandler(
     prefix.includes("?") ||
     prefix.includes("#") ||
     prefix.includes("//")
-  ) throw Error("Invalid ANWA HTTP prefix");
+  )
+    throw Error("Invalid ANWA HTTP prefix");
 
   const limit = options.maxBodyBytes ?? 1024 * 1024;
   if (!Number.isSafeInteger(limit) || limit < 1)
@@ -92,14 +99,21 @@ export function createAnwaFetchHandler(
       .with(prefix + "/invoke", () => ({ kind: "invoke" }) as const)
       .otherwise((other) =>
         other.startsWith(prefix + "/interactions/")
-          ? ({ kind: "discover", ref: other.slice((prefix + "/interactions/").length) }) as const
-          : ({ kind: "unknown" }) as const
+          ? ({
+              kind: "discover",
+              ref: other.slice((prefix + "/interactions/").length),
+            } as const)
+          : ({ kind: "unknown" } as const),
       );
 
-    if (route.kind === "unknown") return respondToFailure(missing("Route not found"));
+    if (route.kind === "unknown")
+      return respondToFailure(missing("Route not found"));
     const allowedMethod = route.kind === "invoke" ? "POST" : "GET";
     if (request.method !== allowedMethod)
-      return respondToFailure({ kind: "method-not-allowed", allow: allowedMethod });
+      return respondToFailure({
+        kind: "method-not-allowed",
+        allow: allowedMethod,
+      });
 
     const verified = await authenticate(request, options);
     if (verified.isErr()) return respondToFailure(verified.error);
@@ -110,7 +124,7 @@ export function createAnwaFetchHandler(
         Result.fromThrowable(
           () => jsonResponse(app.catalog(ctx)),
           internal,
-        )().match((response) => response, respondToFailure)
+        )().match((response) => response, respondToFailure),
       )
       .with({ kind: "discover" }, ({ ref }) => {
         if (!ref || ref.includes("/") || ref.includes("%"))
@@ -123,21 +137,21 @@ export function createAnwaFetchHandler(
       .with({ kind: "invoke" }, async () => {
         const envelope = await readEnvelope(request, limit);
         if (envelope.isErr()) return respondToFailure(envelope.error);
-        return ResultAsync.fromThrowable(
-          async () => {
-            const result = await app.interact(
-              envelope.value.ref,
-              own(envelope.value, "input") ? envelope.value.input : undefined,
-              ctx,
-            );
-            const status = match(result.outcome)
-              .with({ kind: "settled" }, () => 200)
-              .with({ kind: "accepted" }, () => 202)
-              .exhaustive();
-            return jsonResponse(result, status);
-          },
-          classifyInvocationFailure,
-        )().match((response) => response, respondToFailure);
+        return ResultAsync.fromThrowable(async () => {
+          const result = await app.interact(
+            envelope.value.ref,
+            own(envelope.value, "input") ? envelope.value.input : undefined,
+            ctx,
+          );
+          const status = match(result.outcome)
+            .with({ kind: "settled" }, () => 200)
+            .with({ kind: "accepted" }, () => 202)
+            .exhaustive();
+          return jsonResponse(result, status);
+        }, classifyInvocationFailure)().match(
+          (response) => response,
+          respondToFailure,
+        );
       })
       .exhaustive();
   };

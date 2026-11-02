@@ -610,7 +610,9 @@ export class AnwaApp<const M extends Manifest = Manifest> {
             response = (await guarded.run(params)) as InteractionResponse;
           }
         } else {
-          response = (await (handler as RuntimeRun)(params)) as InteractionResponse;
+          response = (await (handler as RuntimeRun)(
+            params,
+          )) as InteractionResponse;
         }
         return this.verifiedResponse(ref, spec, response, caller);
       },
@@ -664,8 +666,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
               (!guarded.allowed && !guarded.error?.code)
             )
               throw Error("Invalid Guard decision");
-            if (!guarded.allowed)
-              runtime.declaredError(spec, guarded.error);
+            if (!guarded.allowed) runtime.declaredError(spec, guarded.error);
             return guarded;
           },
           () => ({ kind: "guard-evaluation-failure" }) as const,

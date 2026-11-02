@@ -84,9 +84,12 @@ function inspect(path: string): void {
       lines.push("- " + direction + ": " + schema.type);
       for (const [field, value] of Object.entries(schema.properties ?? {})) {
         lines.push(
-          "  - " + field + ": " + value.type +
-          (schema.required?.includes(field) ? " (required)" : "") +
-          (value.description ? " — " + value.description : ""),
+          "  - " +
+            field +
+            ": " +
+            value.type +
+            (schema.required?.includes(field) ? " (required)" : "") +
+            (value.description ? " — " + value.description : ""),
         );
       }
     }

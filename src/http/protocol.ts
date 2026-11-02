@@ -4,7 +4,10 @@ import type { Result as TypedResult } from "neverthrow";
 
 /** HTTP transport failures are distinct from ANWA domain-level Results. */
 export type HttpFailure =
-  | { kind: "invalid-request"; title: "Invalid JSON request" | "Invalid request envelope" }
+  | {
+      kind: "invalid-request";
+      title: "Invalid JSON request" | "Invalid request envelope";
+    }
   | { kind: "unsupported-media" }
   | { kind: "payload-too-large" }
   | { kind: "unauthenticated" }
@@ -22,40 +25,62 @@ const invalidEnvelope = (): HttpFailure => ({
 export function respondToFailure(failure: HttpFailure): Response {
   const definition = match(failure)
     .with({ kind: "invalid-request" }, ({ title }) => ({
-      status: 400, code: "INVALID_REQUEST", title,
+      status: 400,
+      code: "INVALID_REQUEST",
+      title,
     }))
     .with({ kind: "unsupported-media" }, () => ({
-      status: 415, code: "UNSUPPORTED_MEDIA_TYPE", title: "Expected application/json",
+      status: 415,
+      code: "UNSUPPORTED_MEDIA_TYPE",
+      title: "Expected application/json",
     }))
     .with({ kind: "payload-too-large" }, () => ({
-      status: 413, code: "PAYLOAD_TOO_LARGE", title: "Request body too large",
+      status: 413,
+      code: "PAYLOAD_TOO_LARGE",
+      title: "Request body too large",
     }))
     .with({ kind: "unauthenticated" }, () => ({
-      status: 401, code: "UNAUTHENTICATED", title: "Authentication failed",
+      status: 401,
+      code: "UNAUTHENTICATED",
+      title: "Authentication failed",
     }))
     .with({ kind: "invalid-caller" }, () => ({
-      status: 500, code: "ADAPTER_ERROR", title: "Invalid authenticated caller",
+      status: 500,
+      code: "ADAPTER_ERROR",
+      title: "Invalid authenticated caller",
     }))
     .with({ kind: "not-found" }, ({ title }) => ({
-      status: 404, code: "NOT_FOUND", title,
+      status: 404,
+      code: "NOT_FOUND",
+      title,
     }))
     .with({ kind: "method-not-allowed" }, () => ({
-      status: 405, code: "METHOD_NOT_ALLOWED", title: "Method not allowed",
+      status: 405,
+      code: "METHOD_NOT_ALLOWED",
+      title: "Method not allowed",
     }))
     .with({ kind: "internal" }, () => ({
-      status: 500, code: "INTERNAL_ERROR", title: "Server error",
+      status: 500,
+      code: "INTERNAL_ERROR",
+      title: "Server error",
     }))
     .exhaustive();
-  return new Response(JSON.stringify({
-    type: "about:blank", ...definition,
-  }), {
-    status: definition.status,
-    headers: {
-      "content-type": "application/problem+json; charset=utf-8",
-      "cache-control": "no-store",
-      ...(failure.kind === "method-not-allowed" ? { allow: failure.allow } : {}),
+  return new Response(
+    JSON.stringify({
+      type: "about:blank",
+      ...definition,
+    }),
+    {
+      status: definition.status,
+      headers: {
+        "content-type": "application/problem+json; charset=utf-8",
+        "cache-control": "no-store",
+        ...(failure.kind === "method-not-allowed"
+          ? { allow: failure.allow }
+          : {}),
+      },
     },
-  });
+  );
 }
 
 export function jsonResponse(value: unknown, status = 200): Response {
@@ -119,18 +144,20 @@ export async function readEnvelope(
 ): Promise<TypedResult<InvocationEnvelope, HttpFailure>> {
   const type = request.headers
     .get("content-type")
-    ?.split(";")[0]?.trim().toLowerCase();
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
   if (type !== "application/json") return err({ kind: "unsupported-media" });
   const length = request.headers.get("content-length");
-  if (length && Number(length) > limit) return err({ kind: "payload-too-large" });
+  if (length && Number(length) > limit)
+    return err({ kind: "payload-too-large" });
 
   const bytes = await readBytes(request, limit);
   if (bytes.isErr()) return err(bytes.error);
 
   const parsed = Result.fromThrowable(
-    (): unknown => JSON.parse(
-      new TextDecoder("utf-8", { fatal: true }).decode(bytes.value),
-    ),
+    (): unknown =>
+      JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.value)),
     (): HttpFailure => ({
       kind: "invalid-request",
       title: "Invalid JSON request",
@@ -143,6 +170,7 @@ export async function readEnvelope(
     typeof value.ref !== "string" ||
     !value.ref ||
     Object.keys(value).some((key) => key !== "ref" && key !== "input")
-  ) return err(invalidEnvelope());
+  )
+    return err(invalidEnvelope());
   return ok(value as InvocationEnvelope);
 }
