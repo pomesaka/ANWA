@@ -49,7 +49,7 @@ Two **logical** interfaces—not necessarily two wire protocols:
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
 
-[Architecture and developer workflow](docs/architecture.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
+[Architecture and developer workflow](docs/architecture.md) · [Typed errors and exhaustive matching](docs/typed-errors.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
 
 ### Authentication and authorization boundary
 
