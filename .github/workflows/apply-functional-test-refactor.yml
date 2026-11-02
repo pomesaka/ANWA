@@ -70,6 +70,7 @@ jobs:
       - run: bun run validate && bun run demo > /dev/null && bun run demo:todo > /dev/null
       - working-directory: go
         run: |
+          gofmt -w .
           test -z "$(gofmt -l .)"
           go vet ./...
           go test -race ./...
