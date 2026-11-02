@@ -71,14 +71,14 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-// New returns a ServeMux as an http.Handler, so an existing server or router
+// New returns an *http.ServeMux (which implements http.Handler), so a host
 // can mount it without depending on a framework-specific ANWA adapter:
 //
 //     outerMux.Handle("/anwa/", handler)
 //
 // Go 1.22+ ServeMux owns method routing, 404/405 responses and path variables.
 // Only successful route matches reach the dedicated ANWA handlers.
-func New(runtime Runtime, options Options) (http.Handler, error) {
+func New(runtime Runtime, options Options) (*http.ServeMux, error) {
 	if runtime == nil {
 		return nil, errors.New("ANWA HTTP runtime is required")
 	}
