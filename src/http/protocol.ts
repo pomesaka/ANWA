@@ -134,7 +134,13 @@ async function readBytes(
     },
     invalidEnvelope,
   )().andThen((value) => value);
-  reader.releaseLock();
+  // A broken stream or a failed lock release is still a transport failure;
+  // neither may escape into the public Interaction result channel.
+  const released = Result.fromThrowable(
+    () => reader.releaseLock(),
+    invalidEnvelope,
+  )();
+  if (released.isErr()) return err(released.error);
   return result;
 }
 
