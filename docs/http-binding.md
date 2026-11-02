@@ -18,7 +18,9 @@ engine. An application **hosts** the adapter using its own router/server.
   or extended with additional routes.
 - TypeScript / JavaScript: `createAnwaFetchHandler(app, opts)` returns
   `(request: Request) => Promise<Response>` using the Web Fetch standard.
-  Hono can register it in a single `app.all(...)` route.
+  Hono can call it inside its own handlers. For `hc` RPC type inference,
+  routes must be chained and use distinct typed paths; a single `all(...)`
+  wildcard route does **not** expose the catalog/invoke endpoints to `hc`.
 - Framework HTTP configuration, TLS, middleware, logging, deadlines, CORS,
   rate limits, and credential verification remain application/platform-owned.
   No new HTTP-specific fields are required in `anwa.json`.
