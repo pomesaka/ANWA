@@ -24,6 +24,7 @@ jobs:
       - run: bunx oxlint src demo test tools
       - run: bun run validate
       - run: bun run types:orders
+      - run: bun run architecture:check
       - run: bun check
       - run: bun test
       - run: bun run demo > /dev/null
