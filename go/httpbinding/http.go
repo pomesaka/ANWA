@@ -1,5 +1,6 @@
 // Package httpbinding adapts the in-process ANWA runtime to net/http.
-// It does not own a server, router, credentials, business logic, or CORS policy.
+// Routing uses the standard Go ServeMux; this package does not own a server,
+// credentials, business logic, or CORS policy.
 package httpbinding
 
 import (
@@ -32,8 +33,14 @@ type Options struct {
 	MaxBodyBytes int64
 }
 
-// explicitNullInput preserves the difference between an omitted input and an
-// explicit JSON null, without changing the in-process Go App interface.
+type binding struct {
+	runtime      Runtime
+	authenticate func(*http.Request) (*anwa.VerifiedCaller, error)
+	maxBodyBytes int64
+}
+
+// explicitNullInput preserves the difference between omitted input and
+// explicit JSON null without changing the in-process App interface.
 type explicitNullInput struct{}
 
 func (explicitNullInput) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
@@ -64,13 +71,13 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-// New returns a self-contained http.Handler. Attach it to an existing
-// ServeMux, chi, or any router that accepts net/http handlers:
+// New returns a ServeMux as an http.Handler, so an existing server or router
+// can mount it without depending on a framework-specific ANWA adapter:
 //
-//	mux.Handle("/anwa/", handler)
+//     outerMux.Handle("/anwa/", handler)
 //
-// The HTTP Binding 0.1 exposes Query/Action and Discovery. Event streaming,
-// idempotency-key storage and authentication mechanisms are separate concerns.
+// Go 1.22+ ServeMux owns method routing, 404/405 responses and path variables.
+// Only successful route matches reach the dedicated ANWA handlers.
 func New(runtime Runtime, options Options) (http.Handler, error) {
 	if runtime == nil {
 		return nil, errors.New("ANWA HTTP runtime is required")
@@ -81,7 +88,7 @@ func New(runtime Runtime, options Options) (http.Handler, error) {
 	}
 	if !strings.HasPrefix(prefix, "/") || prefix == "/" ||
 		strings.HasSuffix(prefix, "/") || strings.Contains(prefix, "//") ||
-		strings.ContainsAny(prefix, "?#") {
+		strings.ContainsAny(prefix, "?#{}% \t\r\n") {
 		return nil, errors.New("invalid ANWA HTTP prefix")
 	}
 	limit := options.MaxBodyBytes
@@ -92,119 +99,130 @@ func New(runtime Runtime, options Options) (http.Handler, error) {
 		return nil, errors.New("invalid max body size")
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		catalog := path == prefix+"/catalog"
-		invoke := path == prefix+"/invoke"
-		description := strings.HasPrefix(path, prefix+"/interactions/")
-		if !catalog && !invoke && !description {
-			writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Route not found")
-			return
-		}
-		allow := http.MethodGet
-		if invoke {
-			allow = http.MethodPost
-		}
-		if r.Method != allow {
-			w.Header().Set("Allow", allow)
-			writeProblem(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-			return
-		}
-		var caller *anwa.VerifiedCaller
-		if options.Authenticate != nil {
-			var err error
-			caller, err = options.Authenticate(r)
-			if err != nil {
-				writeProblem(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication failed")
-				return
-			}
-			if caller != nil && strings.TrimSpace(caller.Subject) == "" {
-				writeProblem(w, http.StatusInternalServerError, "ADAPTER_ERROR", "Invalid authenticated caller")
-				return
-			}
-		}
-		ctx := &anwa.RequestContext{Caller: caller}
-		if catalog {
-			result, err := runtime.Catalog(ctx)
-			if err != nil {
-				writeProblem(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Server error")
-				return
-			}
-			writeJSON(w, http.StatusOK, result)
-			return
-		}
-		if description {
-			ref := strings.TrimPrefix(path, prefix+"/interactions/")
-			if ref == "" || strings.ContainsAny(ref, "/%") {
-				writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
-				return
-			}
-			result, err := runtime.Discover(ref, ctx)
-			if err != nil {
-				writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
-				return
-			}
-			writeJSON(w, http.StatusOK, result)
-			return
-		}
-		contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || contentType != "application/json" {
-			writeProblem(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Expected application/json")
-			return
-		}
-		if r.ContentLength > limit {
-			writeProblem(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Request body too large")
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, limit)
-		decoder := json.NewDecoder(r.Body)
-		decoder.DisallowUnknownFields()
-		decoder.UseNumber()
-		var envelope invokeEnvelope
-		if err := decoder.Decode(&envelope); err != nil {
-			var tooLarge *http.MaxBytesError
-			if errors.As(err, &tooLarge) {
-				writeProblem(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Request body too large")
-			} else {
-				writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON request")
-			}
-			return
-		}
-		var extra any
-		if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-			writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
-			return
-		}
-		if envelope.Ref == "" {
-			writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
-			return
-		}
-		var input any
-		if envelope.Input != nil {
-			if strings.TrimSpace(string(envelope.Input)) == "null" {
-				input = explicitNullInput{}
-			} else {
-				dec := json.NewDecoder(strings.NewReader(string(envelope.Input)))
-				dec.UseNumber()
-				if err := dec.Decode(&input); err != nil {
-					writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
-					return
-				}
-			}
-		}
-		result, err := runtime.Interact(r.Context(), envelope.Ref, input, ctx)
+	b := binding{
+		runtime:      runtime,
+		authenticate: options.Authenticate,
+		maxBodyBytes: limit,
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET "+prefix+"/catalog", b.catalog)
+	mux.HandleFunc("GET "+prefix+"/interactions/{ref}", b.discover)
+	mux.HandleFunc("POST "+prefix+"/invoke", b.invoke)
+	return mux, nil
+}
+
+// caller obtains trusted identity only from host-side authentication, never
+// from the Interaction input. It is shared by all three route handlers.
+func (b binding) caller(w http.ResponseWriter, r *http.Request) (*anwa.RequestContext, bool) {
+	var caller *anwa.VerifiedCaller
+	if b.authenticate != nil {
+		var err error
+		caller, err = b.authenticate(r)
 		if err != nil {
-			if err.Error() == "unknown InteractionRef" || err.Error() == "use Observe for Event Interactions" {
-				writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
-			} else {
-				writeProblem(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Server error")
+			writeProblem(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication failed")
+			return nil, false
+		}
+		if caller != nil && strings.TrimSpace(caller.Subject) == "" {
+			writeProblem(w, http.StatusInternalServerError, "ADAPTER_ERROR", "Invalid authenticated caller")
+			return nil, false
+		}
+	}
+	return &anwa.RequestContext{Caller: caller}, true
+}
+
+func (b binding) catalog(w http.ResponseWriter, r *http.Request) {
+	ctx, ok := b.caller(w, r)
+	if !ok {
+		return
+	}
+	result, err := b.runtime.Catalog(ctx)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (b binding) discover(w http.ResponseWriter, r *http.Request) {
+	ref := r.PathValue("ref")
+	if ref == "" || strings.ContainsAny(ref, "/%") {
+		writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
+		return
+	}
+	ctx, ok := b.caller(w, r)
+	if !ok {
+		return
+	}
+	result, err := b.runtime.Discover(ref, ctx)
+	if err != nil {
+		writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (b binding) invoke(w http.ResponseWriter, r *http.Request) {
+	ctx, ok := b.caller(w, r)
+	if !ok {
+		return
+	}
+	contentType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || contentType != "application/json" {
+		writeProblem(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Expected application/json")
+		return
+	}
+	if r.ContentLength > b.maxBodyBytes {
+		writeProblem(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Request body too large")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, b.maxBodyBytes)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	decoder.UseNumber()
+	var envelope invokeEnvelope
+	if err := decoder.Decode(&envelope); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeProblem(w, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "Request body too large")
+		} else {
+			writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON request")
+		}
+		return
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
+		return
+	}
+	if envelope.Ref == "" {
+		writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
+		return
+	}
+	var input any
+	if envelope.Input != nil {
+		if strings.TrimSpace(string(envelope.Input)) == "null" {
+			input = explicitNullInput{}
+		} else {
+			dec := json.NewDecoder(strings.NewReader(string(envelope.Input)))
+			dec.UseNumber()
+			if err := dec.Decode(&input); err != nil {
+				writeProblem(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request envelope")
+				return
 			}
-			return
 		}
-		status := http.StatusOK
-		if result.Outcome.Kind == "accepted" {
-			status = http.StatusAccepted
+	}
+	result, err := b.runtime.Interact(r.Context(), envelope.Ref, input, ctx)
+	if err != nil {
+		if err.Error() == "unknown InteractionRef" || err.Error() == "use Observe for Event Interactions" {
+			writeProblem(w, http.StatusNotFound, "NOT_FOUND", "Interaction not found")
+		} else {
+			writeProblem(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Server error")
 		}
-		writeJSON(w, status, result)
-	}), nil
+		return
+	}
+	status := http.StatusOK
+	if result.Outcome.Kind == "accepted" {
+		status = http.StatusAccepted
+	}
+	writeJSON(w, status, result)
 }
