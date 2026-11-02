@@ -252,3 +252,44 @@ test("Explicit null does not become an omitted request input", async () => {
     "INVALID_INPUT",
   );
 });
+
+test("Chained Hono routes work with the manifest-typed hc client over HTTP", async () => {
+  const { hc } = await import("hono/client");
+  const { app } = await import("../demo/http/hono.ts");
+  type AppType = typeof import("../demo/http/hono.ts").app;
+
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (request) => app.fetch(request),
+  });
+  try {
+    const client = hc<AppType>("http://127.0.0.1:" + server.port);
+    const catalog = await client.anwa.catalog.$get();
+    assert.equal(catalog.status, 200);
+    const catalogJson = await catalog.json();
+    assert.ok("entrypoints" in catalogJson);
+
+    const discovered = await client.anwa.interactions[":ref"].$get({
+      param: { ref: "calculator.add" },
+    });
+    assert.equal(discovered.status, 200);
+    const found = await discovered.json();
+    assert.ok("description" in found);
+
+    const result = await client.anwa.invoke.$post({
+      json: { ref: "calculator.add", input: { a: 20, b: 22 } },
+    });
+    assert.equal(result.status, 200);
+    const outcome = await result.json();
+    assert.ok("outcome" in outcome);
+    if ("outcome" in outcome && outcome.outcome.kind === "settled") {
+      assert.equal(outcome.outcome.result.ok, true);
+      if (outcome.outcome.result.ok) {
+        assert.equal(outcome.outcome.result.value, 42);
+      }
+    }
+  } finally {
+    server.stop(true);
+  }
+});
