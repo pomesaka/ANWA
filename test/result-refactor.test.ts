@@ -34,7 +34,11 @@ test("authored TypeScript code has no try/catch blocks", () => {
 
 test("all tagged HTTP protocol failures map to explicit status and code", async () => {
   const failures: Array<[HttpFailure, number, string]> = [
-    [{ kind: "invalid-request", title: "Invalid JSON request" }, 400, "INVALID_REQUEST"],
+    [
+      { kind: "invalid-request", title: "Invalid JSON request" },
+      400,
+      "INVALID_REQUEST",
+    ],
     [{ kind: "unsupported-media" }, 415, "UNSUPPORTED_MEDIA_TYPE"],
     [{ kind: "payload-too-large" }, 413, "PAYLOAD_TOO_LARGE"],
     [{ kind: "unauthenticated" }, 401, "UNAUTHENTICATED"],
@@ -47,11 +51,19 @@ test("all tagged HTTP protocol failures map to explicit status and code", async 
     const response = respondToFailure(failure);
     assert.equal(response.status, status);
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.match(response.headers.get("content-type") ?? "", /application\/problem\+json/);
+    assert.match(
+      response.headers.get("content-type") ?? "",
+      /application\/problem\+json/,
+    );
     const body = await response.json();
-    assert.deepEqual({ type: body.type, status: body.status, code: body.code }, {
-      type: "about:blank", status, code,
-    });
+    assert.deepEqual(
+      { type: body.type, status: body.status, code: body.code },
+      {
+        type: "about:blank",
+        status,
+        code,
+      },
+    );
     if (failure.kind === "method-not-allowed")
       assert.equal(response.headers.get("allow"), "POST");
   }
