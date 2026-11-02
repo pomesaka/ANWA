@@ -42,7 +42,8 @@ type InvokeBody = InteractionResponse<InvokeOutput>;
 // attach the marker without re-parsing or re-serializing the real Response.
 // The generic Invoke endpoint cannot correlate its response type with the
 // particular "ref" supplied by the client; its output is their union.
-type RPCResponse<T> = Response & TypedResponse<T | HttpProblem, StatusCode, "json">;
+type RPCResponse<T> = Response &
+  TypedResponse<T | HttpProblem, StatusCode, "json">;
 function rpcResponse<T>(response: Promise<Response>): Promise<RPCResponse<T>> {
   return response as Promise<RPCResponse<T>>;
 }
