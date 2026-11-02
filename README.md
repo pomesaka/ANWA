@@ -49,7 +49,7 @@ Two **logical** interfaces—not necessarily two wire protocols:
 
 Interaction may complete immediately with a typed `Result<Success, Error>`, or optionally accept an execution reference that can be observed later (durability depends on the application). **Async execution and streaming observation are different concerns.**
 
-[Architecture and developer workflow](docs/architecture.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
+[Architecture and developer workflow](docs/architecture.md) · [Typed errors and exhaustive matching](docs/typed-errors.md) · [Worked order cancellation example](docs/examples/order-cancellation.md) · [Interaction and streaming model](docs/interaction-model.md)
 
 ### Authentication and authorization boundary
 
@@ -96,6 +96,17 @@ go test ./...
 go run ./examples/calculator
 go run ./examples/todo
 ```
+
+## Functional authoring and executable specifications
+
+TypeScript apps are constructed with `createAnwaApp(schema).bind(handlers, options)`.
+`bind` returns a new configured runtime; it does not mutate an existing one. Runtime
+operations are closures and can be called without a receiver. See the
+[factory migration and functional boundaries](docs/functional-core.md).
+
+The [executable specification index](test/README.md) maps contract rules to named
+case tables in TypeScript and Go. Runtime tests assert outcomes and forbidden effects;
+`bun run architecture:check` separately enforces the source-structure policy.
 
 ## Agent-first schema and contract tooling
 

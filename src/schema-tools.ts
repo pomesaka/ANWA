@@ -91,6 +91,89 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
     if (typeof value !== "string" || !value.trim())
       issue(path, "Expected nonempty string");
   };
+  const validateRequired = (
+    value: unknown,
+    properties: Record<string, unknown>,
+    path: string,
+  ): void => {
+    if (value === undefined) return;
+    if (!Array.isArray(value) || value.some((key) => typeof key !== "string")) {
+      issue(path + ".required", "Expected string array");
+      return;
+    }
+    for (const key of value) {
+      if (!has(properties, key))
+        issue(path + ".required", "Unknown required field " + key);
+    }
+  };
+  const validateObject = (
+    schema: Record<string, unknown>,
+    path: string,
+  ): void => {
+    if (schema.properties !== undefined && !isRecord(schema.properties))
+      issue(path + ".properties", "Expected map");
+    const properties = isRecord(schema.properties) ? schema.properties : {};
+    for (const [key, value] of Object.entries(properties))
+      validateData(value, path + ".properties." + key);
+    validateRequired(schema.required, properties, path);
+    if (
+      schema.additionalProperties !== undefined &&
+      schema.additionalProperties !== false
+    )
+      issue(path + ".additionalProperties", "Only false is supported");
+  };
+  const validateErrors = (value: unknown, path: string): void => {
+    if (value === undefined) return;
+    if (!isRecord(value)) {
+      issue(path + ".errors", "Expected map of error codes");
+      return;
+    }
+    for (const [code, meaning] of Object.entries(value)) {
+      if (!/^[A-Z][A-Z0-9_]*$/.test(code) || reserved.has(code))
+        issue(path + ".errors." + code, "Invalid or reserved error code");
+      nonempty(meaning, path + ".errors." + code);
+    }
+  };
+  const validateDefinitions = (value: unknown): void => {
+    if (value === undefined) return;
+    if (!isRecord(value)) {
+      issue("$.$defs", "Expected definition map");
+      return;
+    }
+    for (const [name, schema] of Object.entries(definitions)) {
+      if (!definitionName.test(name))
+        issue("$.$defs." + name, "Invalid definition name");
+      validateData(schema, "$.$defs." + name);
+    }
+    const dependencies = (schema: unknown): string[] => {
+      if (!isRecord(schema)) return [];
+      if (typeof schema.$ref === "string") {
+        const ref = definitionRef.exec(schema.$ref);
+        return ref ? [ref[1]] : [];
+      }
+      return [
+        ...(isRecord(schema.properties)
+          ? Object.values(schema.properties)
+          : []),
+        ...(schema.items === undefined ? [] : [schema.items]),
+      ].flatMap(dependencies);
+    };
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const visit = (name: string): void => {
+      if (visiting.has(name)) {
+        issue("$.$defs." + name, "Cyclic schema reference");
+        return;
+      }
+      if (visited.has(name)) return;
+      visiting.add(name);
+      for (const dependency of dependencies(definitions[name]))
+        if (has(definitions, dependency)) visit(dependency);
+      visiting.delete(name);
+      visited.add(name);
+    };
+    for (const name of Object.keys(definitions)) visit(name);
+  };
   const validateData = (schema: unknown, path: string): void => {
     if (!isRecord(schema)) {
       issue(path, "Expected payload schema");
@@ -119,38 +202,15 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
       (!Array.isArray(schema.enum) || schema.enum.length === 0)
     )
       issue(path + ".enum", "Expected nonempty array");
-    if (schema.type === "object") {
-      if (schema.properties !== undefined && !isRecord(schema.properties))
-        issue(path + ".properties", "Expected map");
-      for (const [key, item] of Object.entries(
-        isRecord(schema.properties) ? schema.properties : {},
-      )) {
-        validateData(item, path + ".properties." + key);
-      }
-      if (schema.required !== undefined) {
-        if (
-          !Array.isArray(schema.required) ||
-          schema.required.some((k) => typeof k !== "string")
-        )
-          issue(path + ".required", "Expected string array");
-        else
-          for (const key of schema.required as string[]) {
-            if (!has(isRecord(schema.properties) ? schema.properties : {}, key))
-              issue(path + ".required", "Unknown required field " + key);
-          }
-      }
-      if (
-        schema.additionalProperties !== undefined &&
-        schema.additionalProperties !== false
-      )
-        issue(path + ".additionalProperties", "Only false is supported");
-    } else if (
-      schema.properties !== undefined ||
-      schema.required !== undefined ||
-      schema.additionalProperties !== undefined
-    ) {
+    if (schema.type === "object") validateObject(schema, path);
+    if (
+      schema.type !== "object" &&
+      (schema.properties !== undefined ||
+        schema.required !== undefined ||
+        schema.additionalProperties !== undefined)
+    )
       issue(path, "Object-only keywords on a non-object schema");
-    }
+
     if (schema.type === "array") {
       if (schema.items === undefined)
         issue(path + ".items", "Required for arrays");
@@ -162,44 +222,7 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
   if (!isRecord(manifest))
     return [{ path: "$", message: "Expected manifest object" }];
   checkFields(manifest, ["anwa", "$defs", "entrypoints", "interactions"], "$");
-  if (manifest.$defs !== undefined) {
-    if (!isRecord(manifest.$defs)) issue("$.$defs", "Expected definition map");
-    else {
-      for (const [name, schema] of Object.entries(definitions)) {
-        if (!definitionName.test(name))
-          issue("$.$defs." + name, "Invalid definition name");
-        validateData(schema, "$.$defs." + name);
-      }
-      const dependencies = (schema: unknown): string[] => {
-        if (!isRecord(schema)) return [];
-        if (typeof schema.$ref === "string") {
-          const ref = definitionRef.exec(schema.$ref);
-          return ref ? [ref[1]] : [];
-        }
-        return [
-          ...(isRecord(schema.properties)
-            ? Object.values(schema.properties)
-            : []),
-          ...(schema.items === undefined ? [] : [schema.items]),
-        ].flatMap(dependencies);
-      };
-      const visiting = new Set<string>();
-      const visited = new Set<string>();
-      const visit = (name: string): void => {
-        if (visiting.has(name)) {
-          issue("$.$defs." + name, "Cyclic schema reference");
-          return;
-        }
-        if (visited.has(name)) return;
-        visiting.add(name);
-        for (const dependency of dependencies(definitions[name]))
-          if (has(definitions, dependency)) visit(dependency);
-        visiting.delete(name);
-        visited.add(name);
-      };
-      for (const name of Object.keys(definitions)) visit(name);
-    }
-  }
+  validateDefinitions(manifest.$defs);
   if (manifest.anwa !== "0.2") issue("$.anwa", "Expected ANWA 0.2");
   if (
     !isRecord(manifest.interactions) ||
@@ -261,16 +284,7 @@ export function validateManifest(manifest: unknown): Diagnostic[] {
     for (const direction of ["input", "output"])
       if (value[direction] !== undefined)
         validateData(value[direction], path + "." + direction);
-    if (value.errors !== undefined) {
-      if (!isRecord(value.errors))
-        issue(path + ".errors", "Expected map of error codes");
-      else
-        for (const [code, meaning] of Object.entries(value.errors)) {
-          if (!/^[A-Z][A-Z0-9_]*$/.test(code) || reserved.has(code))
-            issue(path + ".errors." + code, "Invalid or reserved error code");
-          nonempty(meaning, path + ".errors." + code);
-        }
-    }
+    validateErrors(value.errors, path);
   }
   if (!Array.isArray(manifest.entrypoints) || manifest.entrypoints.length === 0)
     issue("$.entrypoints", "Expected nonempty InteractionRef array");

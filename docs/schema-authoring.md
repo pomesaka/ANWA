@@ -21,7 +21,7 @@ bun run demo:todo
 The repository uses the **Bun 1.4.4 built-in formatter** and **Oxlint 1.90.0 invoked through Bun**. The pinned Bun 1.4.4 executable does not expose `bun lint` as a functioning built-in CLI; using the external linter avoids misleading pass results.
 
 - **Validation:** top-level Interaction names/entrypoints, allowed kinds, machine-readable errors, payload type subset, shared-schema references and referenced Context candidates.
-- **Type generation:** `bun run codegen` generates checked `contract.generated.ts` modules from JSON. Their literal schema types are inferred by `new AnwaApp(schema).bind(...)`, constraining each Handler's input, successful output, declared error codes and Guard parameters. The existing `types:orders` command also emits standalone declaration aliases.
+- **Type generation:** `bun run codegen` generates checked `contract.generated.ts` modules from JSON. Their literal schema types are inferred by `createAnwaApp(schema).bind(...)`, constraining each Handler's input, successful output, declared error codes and Guard parameters. The existing `types:orders` command also emits standalone declaration aliases.
 - **Runtime checking:** incoming inputs, handler success output, domain error codes and `context.next` references/optional inputs.
 - **Type checking:** `bun check` with strict TypeScript configuration, plus Bun tests.
 

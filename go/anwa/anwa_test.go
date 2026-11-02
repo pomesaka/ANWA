@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -40,21 +41,26 @@ func TestExistingTypeScriptManifestsParseInGo(t *testing.T) {
 	}
 }
 
-func TestManifestRejectsUnknownKeywordsAndRefs(t *testing.T) {
-	for _, data := range []string{
-		`{"anwa":"0.2","entrypoints":["x"],"interactions":{"x":{"kind":"query","description":"test","input":{"type":"string","pattern":"x"}}}}`,
-		`{"anwa":"0.2","entrypoints":["x"],"interactions":{"x":{"kind":"query","description":"test","input":{"$ref":"#/$defs/Missing"}}}}`,
-		`{"anwa":"0.2","entrypoints":["x"],"$defs":{"A":{"$ref":"#/$defs/B"},"B":{"$ref":"#/$defs/A"}},"interactions":{"x":{"kind":"query","description":"test"}}}`,
-		`{"anwa":"0.2","entrypoints":["x"],"$defs":{"A":{"type":"string"}},"interactions":{"x":{"kind":"query","description":"test","input":{"$ref":"#/$defs/A","type":"string"}}}}`,
-		`{"anwa":"0.2","entrypoints":["x"],"things":{},"interactions":{"x":{"kind":"query","description":"test"}}}`,
-	} {
-		if _, err := ParseManifest([]byte(data)); err == nil {
-			t.Fatalf("expected invalid manifest: %s", data)
-		}
+func TestManifest_RejectsInvalidDeclarations(t *testing.T) {
+	cases := []struct{ name, json, want string }{
+		{"unsupported schema keyword", `{"anwa":"0.2","entrypoints":["x"],"interactions":{"x":{"kind":"query","description":"test","input":{"type":"string","pattern":"x"}}}}`, "unknown field"},
+		{"missing local reference", `{"anwa":"0.2","entrypoints":["x"],"interactions":{"x":{"kind":"query","description":"test","input":{"$ref":"#/$defs/Missing"}}}}`, "unknown or unsupported"},
+		{"reference cycle", `{"anwa":"0.2","entrypoints":["x"],"$defs":{"A":{"$ref":"#/$defs/B"},"B":{"$ref":"#/$defs/A"}},"interactions":{"x":{"kind":"query","description":"test"}}}`, "cyclic"},
+		{"reference sibling", `{"anwa":"0.2","entrypoints":["x"],"$defs":{"A":{"type":"string"}},"interactions":{"x":{"kind":"query","description":"test","input":{"$ref":"#/$defs/A","type":"string"}}}}`, "only schema keyword"},
+		{"Thing root field", `{"anwa":"0.2","entrypoints":["x"],"things":{},"interactions":{"x":{"kind":"query","description":"test"}}}`, "unknown field"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseManifest([]byte(tc.json))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("want %s error, got %v", tc.want, err)
+			}
+		})
 	}
 }
 
-func TestCalculatorWorksFromSamePublicManifest(t *testing.T) {
+func calculatorApp(t *testing.T) *App {
+	t.Helper()
 	manifest := fixture(t, "calculator")
 	app, err := New(manifest, Config{
 		Public: []string{"calculator.add", "calculator.divide"},
@@ -81,25 +87,52 @@ func TestCalculatorWorksFromSamePublicManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := app.Catalog(nil)
-	if err != nil || len(catalog.Interactions) != 2 {
-		t.Fatalf("catalog: %+v %v", catalog, err)
+	return app
+}
+
+func assertSettled(t *testing.T, response Response, code string) *Result {
+	t.Helper()
+	if response.Outcome.Kind != "settled" || response.Outcome.Execution != nil || response.Outcome.Result == nil {
+		t.Fatalf("expected only a settled result: %+v", response)
 	}
-	desc, err := app.Discover("calculator.divide", nil)
-	if err != nil || desc.Description.Kind != "action" {
-		t.Fatalf("discover: %+v %v", desc, err)
+	result := response.Outcome.Result
+	if code == "" {
+		if !result.OK || result.Error != nil {
+			t.Fatalf("expected success: %+v", result)
+		}
+		return result
 	}
-	good, err := app.Interact(context.Background(), "calculator.add", map[string]any{"a": 2, "b": 3}, nil)
-	if err != nil || good.Outcome.Result == nil || good.Outcome.Result.Value != float64(5) {
-		t.Fatalf("result: %+v %v", good, err)
+	if result.OK || result.Error == nil || result.Error.Code != code {
+		t.Fatalf("expected %s: %+v", code, result)
 	}
-	bad, err := app.Follow(context.Background(), Next{Ref: "calculator.add", Input: map[string]any{"a": "bad", "b": 3}}, nil)
-	if err != nil || bad.Outcome.Result.Error.Code != "INVALID_INPUT" {
-		t.Fatalf("invalid input: %+v %v", bad, err)
-	}
-	div, err := app.Interact(context.Background(), "calculator.divide", map[string]any{"a": 1, "b": 0}, nil)
-	if err != nil || div.Outcome.Result.Error.Code != "DIVIDE_BY_ZERO" {
-		t.Fatalf("domain error: %+v %v", div, err)
+	return result
+}
+
+func TestCalculator_InvocationContract(t *testing.T) {
+	for _, tc := range []struct {
+		name, ref string
+		input     any
+		value     any
+		code      string
+	}{
+		{"addition", "calculator.add", map[string]any{"a": 2, "b": 3}, float64(5), ""},
+		{"division", "calculator.divide", map[string]any{"a": 12, "b": 3}, float64(4), ""},
+		{"division by zero", "calculator.divide", map[string]any{"a": 1, "b": 0}, nil, "DIVIDE_BY_ZERO"},
+		{"invalid numeric input", "calculator.add", map[string]any{"a": "bad", "b": 3}, nil, "INVALID_INPUT"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response, err := calculatorApp(t).Interact(context.Background(), tc.ref, tc.input, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := assertSettled(t, response, tc.code)
+			if tc.code == "" && !reflect.DeepEqual(result.Value, tc.value) {
+				t.Fatalf("want %#v got %#v", tc.value, result.Value)
+			}
+			if len(response.Context.Next) != 0 {
+				t.Fatalf("calculator must not prescribe a follow-up: %+v", response.Context)
+			}
+		})
 	}
 }
 
@@ -117,61 +150,92 @@ func securedManifest() Manifest {
 	}
 }
 
-func TestGuardsDiscoveryAndNoLeaks(t *testing.T) {
-	ran := 0
-	app, err := New(securedManifest(), Config{
-		Public: []string{"public.ping"},
-		Handlers: map[string]Handler{
-			"public.ping": {Run: func(_ context.Context, _ Args) (Response, error) {
-				return Reply(OK("pong"), Next{Ref: "private.read"}), nil
-			}},
-			"private.read": {
-				Run: func(_ context.Context, _ Args) (Response, error) {
-					ran++
-					return Reply(OK("secret"), Next{Ref: "public.ping"}), nil
+func TestAccess_DiscoveryAndRunAreCallerScoped(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		caller   *RequestContext
+		refs     []string
+		code     string
+		executed int
+	}{
+		{"anonymous", nil, []string{"public.ping"}, "AUTH_REQUIRED", 0},
+		{"verified caller", &RequestContext{Caller: &VerifiedCaller{Subject: "alice"}}, []string{"private.read", "public.ping"}, "", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ran := 0
+			app, err := New(securedManifest(), Config{
+				Public: []string{"public.ping"},
+				Handlers: map[string]Handler{
+					"public.ping": {Run: func(_ context.Context, _ Args) (Response, error) {
+						return Reply(OK("pong"), Next{Ref: "private.read"}), nil
+					}},
+					"private.read": {
+						Run: func(_ context.Context, _ Args) (Response, error) {
+							ran++
+							return Reply(OK("secret"), Next{Ref: "public.ping"}), nil
+						},
+						OnDenied: func(_ context.Context, _ Args, _ DomainError) ([]Next, error) {
+							return []Next{{Ref: "private.read"}}, nil
+						},
+					},
 				},
-				OnDenied: func(_ context.Context, _ Args, _ DomainError) ([]Next, error) {
-					return []Next{{Ref: "private.read"}}, nil
-				},
-			},
-		},
-		Guards: map[string]Guard{"canRead": func(_ context.Context, args Args) (GuardDecision, error) {
-			if args.Caller == nil {
-				return GuardDecision{Error: &DomainError{Code: "AUTH_REQUIRED"}}, nil
+				Guards: map[string]Guard{"canRead": func(_ context.Context, args Args) (GuardDecision, error) {
+					if args.Caller == nil {
+						return GuardDecision{Error: &DomainError{Code: "AUTH_REQUIRED"}}, nil
+					}
+					return GuardDecision{Allowed: true}, nil
+				}},
+				Discoverable: func(_ string, caller *VerifiedCaller) bool { return caller != nil },
+			})
+			if err != nil {
+				t.Fatal(err)
 			}
-			return GuardDecision{Allowed: true}, nil
-		}},
-		Discoverable: func(_ string, caller *VerifiedCaller) bool { return caller != nil },
-	})
-	if err != nil {
-		t.Fatal(err)
+			catalog, err := app.Catalog(tc.caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			refs := make([]string, 0, len(catalog.Interactions))
+			for _, item := range catalog.Interactions {
+				refs = append(refs, item.Ref)
+			}
+			if !reflect.DeepEqual(refs, tc.refs) {
+				t.Fatalf("want disclosed refs %v got %v", tc.refs, refs)
+			}
+			_, err = app.Discover("private.read", tc.caller)
+			if (err == nil) != (tc.executed == 1) {
+				t.Fatalf("description exposure disagrees with policy: %v", err)
+			}
+			ping, err := app.Interact(context.Background(), "public.ping", nil, tc.caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := assertSettled(t, ping, "").Value; got != "pong" {
+				t.Fatalf("public read: %+v", got)
+			}
+			if len(ping.Context.Next) != tc.executed {
+				t.Fatalf("private continuation exposure: %+v", ping.Context)
+			}
+			result, err := app.Interact(context.Background(), "private.read", nil, tc.caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome := assertSettled(t, result, tc.code)
+			if tc.code == "" && outcome.Value != "secret" {
+				t.Fatalf("guarded success payload: %+v", outcome)
+			}
+			if ran != tc.executed {
+				t.Fatalf("want %d handler calls got %d", tc.executed, ran)
+			}
+			if len(result.Context.Next) != tc.executed {
+				t.Fatalf("private next exposure: %+v", result.Context)
+			}
+		})
 	}
-	public, err := app.Catalog(nil)
-	if err != nil || len(public.Interactions) != 1 {
-		t.Fatalf("anonymous discovery leaked: %+v %v", public, err)
-	}
-	if _, err := app.Discover("private.read", nil); err == nil {
-		t.Fatal("anonymous discovery must be hidden")
-	}
-	ping, _ := app.Interact(context.Background(), "public.ping", nil, nil)
-	if len(ping.Context.Next) != 0 {
-		t.Fatal("private next leaked")
-	}
-	denied, err := app.Interact(context.Background(), "private.read", nil, nil)
-	if err != nil || denied.Outcome.Result.Error.Code != "AUTH_REQUIRED" || ran != 0 || len(denied.Context.Next) != 0 {
-		t.Fatalf("guard denial: %+v %v", denied, err)
-	}
-	alice := &RequestContext{Caller: &VerifiedCaller{Subject: "alice"}}
-	visible, _ := app.Catalog(alice)
-	if len(visible.Interactions) != 2 {
-		t.Fatalf("authenticated visibility: %+v", visible)
-	}
-	success, err := app.Interact(context.Background(), "private.read", nil, alice)
-	if err != nil || !success.Outcome.Result.OK || ran != 1 || success.Context.Next[0].Ref != "public.ping" {
-		t.Fatalf("authenticated read: %+v %v", success, err)
-	}
-	if _, err := app.Catalog(&RequestContext{Caller: &VerifiedCaller{Subject: " "}}); err == nil {
-		t.Fatal("untrusted empty Caller must be rejected")
+}
+
+func TestAccess_EmptyTrustedSubjectIsRejected(t *testing.T) {
+	if _, err := calculatorApp(t).Catalog(&RequestContext{Caller: &VerifiedCaller{Subject: " "}}); err == nil {
+		t.Fatal("empty trusted subject accepted")
 	}
 }
 
@@ -205,16 +269,19 @@ func TestContractViolationsAreOpaque(t *testing.T) {
 				t.Fatal(err)
 			}
 			reply, err := app.Interact(context.Background(), "public.ping", nil, nil)
-			if err != nil || reply.Outcome.Result == nil || reply.Outcome.Result.Error == nil ||
-				reply.Outcome.Result.Error.Code != "UNEXPECTED_ERROR" ||
-				len(reply.Context.Next) != 0 {
-				t.Fatalf("failed to hide violation: %+v %v", reply, err)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := assertSettled(t, reply, "UNEXPECTED_ERROR")
+			want := &DomainError{Code: "UNEXPECTED_ERROR", Message: "Unexpected application failure", Effects: "unknown"}
+			if !reflect.DeepEqual(result.Error, want) || len(reply.Context.Next) != 0 {
+				t.Fatalf("failure must be opaque and have no continuation: %+v", reply)
 			}
 		})
 	}
 }
 
-func TestSharedSchemasValidateInputAndOutput(t *testing.T) {
+func TestSharedSchemas_InputAndOutputValidation(t *testing.T) {
 	doc := Manifest{
 		ANWA: "0.2", EntryPoints: []string{"data.echo"},
 		Definitions: map[string]*Schema{
@@ -228,24 +295,37 @@ func TestSharedSchemasValidateInputAndOutput(t *testing.T) {
 			Input: &Schema{Ref: "#/$defs/Container"}, Output: &Schema{Ref: "#/$defs/Container"},
 		}},
 	}
-	app, err := New(doc, Config{Public: []string{"data.echo"}, Handlers: map[string]Handler{
-		"data.echo": {Run: func(_ context.Context, args Args) (Response, error) {
-			return Reply(OK(args.Input)), nil
-		}},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	invalid, _ := app.Follow(context.Background(), Next{Ref: "data.echo", Input: map[string]any{"label": 9}}, nil)
-	if invalid.Outcome.Result.Error.Code != "INVALID_INPUT" {
-		t.Fatalf("bad local reference input: %+v", invalid)
-	}
-	valid, err := app.Interact(context.Background(), "data.echo", map[string]any{"label": "hello"}, nil)
-	if err != nil || !valid.Outcome.Result.OK {
-		t.Fatalf("valid ref input: %+v %v", valid, err)
-	}
-	if valid.Outcome.Result.Value.(map[string]any)["label"] != "hello" {
-		t.Fatalf("wrong result: %+v", valid)
+	for _, tc := range []struct {
+		name   string
+		input  any
+		output any
+		code   string
+		calls  int
+	}{
+		{"invalid input prevents handler", map[string]any{"label": 9}, map[string]any{"label": "hello"}, "INVALID_INPUT", 0},
+		{"valid shared payload", map[string]any{"label": "hello"}, map[string]any{"label": "hello"}, "", 1},
+		{"invalid output is opaque", map[string]any{"label": "hello"}, map[string]any{"label": 9}, "UNEXPECTED_ERROR", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			app, err := New(doc, Config{Public: []string{"data.echo"}, Handlers: map[string]Handler{
+				"data.echo": {Run: func(_ context.Context, _ Args) (Response, error) { calls++; return Reply(OK(tc.output)), nil }},
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := app.Interact(context.Background(), "data.echo", tc.input, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := assertSettled(t, response, tc.code)
+			if calls != tc.calls {
+				t.Fatalf("want %d calls got %d", tc.calls, calls)
+			}
+			if tc.code == "" && !reflect.DeepEqual(result.Value, tc.output) {
+				t.Fatalf("want %+v got %+v", tc.output, result.Value)
+			}
+		})
 	}
 }
 func boolPtr(v bool) *bool { return &v }
@@ -305,7 +385,7 @@ func TestAcceptedActionsAndObservationGuards(t *testing.T) {
 	}
 }
 
-func TestResultNullIsSerializedAndNoErrorsAreLeaked(t *testing.T) {
+func TestWire_SuccessIncludesExplicitNullAndEmptyContinuation(t *testing.T) {
 	data, err := json.Marshal(Reply(OK(nil)))
 	if err != nil {
 		t.Fatal(err)
@@ -316,35 +396,28 @@ func TestResultNullIsSerializedAndNoErrorsAreLeaked(t *testing.T) {
 	}
 }
 
-func TestActionEffectsMustBeExplicit(t *testing.T) {
-	base := Manifest{ANWA: "0.2", EntryPoints: []string{"action.run"},
-		Interactions: map[string]Interaction{
-			"action.run": {Kind: "action", Description: "A test mutation",
-				HasSideEffects: boolPtr(false), Idempotent: boolPtr(false)},
-		},
+func TestManifest_ActionEffectsAreRequiredBooleans(t *testing.T) {
+	cases := []struct {
+		name, kind          string
+		effects, idempotent *bool
+		valid               bool
+	}{
+		{"explicit false values", "action", boolPtr(false), boolPtr(false), true},
+		{"pure idempotent Action", "action", boolPtr(false), boolPtr(true), true},
+		{"missing side effects", "action", nil, boolPtr(true), false},
+		{"missing idempotency", "action", boolPtr(true), nil, false},
+		{"Query forbids Action fields", "query", boolPtr(false), boolPtr(true), false},
+		{"Event forbids Action fields", "event", boolPtr(false), boolPtr(true), false},
 	}
-	if err := base.Validate(); err != nil {
-		t.Fatalf("explicit false must be allowed: %v", err)
-	}
-	for _, field := range []string{"hasSideEffects", "idempotent"} {
-		copy := base
-		copy.Interactions = map[string]Interaction{"action.run": base.Interactions["action.run"]}
-		spec := copy.Interactions["action.run"]
-		if field == "hasSideEffects" {
-			spec.HasSideEffects = nil
-		} else {
-			spec.Idempotent = nil
-		}
-		copy.Interactions["action.run"] = spec
-		if err := copy.Validate(); err == nil {
-			t.Fatalf("missing %s must be rejected", field)
-		}
-	}
-	query := base
-	query.Interactions = map[string]Interaction{
-		"action.run": {Kind: "query", Description: "Read only", HasSideEffects: boolPtr(false)},
-	}
-	if err := query.Validate(); err == nil {
-		t.Fatal("Queries cannot declare Action-only effects")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := Manifest{ANWA: "0.2", EntryPoints: []string{"test.run"}, Interactions: map[string]Interaction{
+				"test.run": {Kind: tc.kind, Description: "Operation", HasSideEffects: tc.effects, Idempotent: tc.idempotent},
+			}}
+			err := doc.Validate()
+			if (err == nil) != tc.valid {
+				t.Fatalf("want valid=%t, got %v", tc.valid, err)
+			}
+		})
 	}
 }

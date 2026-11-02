@@ -1,9 +1,15 @@
-import { AnwaApp, fail, ok, reply } from "../../src/anwa.ts";
+import {
+  createAnwaApp,
+  type AnwaApp,
+  fail,
+  ok,
+  reply,
+} from "../../src/anwa.ts";
 
 import { schema } from "./contract.generated.ts";
 
 export function createCalculator(): AnwaApp<typeof schema> {
-  return new AnwaApp(schema).bind(
+  return createAnwaApp(schema).bind(
     {
       "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
       "calculator.divide": async ({ input }) =>

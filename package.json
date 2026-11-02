@@ -18,11 +18,17 @@
     "typecheck": "bun check",
     "lint:check": "bunx oxlint src demo test tools",
     "codegen": "bun tools/anwa.ts generate-manifest demo/calculator/anwa.json demo/calculator/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/orders/anwa.json demo/orders/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/reports/anwa.json demo/reports/contract.generated.ts && bun tools/anwa.ts generate-manifest demo/todo/anwa.json demo/todo/contract.generated.ts",
-    "demo:todo": "bun demo/todo/run.ts"
+    "demo:todo": "bun demo/todo/run.ts",
+    "architecture:check": "bun tools/check-architecture.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
     "oxlint": "1.90.0",
-    "hono": "4.13.14"
+    "hono": "4.13.14",
+    "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "neverthrow": "8.2.0",
+    "ts-pattern": "5.9.2"
   }
 }

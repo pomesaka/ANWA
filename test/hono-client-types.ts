@@ -55,7 +55,6 @@ void missingInput;
 // @ts-expect-error Hono RPC must not expose a made-up route.
 void client.anwa.unknown.$get;
 
-const descriptorRequest = client.anwa.interactions[":ref"].$get({
-  param: { ref: "calculator.add" },
-});
+type DescriptorInput = InferRequestType<typeof descriptorMethod>;
+const descriptorRequest: DescriptorInput = { param: { ref: "calculator.add" } };
 void descriptorRequest;

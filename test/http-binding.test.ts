@@ -1,294 +1,345 @@
-import { test } from "bun:test";
+/** HTTP Binding 0.1 — transport failures and ANWA outcomes are separate channels. */
+import { describe, test } from "bun:test";
 import assert from "node:assert/strict";
-import { Hono } from "hono";
+import { hc } from "hono/client";
 import { createAnwaFetchHandler } from "../src/http/fetch.ts";
 import { createCalculator } from "../demo/calculator/index.ts";
 import { createOrders } from "../demo/orders/index.ts";
 import { createReports } from "../demo/reports/index.ts";
+import { createAnwaApp, ok, reply } from "../src/anwa.ts";
+import { app as honoApp, type AppType } from "../demo/http/hono.ts";
+import { success, failure, execution } from "./support/outcome.ts";
 
-const jsonRequest = (body: string, headers: Record<string, string> = {}) =>
-  new Request("https://example.test/anwa/invoke", {
-    method: "POST",
+const request = (
+  path: string,
+  body?: string,
+  headers: Record<string, string> = {},
+  method = body === undefined ? "GET" : "POST",
+) =>
+  new Request("https://example.test" + path, {
+    method,
+    ...(body === undefined ? {} : { body }),
     headers: { "content-type": "application/json", ...headers },
-    body,
   });
-const invokeBody = (ref: string, input?: unknown) =>
+const envelope = (ref: string, input?: unknown) =>
   JSON.stringify({ ref, ...(input === undefined ? {} : { input }) });
-
-test("Fetch binding serves Discovery and Invoke without a network server", async () => {
-  const handler = createAnwaFetchHandler(createCalculator());
-  const catalog = await handler(
-    new Request("https://example.test/anwa/catalog"),
-  );
-  assert.equal(catalog.status, 200);
-  assert.equal(catalog.headers.get("cache-control"), "no-store");
-  assert.deepEqual((await catalog.json()).entrypoints, [
-    "calculator.add",
-    "calculator.divide",
-  ]);
-  const discovered = await handler(
-    new Request("https://example.test/anwa/interactions/calculator.add"),
-  );
-  assert.equal(discovered.status, 200);
-  assert.equal((await discovered.json()).description.ref, "calculator.add");
-
-  const added = await handler(
-    jsonRequest(invokeBody("calculator.add", { a: 2, b: 3 })),
-  );
-  assert.equal(added.status, 200);
-  assert.deepEqual((await added.json()).outcome, {
-    kind: "settled",
-    result: { ok: true, value: 5 },
-  });
-  const divided = await handler(
-    jsonRequest(invokeBody("calculator.divide", { a: 1, b: 0 })),
-  );
-  const divideResult = (await divided.json()).outcome;
-  assert.equal(divided.status, 200); // domain errors are not transport errors
-  assert.equal(divideResult.result.error.code, "DIVIDE_BY_ZERO");
-  const invalid = await handler(
-    jsonRequest(invokeBody("calculator.add", { a: "oops", b: 3 })),
-  );
-  assert.equal(invalid.status, 200);
-  assert.equal(
-    (await invalid.json()).outcome.result.error.code,
-    "INVALID_INPUT",
-  );
-});
-
-test("Fetch binding returns 202 for accepted async Actions", async () => {
-  const handler = createAnwaFetchHandler(createReports());
-  const result = await handler(
-    jsonRequest(invokeBody("report.generate", { topic: "ANWA" })),
-  );
-  assert.equal(result.status, 202);
-  assert.equal((await result.json()).outcome.kind, "accepted");
-});
-
-test("Trusted authentication is separate from public request fields", async () => {
-  const app = createOrders();
-  const handler = createAnwaFetchHandler(app, {
-    authenticate: async (request) => {
-      const authorization = request.headers.get("authorization");
-      if (!authorization) return null;
-      if (authorization !== "Bearer alice-secret")
-        throw Error("Never reveal credential details");
+const authenticated = () =>
+  createAnwaFetchHandler(createOrders(), {
+    authenticate: (req) => {
+      const token = req.headers.get("authorization");
+      if (!token) return null;
+      if (token !== "Bearer test-alice") throw Error("private token detail");
       return { subject: "alice" };
     },
   });
-  const anonymous = await handler(
-    new Request("https://example.test/anwa/catalog"),
-  );
-  assert.deepEqual((await anonymous.json()).interactions, []);
-  const privateDescriptor = await handler(
-    new Request("https://example.test/anwa/interactions/order.cancel"),
-  );
-  assert.equal(privateDescriptor.status, 404);
 
-  const denied = await handler(
-    jsonRequest(invokeBody("order.get", { orderId: "pending" })),
-  );
-  assert.equal(denied.status, 200);
-  assert.equal(
-    (await denied.json()).outcome.result.error.code,
-    "AUTH_REQUIRED",
-  );
-
-  const spoofed = await handler(
-    jsonRequest(
-      '{"ref":"order.get","input":{"orderId":"pending"},"caller":{"subject":"alice"}}',
-    ),
-  );
-  assert.equal(spoofed.status, 400);
-
-  const authHeaders = { authorization: "Bearer alice-secret" };
-  const allowed = await handler(
-    jsonRequest(invokeBody("order.get", { orderId: "pending" }), authHeaders),
-  );
-  assert.equal((await allowed.json()).outcome.result.value.id, "pending");
-
-  const shipped = await handler(
-    jsonRequest(
-      invokeBody("order.cancel", {
-        orderId: "shipped",
-        reason: "Changed mind",
-      }),
-      authHeaders,
-    ),
-  );
-  const failure = await shipped.json();
-  assert.equal(failure.outcome.result.error.code, "ORDER_ALREADY_SHIPPED");
-  const next = failure.context.next.find(
-    (x: { ref: string }) => x.ref === "shipment.track",
-  );
-  assert.ok(next);
-  const followed = await handler(
-    jsonRequest(invokeBody(next.ref, next.input), authHeaders),
-  );
-  assert.equal((await followed.json()).outcome.result.value, "delivered");
-
-  const wrongToken = await handler(
-    new Request("https://example.test/anwa/catalog", {
-      headers: { authorization: "Bearer bad" },
-    }),
-  );
-  assert.equal(wrongToken.status, 401);
-  assert.doesNotMatch(await wrongToken.text(), /Never reveal/);
-});
-
-test("Fetch binding distinguishes protocol errors from ANWA Results", async () => {
-  const handler = createAnwaFetchHandler(createCalculator(), {
-    maxBodyBytes: 64,
-  });
+describe("HTTP — protocol failures have exact status, code and no ANWA outcome", () => {
   const cases = [
-    [new Request("https://example.test/anwa/missing"), 404],
-    [new Request("https://example.test/anwa/invoke"), 405],
-    [new Request("https://example.test/anwa/interactions/unknown"), 404],
-    [jsonRequest('{"ref":"missing"}'), 404],
-    [jsonRequest('{"ref":"calculator.add"'), 400],
-    [jsonRequest('{"ref":"calculator.add","caller":"untrusted"}'), 400],
-    [jsonRequest("null"), 400],
-    [jsonRequest('{"ref":"calculator.add"}{}'), 400],
-    [
-      new Request("https://example.test/anwa/invoke", {
-        method: "POST",
-        body: "{}",
-        headers: { "content-type": "text/plain" },
-      }),
-      415,
-    ],
-    [
-      jsonRequest(
-        '{"ref":"calculator.add","input":{"a":1,"b":2},"padding":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}',
-      ),
-      413,
-    ],
-  ] as const;
-  for (const [request, expected] of cases) {
-    const response = await handler(request);
-    assert.equal(response.status, expected, request.url);
-    assert.match(
-      response.headers.get("content-type") ?? "",
-      /application\/problem\+json/,
-    );
-    assert.equal((await response.json()).status, expected);
-  }
-  const method = await handler(new Request("https://example.test/anwa/invoke"));
-  assert.equal(method.headers.get("allow"), "POST");
-  const jsonWithCharset = await createAnwaFetchHandler(createCalculator())(
-    jsonRequest(invokeBody("calculator.add", { a: 1, b: 2 }), {
-      "content-type": "application/json; charset=utf-8",
-    }),
+    {
+      name: "unknown route",
+      path: "/anwa/missing",
+      status: 404,
+      code: "NOT_FOUND",
+    },
+    {
+      name: "wrong invoke method",
+      path: "/anwa/invoke",
+      status: 405,
+      code: "METHOD_NOT_ALLOWED",
+      allow: "POST",
+    },
+    {
+      name: "unknown description",
+      path: "/anwa/interactions/missing",
+      status: 404,
+      code: "NOT_FOUND",
+    },
+    {
+      name: "unknown Interaction",
+      path: "/anwa/invoke",
+      body: '{"ref":"missing"}',
+      status: 404,
+      code: "NOT_FOUND",
+    },
+    {
+      name: "malformed JSON",
+      path: "/anwa/invoke",
+      body: '{"ref":',
+      status: 400,
+      code: "INVALID_REQUEST",
+    },
+    {
+      name: "extra envelope field",
+      path: "/anwa/invoke",
+      body: '{"ref":"calculator.add","caller":"alice"}',
+      status: 400,
+      code: "INVALID_REQUEST",
+    },
+    {
+      name: "null envelope",
+      path: "/anwa/invoke",
+      body: "null",
+      status: 400,
+      code: "INVALID_REQUEST",
+    },
+    {
+      name: "two JSON documents",
+      path: "/anwa/invoke",
+      body: '{"ref":"calculator.add"}{}',
+      status: 400,
+      code: "INVALID_REQUEST",
+    },
+    {
+      name: "non-JSON content type",
+      path: "/anwa/invoke",
+      body: "{}",
+      headers: { "content-type": "text/plain" },
+      status: 415,
+      code: "UNSUPPORTED_MEDIA_TYPE",
+    },
+    {
+      name: "body exceeds 64-byte limit",
+      path: "/anwa/invoke",
+      body: '{"ref":"calculator.add","input":{"a":1,"b":2},"padding":"xxxxxxxxxxxxxxxxxxxx"}',
+      status: 413,
+      code: "PAYLOAD_TOO_LARGE",
+    },
+  ];
+  test.each(cases)(
+    "$name",
+    async ({ path, body, headers, status, code, allow }) => {
+      const handler = createAnwaFetchHandler(createCalculator(), {
+        maxBodyBytes: 64,
+      });
+      const response = await handler(request(path, body, headers));
+      assert.equal(response.status, status);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.match(
+        response.headers.get("content-type") ?? "",
+        /^application\/problem\+json/,
+      );
+      assert.equal(response.headers.get("allow"), allow ?? null);
+      const document = await response.json();
+      assert.deepEqual(Object.keys(document).sort(), [
+        "code",
+        "status",
+        "title",
+        "type",
+      ]);
+      assert.equal(document.type, "about:blank");
+      assert.equal(document.status, status);
+      assert.equal(document.code, code);
+      assert.equal(typeof document.title, "string");
+    },
   );
-  assert.equal(jsonWithCharset.status, 200);
-  assert.throws(
-    () => createAnwaFetchHandler(createCalculator(), { prefix: "/anwa/" }),
-    /prefix/,
-  );
-});
-
-test("Hono can register the Fetch binding directly on an existing router", async () => {
-  const router = new Hono();
-  router.get("/health", (c) => c.text("healthy"));
-  const handler = createAnwaFetchHandler(createCalculator());
-  router.all("/anwa/*", (c) => handler(c.req.raw));
-
-  const health = await router.request("https://example.test/health");
-  assert.equal(await health.text(), "healthy");
-  const response = await router.request("https://example.test/anwa/invoke", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: invokeBody("calculator.add", { a: 7, b: 8 }),
-  });
-  assert.equal(response.status, 200);
-  assert.equal((await response.json()).outcome.result.value, 15);
-});
-
-test("Hono + Fetch binding accepts real loopback HTTP traffic", async () => {
-  const router = new Hono();
-  const handler = createAnwaFetchHandler(createCalculator());
-  router.all("/anwa/*", (c) => handler(c.req.raw));
-  const server = Bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    fetch: (request) => router.fetch(request),
-  });
-  try {
-    const response = await fetch(
-      "http://127.0.0.1:" + server.port + "/anwa/invoke",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: invokeBody("calculator.add", { a: 20, b: 22 }),
+  test.each([
+    {
+      name: "throwing authenticator is 401",
+      authenticate: () => {
+        throw Error("private credential");
       },
+      status: 401,
+      code: "UNAUTHENTICATED",
+    },
+    {
+      name: "empty trusted subject is adapter error",
+      authenticate: () => ({ subject: " " }),
+      status: 500,
+      code: "ADAPTER_ERROR",
+    },
+  ])("$name", async ({ authenticate, status, code }) => {
+    const response = await createAnwaFetchHandler(createCalculator(), {
+      authenticate,
+    })(request("/anwa/catalog"));
+    assert.equal(response.status, status);
+    const body = await response.json();
+    assert.equal(body.code, code);
+    assert.equal(body.status, status);
+    assert.doesNotMatch(JSON.stringify(body), /private credential/);
+  });
+  test.each([
+    { name: "trailing slash prefix", options: { prefix: "/anwa/" } },
+    { name: "root prefix", options: { prefix: "/" } },
+    { name: "negative body limit", options: { maxBodyBytes: -1 } },
+  ])("$name fails at construction", ({ options }) => {
+    assert.throws(
+      () => createAnwaFetchHandler(createCalculator(), options),
+      /Invalid ANWA HTTP prefix|Invalid maxBodyBytes/,
+    );
+  });
+});
+
+describe("HTTP — settled success and failure both preserve Outcome + Context", () => {
+  test.each([
+    {
+      name: "numeric sum",
+      ref: "calculator.add",
+      input: { a: 2, b: 3 },
+      value: 5,
+      code: null,
+    },
+    {
+      name: "declared division failure",
+      ref: "calculator.divide",
+      input: { a: 1, b: 0 },
+      value: undefined,
+      code: "DIVIDE_BY_ZERO",
+    },
+    {
+      name: "schema-invalid input",
+      ref: "calculator.add",
+      input: { a: "oops", b: 3 },
+      value: undefined,
+      code: "INVALID_INPUT",
+    },
+  ])("$name returns 200 JSON", async ({ ref, input, value, code }) => {
+    const response = await createAnwaFetchHandler(createCalculator())(
+      request("/anwa/invoke", envelope(ref, input)),
     );
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).outcome.result.value, 42);
-  } finally {
-    server.stop(true);
-  }
+    assert.match(
+      response.headers.get("content-type") ?? "",
+      /^application\/json/,
+    );
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const body = await response.json();
+    if (code === null) assert.deepEqual(success(body), value);
+    else failure(body, code);
+    assert.deepEqual(body.context.next, []);
+  });
+  test("accepted Action returns 202 with an execution handle, not a settled result", async () => {
+    const handler = createAnwaFetchHandler(
+      createReports({ wait: () => Promise.resolve() }),
+    );
+    const response = await handler(
+      request("/anwa/invoke", envelope("report.generate", { topic: "ANWA" })),
+    );
+    assert.equal(response.status, 202);
+    assert.notEqual(execution(await response.json()), "");
+  });
+  test("application/json with charset is accepted", async () => {
+    const result = await createAnwaFetchHandler(createCalculator())(
+      request("/anwa/invoke", envelope("calculator.add", { a: 2, b: 3 }), {
+        "content-type": "application/json; charset=utf-8",
+      }),
+    );
+    assert.equal(result.status, 200);
+    assert.equal(success(await result.json()), 5);
+  });
 });
 
-test("Explicit null does not become an omitted request input", async () => {
-  const { AnwaApp, ok, reply } = await import("../src/anwa.ts");
-  const schema = {
-    anwa: "0.2",
-    entrypoints: ["ping"],
-    interactions: { ping: { kind: "query", description: "Public ping" } },
-  } as const;
-  const runtime = new AnwaApp(schema).bind(
-    { ping: async () => reply(ok("pong")) },
-    { public: ["ping"] },
-  );
-  const handler = createAnwaFetchHandler(runtime);
-  const omitted = await handler(jsonRequest('{"ref":"ping"}'));
-  assert.equal((await omitted.json()).outcome.result.value, "pong");
-  const explicitNull = await handler(
-    jsonRequest('{"ref":"ping","input":null}'),
-  );
-  assert.equal(explicitNull.status, 200);
-  assert.equal(
-    (await explicitNull.json()).outcome.result.error.code,
-    "INVALID_INPUT",
-  );
+describe("HTTP AUTH — credentials are adapter input, never envelope input", () => {
+  test.each([
+    { name: "anonymous", token: "", visible: [], code: "AUTH_REQUIRED" },
+    {
+      name: "verified owner",
+      token: "Bearer test-alice",
+      visible: ["order.get", "order.cancel", "shipment.track"],
+      code: null,
+    },
+  ])("$name discovery and invocation", async ({ token, visible, code }) => {
+    const handler = authenticated();
+    const headers: Record<string, string> = token
+      ? { authorization: token }
+      : {};
+    const catalog = await handler(request("/anwa/catalog", undefined, headers));
+    assert.equal(catalog.status, 200);
+    assert.deepEqual(
+      (await catalog.json()).interactions.map((op: { ref: string }) => op.ref),
+      visible,
+    );
+    const response = await handler(
+      request(
+        "/anwa/invoke",
+        envelope("order.get", { orderId: "pending" }),
+        headers,
+      ),
+    );
+    assert.equal(response.status, 200);
+    if (code) failure(await response.json(), code);
+    else
+      assert.deepEqual(success(await response.json()), {
+        id: "pending",
+        status: "pending",
+      });
+  });
+  test("hidden description is not disclosed", async () => {
+    const response = await authenticated()(
+      request("/anwa/interactions/order.cancel"),
+    );
+    assert.equal(response.status, 404);
+    assert.equal((await response.json()).code, "NOT_FOUND");
+  });
+  test("forged caller field cannot bypass anonymous Guard", async () => {
+    const response = await authenticated()(
+      request(
+        "/anwa/invoke",
+        '{"ref":"order.get","input":{"orderId":"pending"},"caller":{"subject":"alice"}}',
+      ),
+    );
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, "INVALID_REQUEST");
+  });
 });
 
-test("Chained Hono routes work with the manifest-typed hc client over HTTP", async () => {
-  const { hc } = await import("hono/client");
-  const { app } = await import("../demo/http/hono.ts");
-  type AppType = typeof import("../demo/http/hono.ts").app;
+describe("HTTP INPUT — omitted input and explicit null remain distinct", () => {
+  test.each([
+    { name: "omitted input succeeds", body: '{"ref":"ping"}', code: null },
+    {
+      name: "explicit null is unexpected input",
+      body: '{"ref":"ping","input":null}',
+      code: "INVALID_INPUT",
+    },
+  ])("$name", async ({ body, code }) => {
+    const schema = {
+      anwa: "0.2",
+      entrypoints: ["ping"],
+      interactions: { ping: { kind: "query", description: "Ping" } },
+    } as const;
+    const handler = createAnwaFetchHandler(
+      createAnwaApp(schema).bind(
+        { ping: () => reply(ok("pong")) },
+        { public: ["ping"] },
+      ),
+    );
+    const response = await handler(request("/anwa/invoke", body));
+    assert.equal(response.status, 200);
+    if (code) failure(await response.json(), code);
+    else assert.equal(success(await response.json()), "pong");
+  });
+});
 
+test("HONO RPC — real HTTP supports health, catalog, description and typed invocation", async () => {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch: (request) => app.fetch(request),
+    fetch: (request) => honoApp.fetch(request),
   });
   try {
     const client = hc<AppType>("http://127.0.0.1:" + server.port);
+    assert.equal(await (await client.health.$get()).text(), "healthy");
     const catalog = await client.anwa.catalog.$get();
     assert.equal(catalog.status, 200);
-    const catalogJson = await catalog.json();
-    assert.ok("entrypoints" in catalogJson);
-
-    const discovered = await client.anwa.interactions[":ref"].$get({
+    const catalogBody = await catalog.json();
+    assert.ok("entrypoints" in catalogBody);
+    assert.deepEqual(catalogBody.entrypoints, [
+      "calculator.add",
+      "calculator.divide",
+    ]);
+    const found = await client.anwa.interactions[":ref"].$get({
       param: { ref: "calculator.add" },
     });
-    assert.equal(discovered.status, 200);
-    const found = await discovered.json();
-    assert.ok("description" in found);
-
-    const result = await client.anwa.invoke.$post({
+    assert.equal(found.status, 200);
+    const description = await found.json();
+    assert.ok("description" in description);
+    assert.equal(description.description.ref, "calculator.add");
+    const response = await client.anwa.invoke.$post({
       json: { ref: "calculator.add", input: { a: 20, b: 22 } },
     });
-    assert.equal(result.status, 200);
-    const outcome = await result.json();
-    assert.ok("outcome" in outcome);
-    if ("outcome" in outcome && outcome.outcome.kind === "settled") {
-      assert.equal(outcome.outcome.result.ok, true);
-      if (outcome.outcome.result.ok) {
-        assert.equal(outcome.outcome.result.value, 42);
-      }
-    }
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.ok("outcome" in body);
+    assert.equal(success(body), 42);
   } finally {
     server.stop(true);
   }
