@@ -15,7 +15,7 @@ The four logical framework responsibilities remain:
 3. **Discovery:** list and describe Interactions without requiring an owning resource.
 4. **Interaction:** invoke or observe Interactions and return `Outcome + Context`.
 
-These responsibilities are not four mandatory network protocols. The current reference runtime is an in-process adapter.
+These responsibilities are not four mandatory network protocols. The ANWA Core reference runtime remains in-process. An optional, experimental [HTTP Binding 0.1](../docs/http-binding.md) now exposes Discovery and Query/Action invocation over HTTP via Go's `http.Handler` or the Web Fetch API. It does not change the v0.2 manifest, add transport fields, or expose Event streams yet.
 
 ## Public manifest
 

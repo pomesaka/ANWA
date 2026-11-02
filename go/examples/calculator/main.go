@@ -4,11 +4,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/pomesaka/ANWA/go/anwa"
+	"github.com/pomesaka/ANWA/go/httpbinding"
 )
 
 // The generated interface requires both methods to exist with typed inputs
@@ -29,6 +32,8 @@ func (*CalculatorServer) CalculatorDivide(_ context.Context, request CalculatorD
 }
 
 func main() {
+	listen := flag.String("listen", "", "serve ANWA over HTTP at this address (example: 127.0.0.1:8080)")
+	flag.Parse()
 	data, err := os.ReadFile("../demo/calculator/anwa.json")
 	if err != nil {
 		log.Fatal(err)
@@ -44,6 +49,17 @@ func main() {
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *listen != "" {
+		adapter, err := httpbinding.New(app, httpbinding.Options{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		mux := http.NewServeMux()
+		mux.Handle("/anwa/", adapter)
+		log.Printf("ANWA HTTP calculator listening on %s", *listen)
+		log.Fatal(http.ListenAndServe(*listen, mux))
+		return
 	}
 	catalog, err := app.Catalog(nil)
 	if err != nil {

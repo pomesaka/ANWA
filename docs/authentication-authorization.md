@@ -1,6 +1,6 @@
 # Authentication, authorization and discovery
 
-> Active experimental ANWA v0.2 design. The reference is in-process; it is **not** an authentication provider or a deployable security boundary.
+> Active experimental ANWA v0.2 design. Core is in-process, and the optional [HTTP Binding 0.1](http-binding.md) supplies transport routing only. Neither is an authentication provider or a deployable security boundary.
 
 ## Trust boundary
 
@@ -14,7 +14,7 @@ app.catalog(request);
 app.discover("order.get", request);
 ```
 
-The code above **simulates** a verified identity. `VerifiedCaller` is a TypeScript contract, **not a cryptographic proof**. The in-process `interact` API accepts ordinary objects; a web adapter must **not** permit clients to supply or override that trusted argument directly. No token verification, sessions, password handling, or remote authentication is implemented in the ANWA reference runtime.
+The code above **simulates** a verified identity. `VerifiedCaller` is a TypeScript contract, **not a cryptographic proof**. The in-process `interact` API accepts ordinary objects; a web adapter must **not** permit clients to supply or override that trusted argument directly. No token verification, sessions, or password handling is implemented in the ANWA reference runtime. The optional HTTP Binding accepts a trusted application-authored authentication callback, but it does not verify credentials itself or trust a `caller` field in JSON.
 
 ## Runtime access control
 
@@ -37,6 +37,6 @@ This policy has **no resource input**, so it cannot prove access to a particular
 
 ## Incomplete security features
 
-There is no authentication adapter, enforcement outside this in-process entrypoint, session management, identity-provider integration, durable audit trail, atomic policy check in storage, or token-based authorization. Consumers must not treat the current runtime as a secure externally callable server.
+An optional HTTP routing adapter now exists, but it **does not** provide an authentication implementation, session management, identity-provider integration, durable audit trail, atomic policy check in storage, or token-based authorization. Do not expose guarded ANWA operations without a trusted authenticator and business-side authorization. Consumers must not treat the current runtime as a secure externally callable server.
 
 [Architecture](architecture.md) · [ANWA v0.2](../spec/anwa-0.2.md) · [Orders demo](../demo/orders/index.ts)
