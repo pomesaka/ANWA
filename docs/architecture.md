@@ -79,4 +79,4 @@ The author-maintained `anwa.json` is the source of truth. Shared payload shapes 
 
 CI regenerates the contract and fails on drift; it also runs strict `bun check`, Formatter, Oxlint, Bun tests and demos. Runtime validation remains essential for untrusted agent inputs.
 
-[ANWA spec](../spec/anwa-0.2.md) · [Schema authoring](schema-authoring.md)
+[ANWA spec](../spec/anwa-0.2.md) · [Schema authoring](schema-authoring.md) · [Typed failure boundaries](typed-errors.md)
