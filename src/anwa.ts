@@ -1,4 +1,4 @@
-import { Result, ResultAsync } from "neverthrow";
+import { Result as NeverthrowResult, ResultAsync } from "neverthrow";
 import { match } from "ts-pattern";
 import {
   validateManifest,
@@ -370,7 +370,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       !this.schema.interactions[ref].guard
     )
       return false;
-    return Result.fromThrowable(
+    return NeverthrowResult.fromThrowable(
       () => this.discoveryPolicy?.({ ref, caller }) === true,
       () => ({ kind: "discovery-policy-failure" }) as const,
     )().unwrapOr(false); // Fail closed if the application policy throws.
