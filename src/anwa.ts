@@ -1,3 +1,5 @@
+import { Result, ResultAsync } from "neverthrow";
+import { match } from "ts-pattern";
 import {
   validateManifest,
   type DataSchema,
@@ -368,11 +370,10 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       !this.schema.interactions[ref].guard
     )
       return false;
-    try {
-      return this.discoveryPolicy?.({ ref, caller }) === true;
-    } catch {
-      return false; // Fail closed if discovery policy cannot decide.
-    }
+    return Result.fromThrowable(
+      () => this.discoveryPolicy?.({ ref, caller }) === true,
+      () => ({ kind: "discovery-policy-failure" }) as const,
+    )().unwrapOr(false); // Fail closed if the application policy throws.
   }
 
   /** Discovery is filtered separately from invocation Guards; it has no resource input. */
@@ -517,81 +518,107 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     return this.interactInternal(candidate.ref, candidate.input, request);
   }
 
-  private async interactInternal(
+  /**
+   * Accept the public Outcome union only after checking its runtime shape.
+   * A handler can be supplied by JavaScript/untrusted adapters, so static
+   * TypeScript exhaustiveness is not sufficient at this boundary.
+   */
+  private verifiedResponse(
     ref: string,
-    input?: unknown,
-    request?: RequestContext,
-  ): Promise<InteractionResponse> {
-    const caller = verifiedCaller(request);
-    const { spec, handler } = this.resolve(ref);
-    if (spec.kind === "event")
-      throw Error("Use observe for Event Interactions");
-    const error = spec.input
-      ? checkPayload(spec.input, input, "$", this.schema.$defs)
-      : input === undefined
-        ? null
-        : "Unexpected input";
-    if (error) return reply(fail("INVALID_INPUT", error));
-    try {
-      const params = { ref, input, app: this, caller };
-      let response: InteractionResponse;
-      if (spec.guard) {
-        const decision = await this.guards[spec.guard](params);
-        if (
-          typeof decision?.allowed !== "boolean" ||
-          (!decision.allowed && !decision.error?.code)
-        )
-          throw Error("Invalid Guard decision");
-        const guarded = handler as Extract<RuntimeBinding, { run: RuntimeRun }>;
-        if (!decision.allowed) {
-          this.declaredError(spec, decision.error);
-          const next = await guarded.onDenied!({
-            ...params,
-            error: decision.error,
-          });
-          response = reply({ ok: false, error: decision.error }, next);
-        } else {
-          response = (await guarded.run(params)) as InteractionResponse;
-        }
-      } else {
-        response = (await (handler as RuntimeRun)(
-          params,
-        )) as InteractionResponse;
-      }
-      if (!response || !response.outcome)
-        throw Error("Handler must return reply(...)");
-      const outcome = response.outcome;
-      if (outcome.kind === "accepted") {
+    spec: InteractionDefinition,
+    response: InteractionResponse,
+    caller: VerifiedCaller | null,
+  ): InteractionResponse {
+    if (!response || !response.outcome)
+      throw Error("Handler must return reply(...)");
+    match(response.outcome)
+      .with({ kind: "accepted" }, (outcome) => {
         if (
           spec.kind !== "action" ||
           typeof outcome.execution?.id !== "string" ||
           !outcome.execution.id
         )
           throw Error("Invalid accepted outcome");
-      } else if (outcome.kind === "settled") {
-        const result = outcome.result;
-        if (typeof result?.ok !== "boolean") throw Error("Invalid Result");
-        if (result.ok) {
+      })
+      .with({ kind: "settled", result: { ok: true } }, ({ result }) => {
+        if (
+          spec.output &&
+          checkPayload(spec.output, result.value, "$", this.schema.$defs)
+        )
+          throw Error("Invalid handler output");
+      })
+      .with({ kind: "settled", result: { ok: false } }, ({ result }) => {
+        this.declaredError(spec, result.error);
+      })
+      .exhaustive();
+    this.validateContext(response.context, ref);
+    return {
+      ...response,
+      context: {
+        next: response.context.next.filter((choice) =>
+          this.canDiscover(choice.ref, caller),
+        ),
+      },
+    };
+  }
+
+  private async interactInternal(
+    ref: string,
+    input?: unknown,
+    request?: RequestContext,
+  ): Promise<InteractionResponse> {
+    // Unknown refs and a forged trusted context are API usage errors.
+    // As before, these are not converted into application-level Results.
+    const caller = verifiedCaller(request);
+    const { spec, handler } = this.resolve(ref);
+    if (spec.kind === "event")
+      throw Error("Use observe for Event Interactions");
+
+    const inputIssue = spec.input
+      ? checkPayload(spec.input, input, "$", this.schema.$defs)
+      : input === undefined
+        ? null
+        : "Unexpected input";
+    if (inputIssue) return reply(fail("INVALID_INPUT", inputIssue));
+
+    // Handler/Guard failures are contained at one explicit async boundary.
+    // The library's ResultAsync catches both synchronous throws and
+    // rejected promises, so no try/catch is needed in the runtime.
+    return ResultAsync.fromThrowable(
+      async (): Promise<InteractionResponse> => {
+        const params = { ref, input, app: this, caller };
+        let response: InteractionResponse;
+        if (spec.guard) {
+          const decision = await this.guards[spec.guard](params);
           if (
-            spec.output &&
-            checkPayload(spec.output, result.value, "$", this.schema.$defs)
+            typeof decision?.allowed !== "boolean" ||
+            (!decision.allowed && !decision.error?.code)
           )
-            throw Error("Invalid handler output");
-        } else this.declaredError(spec, result.error);
-      } else throw Error("Unknown outcome");
-      this.validateContext(response.context, ref);
-      // Avoid advertising private Interaction names in a result delivered to this caller.
-      return {
-        ...response,
-        context: {
-          next: response.context.next.filter((choice) =>
-            this.canDiscover(choice.ref, caller),
-          ),
-        },
-      };
-    } catch {
-      return unexpected();
-    }
+            throw Error("Invalid Guard decision");
+          const guarded = handler as Extract<
+            RuntimeBinding,
+            { run: RuntimeRun }
+          >;
+          if (!decision.allowed) {
+            this.declaredError(spec, decision.error);
+            const next = await guarded.onDenied!({
+              ...params,
+              error: decision.error,
+            });
+            response = reply({ ok: false, error: decision.error }, next);
+          } else {
+            response = (await guarded.run(params)) as InteractionResponse;
+          }
+        } else {
+          response = (await (handler as RuntimeRun)(params)) as InteractionResponse;
+        }
+        return this.verifiedResponse(ref, spec, response, caller);
+      },
+      () => ({ kind: "unexpected-interaction-failure" }) as const,
+    )().match(
+      (response) => response,
+      () => unexpected(),
+    );
   }
 
   /** Async Guards are evaluated when an Event stream is first consumed, before the Event handler starts. */
@@ -629,18 +656,25 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     return (async function* (runtime: AnwaApp<M>): AsyncGenerator<unknown> {
       const params = { ref, input, app: runtime, caller };
       if (spec.guard) {
-        let decision: GuardDecision;
-        try {
-          decision = await runtime.guards[spec.guard](params);
-          if (
-            typeof decision?.allowed !== "boolean" ||
-            (!decision.allowed && !decision.error?.code)
-          )
-            throw Error("Invalid Guard decision");
-          if (!decision.allowed) runtime.declaredError(spec, decision.error);
-        } catch {
-          throw new ObservationDenied("UNEXPECTED_ERROR");
-        }
+        const decision = await ResultAsync.fromThrowable(
+          async (): Promise<GuardDecision> => {
+            const guarded = await runtime.guards[spec.guard!](params);
+            if (
+              typeof guarded?.allowed !== "boolean" ||
+              (!guarded.allowed && !guarded.error?.code)
+            )
+              throw Error("Invalid Guard decision");
+            if (!guarded.allowed)
+              runtime.declaredError(spec, guarded.error);
+            return guarded;
+          },
+          () => ({ kind: "guard-evaluation-failure" }) as const,
+        )().match(
+          (value) => value,
+          () => {
+            throw new ObservationDenied("UNEXPECTED_ERROR");
+          },
+        );
         if (!decision.allowed) throw new ObservationDenied(decision.error.code);
       }
       const run = typeof handler === "function" ? handler : handler.run;
