@@ -20,7 +20,8 @@ function collectSources(directory: string): string[] {
 }
 
 test("authored TypeScript code has no try/catch blocks", () => {
-  const catchBlocks = /\btry\s*\{|\bcatch\s*\(/;
+  // A try/finally cleanup block is not an exception handler.
+  const catchBlocks = /\bcatch\s*(?:\(|\{)/;
   for (const folder of authoredDirectories) {
     for (const path of collectSources(join(repositoryRoot, folder))) {
       assert.doesNotMatch(
