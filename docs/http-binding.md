@@ -11,8 +11,11 @@ network transport. The binding is a small adapter over the **existing ANWA
 runtime**, not a second router, schema registry, auth provider or workflow
 engine. An application **hosts** the adapter using its own router/server.
 
-- Go: `go/httpbinding.New(app, opts)` returns `http.Handler` compatible
-  with `net/http` and routers that accept this interface (e.g., chi).
+- Go: `go/httpbinding.New(app, opts)` returns a standard `*http.ServeMux`,
+  which implements `http.Handler`. Three endpoint-specific handlers are
+  registered using Go 1.22+ method patterns and `Request.PathValue`. The
+  returned mux can be mounted in an existing `net/http` router (e.g., chi)
+  or extended with additional routes.
 - TypeScript / JavaScript: `createAnwaFetchHandler(app, opts)` returns
   `(request: Request) => Promise<Response>` using the Web Fetch standard.
   Hono can register it in a single `app.all(...)` route.
@@ -63,10 +66,15 @@ submit the selected candidate's `ref` and optional `input` to
 | `415` | Invoke Content-Type is not `application/json` |
 | `500` | Adapter failure or unexpected runtime error, with details suppressed |
 
-Protocol failures use `application/problem+json`, with `type`, `title`,
-`status` and a `code` extension. ANWA's declared domain errors remain
-in the **200 response envelope** so `context.next` is not discarded.
-Every response sets `Cache-Control: no-store`.
+Errors raised **inside ANWA endpoint handlers** use `application/problem+json`,
+with `type`, `title`, `status` and a `code` extension. ANWA's declared domain
+errors remain in the **200 response envelope** so `context.next` is not
+discarded. The Go adapter deliberately delegates unmatched routes and
+wrong-method responses to `http.ServeMux` (native 404/405, with a plain-text
+body and an `Allow` header for 405). Go `GET` route patterns also match `HEAD`.
+The Fetch binding retains its own problem+json 404/405 responses. Responses
+created by ANWA handlers have `Cache-Control: no-store`; mux-generated
+404/405 responses follow Go standard behavior.
 
 ANWA core declares both `hasSideEffects` and `idempotent` on Actions.
 These declarations **do not** cause automatic HTTP retries or implement
@@ -100,8 +108,11 @@ mux := http.NewServeMux()
 mux.Handle("/anwa/", handler)
 ```
 
-The returned `http.Handler` can also be mounted under a chi router that
-accepts `http.Handler`. No chi dependency is introduced into ANWA.
+The returned `*http.ServeMux` implements `http.Handler` and can also be
+mounted under a chi router that accepts `http.Handler`. It owns its three
+routes, while the hosting application still controls the outer router.
+The inner mux can accept additional routes if necessary. No chi dependency
+is introduced into ANWA.
 
 ## TypeScript / Hono and Fetch-native runtimes
 
@@ -150,7 +161,7 @@ how to handle user-supplied URLs and external-service requests.
 
 | Host interface | Proposed integration | Current status |
 | --- | --- | --- |
-| Go `net/http`, chi | Mount `http.Handler` | Go binding implemented; stdlib tested |
+| Go `net/http`, chi | Mount `*http.ServeMux` as `http.Handler` | Go binding implemented; stdlib tested |
 | Hono | Route calls the Fetch handler with `c.req.raw` | Hono integration tested |
 | Bun / Deno / Cloudflare Workers | Native Fetch Request → Response | Fetch binding implemented |
 | Express / Fastify | Separate thin Node `IncomingMessage` / response bridge | Not implemented |
