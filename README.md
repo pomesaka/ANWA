@@ -97,6 +97,17 @@ go run ./examples/calculator
 go run ./examples/todo
 ```
 
+## Functional authoring and executable specifications
+
+TypeScript apps are constructed with `createAnwaApp(schema).bind(handlers, options)`.
+`bind` returns a new configured runtime; it does not mutate an existing one. Runtime
+operations are closures and can be called without a receiver. See the
+[factory migration and functional boundaries](docs/functional-core.md).
+
+The [executable specification index](test/README.md) maps contract rules to named
+case tables in TypeScript and Go. Runtime tests assert outcomes and forbidden effects;
+`bun run architecture:check` separately enforces the source-structure policy.
+
 ## Agent-first schema and contract tooling
 
 ANWA's experimental v0.2 Schema-first workflow includes **contract validation**, **schema-derived Handler input/output/error types**, and a **diagnostic schema view**. These tools do not generate business logic. **Human ease of writing the manifest is not a design target**: the contract is primarily for implementing agents and consuming agents.

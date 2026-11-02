@@ -1,10 +1,14 @@
-import { AnwaApp, type VerifiedCaller } from "../../src/anwa.ts";
+import {
+  createAnwaApp,
+  type AnwaApp,
+  type VerifiedCaller,
+} from "../../src/anwa.ts";
 import type { GuardDecision } from "../../src/contracts.ts";
 import { schema } from "./contract.generated.ts";
-import { TodoLogic } from "./logic.ts";
+import { createTodoLogic } from "./logic.ts";
 
 export function createTodo(): AnwaApp<typeof schema> {
-  const logic = new TodoLogic();
+  const logic = createTodoLogic();
   type Access = GuardDecision<"AUTH_REQUIRED" | "PERMISSION_DENIED">;
   const check = (
     caller: VerifiedCaller | null,
@@ -37,7 +41,7 @@ export function createTodo(): AnwaApp<typeof schema> {
     return { allowed: true };
   };
   const denied = () => [];
-  return new AnwaApp(schema).bind(
+  return createAnwaApp(schema).bind(
     {
       "workspace.create": {
         run: async ({ input, caller }) => logic.workspaceCreate(input, caller!),

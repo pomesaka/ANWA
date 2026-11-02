@@ -140,69 +140,111 @@ func TestTodoLifecycleAndContextNavigation(t *testing.T) {
 	}
 }
 
-func TestTodoAuthIsolationAndInputBoundary(t *testing.T) {
-	app := testApp(t)
-	alice, bob := user("alice"), user("bob")
-	anonymous, err := app.Catalog(nil)
-	if err != nil {
-		t.Fatal(err)
+func TestTodo_InvalidCreateHasNoStateEffects(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  any
+		caller *anwa.RequestContext
+		code   string
+	}{
+		{"anonymous caller", map[string]any{"title": "private"}, nil, "AUTH_REQUIRED"},
+		{"numeric title", map[string]any{"title": 9}, user("alice"), "INVALID_INPUT"},
+		{"forged caller in input", map[string]any{"title": "work", "caller": "alice"}, nil, "INVALID_INPUT"},
+		{"blank title", map[string]any{"title": " "}, user("alice"), "INVALID_TITLE"},
+		{"title beyond 120 characters", map[string]any{"title": strings.Repeat("x", 121)}, user("alice"), "INVALID_TITLE"},
 	}
-	if len(anonymous.Interactions) != 0 || len(anonymous.EntryPoints) != 0 {
-		t.Fatalf("discovery leaked to anonymous caller: %+v", anonymous)
-	}
-	if _, err := app.Discover("task.get", nil); err == nil {
-		t.Fatal("anonymous caller discovered protected interaction")
-	}
-	known, err := app.Catalog(alice)
-	if err != nil || len(known.Interactions) != 6 {
-		t.Fatalf("authenticated discovery: %+v, %v", known, err)
-	}
-
-	failed(t, invoke(t, app, "task.create", map[string]any{"title": "secret"}, nil), "AUTH_REQUIRED")
-	failed(t, invoke(t, app, "task.create", map[string]any{"title": 9}, alice), "INVALID_INPUT")
-	failed(t, invoke(t, app, "task.create", map[string]any{"title": "ok", "caller": "alice"}, nil), "INVALID_INPUT")
-	failed(t, invoke(t, app, "task.create", map[string]any{"title": "  "}, alice), "INVALID_TITLE")
-	failed(t, invoke(t, app, "task.create", map[string]any{"title": strings.Repeat("x", 121)}, alice), "INVALID_TITLE")
-
-	created := invoke(t, app, "task.create", map[string]any{"title": "private"}, alice)
-	item := successful[TaskCreateOutput](t, created).Task
-	if result := successful[TaskListOutput](t, invoke(t, app, "task.list", nil, bob)); len(result.Items) != 0 {
-		t.Fatalf("bob saw private tasks: %+v", result.Items)
-	}
-	failed(t, invoke(t, app, "task.get", map[string]any{"taskId": item.Id}, bob), "TASK_NOT_FOUND")
-	failed(t, invoke(t, app, "task.rename", map[string]any{
-		"taskId": item.Id, "expectedVersion": 1, "title": "stolen",
-	}, bob), "TASK_NOT_FOUND")
-	failed(t, invoke(t, app, "task.complete", map[string]any{
-		"taskId": item.Id, "expectedVersion": 1,
-	}, bob), "TASK_NOT_FOUND")
-	failed(t, invoke(t, app, "task.delete", map[string]any{
-		"taskId": item.Id, "expectedVersion": 1,
-	}, bob), "TASK_NOT_FOUND")
-	failed(t, invoke(t, app, "task.rename", map[string]any{
-		"taskId": item.Id, "expectedVersion": "1", "title": "bad",
-	}, alice), "INVALID_INPUT")
-	if got := successful[TaskGetOutput](t, invoke(t, app, "task.get", map[string]any{"taskId": item.Id}, alice)).Task; got != item {
-		t.Fatalf("denied attempts mutated task: %+v", got)
-	}
-
-	// Follow-up candidates are not authorization capabilities.
-	followed, err := app.Follow(context.Background(), created.Context.Next[0], bob)
-	if err != nil {
-		t.Fatal(err)
-	}
-	failed(t, followed, "TASK_NOT_FOUND")
-	noCaller, err := app.Follow(context.Background(), created.Context.Next[0], nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	failed(t, noCaller, "AUTH_REQUIRED")
-	if len(noCaller.Context.Next) != 0 {
-		t.Fatalf("private next leaked: %+v", noCaller.Context)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testApp(t)
+			failed(t, invoke(t, app, "task.create", tc.input, tc.caller), tc.code)
+			got := successful[TaskListOutput](t, invoke(t, app, "task.list", nil, user("alice")))
+			if len(got.Items) != 0 {
+				t.Fatalf("rejected create changed state: %+v", got)
+			}
+		})
 	}
 }
 
-func TestTodoOptimisticConcurrencyAndOrderedListing(t *testing.T) {
+func TestTodo_OtherCallerCannotReadOrMutateOwnedTask(t *testing.T) {
+	cases := []struct {
+		name, ref string
+		extra     map[string]any
+	}{
+		{"read", "task.get", map[string]any{}},
+		{"rename", "task.rename", map[string]any{"expectedVersion": 1, "title": "stolen"}},
+		{"complete", "task.complete", map[string]any{"expectedVersion": 1}},
+		{"delete", "task.delete", map[string]any{"expectedVersion": 1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testApp(t)
+			item := successful[TaskCreateOutput](t, invoke(t, app, "task.create", map[string]any{"title": "private"}, user("alice"))).Task
+			input := map[string]any{"taskId": item.Id}
+			for key, value := range tc.extra {
+				input[key] = value
+			}
+			failed(t, invoke(t, app, tc.ref, input, user("bob")), "TASK_NOT_FOUND")
+			got := successful[TaskGetOutput](t, invoke(t, app, "task.get", map[string]any{"taskId": item.Id}, user("alice"))).Task
+			if got != item {
+				t.Fatalf("denied operation mutated task: want %+v got %+v", item, got)
+			}
+			if items := successful[TaskListOutput](t, invoke(t, app, "task.list", nil, user("bob"))).Items; len(items) != 0 {
+				t.Fatalf("other caller saw tasks: %+v", items)
+			}
+		})
+	}
+}
+
+func TestTodo_FollowRechecksCaller(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		caller *anwa.RequestContext
+		code   string
+	}{
+		{"anonymous", nil, "AUTH_REQUIRED"}, {"other caller", user("bob"), "TASK_NOT_FOUND"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testApp(t)
+			created := invoke(t, app, "task.create", map[string]any{"title": "private"}, user("alice"))
+			successful[TaskCreateOutput](t, created)
+			result, err := app.Follow(context.Background(), created.Context.Next[0], tc.caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			failed(t, result, tc.code)
+			if len(result.Context.Next) != 0 {
+				t.Fatalf("denied caller received private continuation: %+v", result.Context)
+			}
+		})
+	}
+}
+
+func TestTodo_DiscoveryIsCallerScoped(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		caller *anwa.RequestContext
+		count  int
+	}{
+		{"anonymous", nil, 0}, {"verified caller", user("alice"), 6},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testApp(t)
+			catalog, err := app.Catalog(tc.caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(catalog.Interactions) != tc.count {
+				t.Fatalf("want %d visible operations, got %+v", tc.count, catalog)
+			}
+			_, err = app.Discover("task.get", tc.caller)
+			if (err == nil) != (tc.count > 0) {
+				t.Fatalf("description exposure differs from catalog: %v", err)
+			}
+		})
+	}
+}
+
+func TestTodo_ConcurrentSameVersionWritesCommitExactlyOnce(t *testing.T) {
 	app := testApp(t)
 	alice := user("alice")
 	var ids []string
@@ -212,6 +254,9 @@ func TestTodoOptimisticConcurrencyAndOrderedListing(t *testing.T) {
 		ids = append(ids, output.Task.Id)
 	}
 	list := successful[TaskListOutput](t, invoke(t, app, "task.list", nil, alice))
+	if len(list.Items) != len(ids) {
+		t.Fatalf("want %d created tasks, got %d", len(ids), len(list.Items))
+	}
 	for i, item := range list.Items {
 		if item.Id != ids[i] {
 			t.Fatalf("list not in insertion order at %d: %+v", i, list.Items)

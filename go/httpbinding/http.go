@@ -61,7 +61,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 // New returns an *http.ServeMux (which implements http.Handler), so a host
 // can mount it without depending on a framework-specific ANWA adapter:
 //
-//     outerMux.Handle("/anwa/", handler)
+//	outerMux.Handle("/anwa/", handler)
 //
 // Go 1.22+ ServeMux owns method routing, 404/405 responses and path variables.
 // Only successful route matches reach the dedicated ANWA handlers.

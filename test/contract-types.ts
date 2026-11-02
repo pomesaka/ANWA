@@ -1,5 +1,5 @@
 // Compile-time regression checks. This module is included in bun check, not bun test.
-import { AnwaApp, fail, ok, reply } from "../src/anwa.ts";
+import { createAnwaApp, fail, ok, reply } from "../src/anwa.ts";
 import type {
   BindingsFor,
   GuardsFor,
@@ -58,7 +58,7 @@ void badOutput;
 const undeclaredError: CancelReturn = reply(fail("SECRET"));
 void undeclaredError;
 
-const app = new AnwaApp(calculator);
+const app = createAnwaApp(calculator);
 // @ts-expect-error the generated type requires both a and b to be numeric
 void app.interact("calculator.add", { a: 1, b: "oops" });
 

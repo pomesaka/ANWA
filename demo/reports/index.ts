@@ -1,5 +1,6 @@
 import {
-  AnwaApp,
+  createAnwaApp,
+  type AnwaApp,
   accepted,
   fail,
   ok,
@@ -20,11 +21,15 @@ interface ReportJob {
   text: string;
 }
 
-export function createReports(): AnwaApp<typeof schema> {
+/** Injectable scheduling keeps the asynchronous contract test deterministic. */
+export function createReports(
+  options: { wait?: (milliseconds: number) => Promise<void> } = {},
+): AnwaApp<typeof schema> {
+  const wait = options.wait ?? sleep;
   const jobs = new Map<string, ReportJob>();
   let nextId = 1;
 
-  return new AnwaApp(schema).bind(
+  return createAnwaApp(schema).bind(
     {
       "report.generate": async ({ input }) => {
         const executionId = String(nextId++);
@@ -32,7 +37,7 @@ export function createReports(): AnwaApp<typeof schema> {
         jobs.set(executionId, job);
         // Ephemeral local work: no cross-process durability or replay guarantee.
         void (async () => {
-          await sleep(5);
+          await wait(5);
           job.status = "running";
           job.events.push({
             type: "state.changed",
@@ -43,7 +48,7 @@ export function createReports(): AnwaApp<typeof schema> {
             "Report: " + input.topic + "\n",
             "Summary: generated in two parts.\n",
           ]) {
-            await sleep(5);
+            await wait(5);
             job.text += chunk;
             job.events.push({
               type: "artifact.delta",
@@ -127,7 +132,7 @@ export function createReports(): AnwaApp<typeof schema> {
           while (true) {
             while (index < job.events.length) yield job.events[index++];
             if (job.status === "completed") return;
-            await sleep(2);
+            await wait(2);
           }
         })(),
     },

@@ -16,7 +16,7 @@ ANWA Core publishes standalone Interactions. No Thing, ThingRef, domain-instance
 The application implementation supplies Context on the same Interaction that produces the result:
 
 ```ts
-const app = new AnwaApp(schema).bind({
+const app = createAnwaApp(schema).bind({
   "order.get": async ({input}) => reply(ok(await readOrder(input.orderId))),
   "order.cancel": {
     run: async ({input}) => {
@@ -75,7 +75,7 @@ of `Outcome + Context`. Event streaming is a separate protocol decision.
 
 ## Schema-derived TypeScript types
 
-The author-maintained `anwa.json` is the source of truth. Shared payload shapes may live in `$defs` and be referenced with local `$ref` (without introducing Thing semantics). `bun run codegen` expands those references and produces a checked `contract.generated.ts` with literal schema types. `new AnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
+The author-maintained `anwa.json` is the source of truth. Shared payload shapes may live in `$defs` and be referenced with local `$ref` (without introducing Thing semantics). `bun run codegen` expands those references and produces a checked `contract.generated.ts` with literal schema types. `createAnwaApp(schema).bind(...)` infers the Handler's `input`, success output shape, declared error codes, allowed InteractionRefs and named Guard parameters.
 
 CI regenerates the contract and fails on drift; it also runs strict `bun check`, Formatter, Oxlint, Bun tests and demos. Runtime validation remains essential for untrusted agent inputs.
 

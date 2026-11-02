@@ -71,7 +71,7 @@ An `InteractionRef` is an **application-scoped string**, e.g. `order.cancel` or 
 
 ```ts
 import { schema } from "../demo/calculator/contract.generated.ts";
-const app = new AnwaApp(schema).bind({
+const app = createAnwaApp(schema).bind({
   "calculator.add": async ({ input }) => reply(ok(input.a + input.b)),
   "calculator.divide": async ({ input }) => input.b === 0
     ? reply(fail("DIVIDE_BY_ZERO")) : reply(ok(input.a / input.b))

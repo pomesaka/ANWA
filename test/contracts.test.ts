@@ -1,511 +1,478 @@
-import { test } from "bun:test";
+/** ANWA v0.2 executable contract: schema acceptance, binding and dispatch are independent tables. */
+import { describe, test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { AnwaApp, fail, ok, reply, type Manifest } from "../src/anwa.ts";
+import {
+  createAnwaApp,
+  fail,
+  ok,
+  reply,
+  type Manifest,
+  type NextInteraction,
+} from "../src/anwa.ts";
 import {
   validateManifest,
   generateTypes,
   generateManifestModule,
 } from "../src/schema-tools.ts";
 import { schema as generatedTodo } from "../demo/todo/contract.generated.ts";
+import { success, failure, opaqueFailure } from "./support/outcome.ts";
 
-const fixture = (path: string): Manifest =>
-  JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")) as Manifest;
-const manifests = [
-  fixture("../demo/calculator/anwa.json"),
-  fixture("../demo/orders/anwa.json"),
-  fixture("../demo/reports/anwa.json"),
-  fixture("../demo/todo/anwa.json"),
-];
-const minimal = (): Manifest => ({
-  anwa: "0.2",
-  entrypoints: ["test.run"],
-  interactions: {
-    "test.run": {
-      kind: "action",
-      hasSideEffects: true,
-      idempotent: false,
-      description: "Test a domain operation",
-      errors: { EXPECTED_FAILURE: "Declared failure" },
-    },
+const action = {
+  kind: "action",
+  description: "Execute a contract fixture",
+  hasSideEffects: true,
+  idempotent: false,
+  input: {
+    type: "object",
+    properties: { key: { type: "string" } },
+    required: ["key"],
+    additionalProperties: false,
   },
-});
-
-test("Action effect declarations are required and never inferred", () => {
-  const withBoth = minimal();
-  assert.deepEqual(validateManifest(withBoth), []);
-
-  for (const field of ["hasSideEffects", "idempotent"] as const) {
-    const missing = structuredClone(withBoth);
-    delete (
-      missing.interactions["test.run"] as unknown as Record<string, unknown>
-    )[field];
-    const issues = validateManifest(missing);
-    assert.ok(
-      issues.some((x) => x.path.endsWith("." + field)),
-      "Missing " + field + " must be rejected",
-    );
-    assert.throws(() => new AnwaApp(missing), /schema invalid/);
-  }
-
-  const explicitFalse = structuredClone(withBoth);
-  (
-    explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>
-  ).hasSideEffects = false;
-  (
-    explicitFalse.interactions["test.run"] as unknown as Record<string, unknown>
-  ).idempotent = false;
-  assert.deepEqual(validateManifest(explicitFalse), []);
-
-  const illegalQuery = {
+  output: { type: "string" },
+  errors: { DENIED: "Policy refused this operation" },
+} as const;
+const manifest = (override: Record<string, unknown> = {}): Manifest =>
+  ({
     anwa: "0.2",
-    entrypoints: ["test.read"],
-    interactions: {
-      "test.read": {
-        kind: "query",
-        description: "Read",
-        hasSideEffects: false,
-        idempotent: true,
-      },
-    },
-  };
-  const issues = validateManifest(illegalQuery);
-  assert.ok(issues.some((x) => x.path.endsWith(".hasSideEffects")));
-  assert.ok(issues.some((x) => x.path.endsWith(".idempotent")));
-});
+    entrypoints: ["test.run"],
+    interactions: { "test.run": { ...action, ...override } },
+  }) as Manifest;
+const loadDemo = (name: string): Manifest =>
+  JSON.parse(
+    readFileSync(new URL(`../demo/${name}/anwa.json`, import.meta.url), "utf8"),
+  );
 
-test("Four demo manifests validate without Thing declarations", () => {
-  for (const manifest of manifests) {
-    assert.deepEqual(validateManifest(manifest), []);
+describe("SCHEMA — Action semantics are explicit, not inferred", () => {
+  const cases = [
+    {
+      name: "both true are accepted",
+      flags: { hasSideEffects: true, idempotent: true },
+      paths: [],
+    },
+    {
+      name: "both false are accepted",
+      flags: { hasSideEffects: false, idempotent: false },
+      paths: [],
+    },
+    {
+      name: "missing hasSideEffects is rejected",
+      flags: { hasSideEffects: undefined },
+      paths: ["hasSideEffects"],
+    },
+    {
+      name: "missing idempotent is rejected",
+      flags: { idempotent: undefined },
+      paths: ["idempotent"],
+    },
+    {
+      name: "null is not an explicit boolean",
+      flags: { idempotent: null },
+      paths: ["idempotent"],
+    },
+    {
+      name: "string false is not boolean false",
+      flags: { hasSideEffects: "false" },
+      paths: ["hasSideEffects"],
+    },
+    {
+      name: "Query forbids Action flags",
+      flags: { kind: "query" },
+      paths: ["hasSideEffects", "idempotent"],
+    },
+    {
+      name: "Event forbids Action flags",
+      flags: { kind: "event" },
+      paths: ["hasSideEffects", "idempotent"],
+    },
+  ];
+  test.each(cases)("$name", ({ flags, paths }) => {
+    const doc = manifest(flags);
     assert.deepEqual(
-      Object.keys(manifest)
-        .filter((field) => field !== "$defs")
+      validateManifest(doc)
+        .map((d) => d.path)
         .sort(),
-      ["anwa", "entrypoints", "interactions"],
+      paths.map((p) => "$.interactions.test.run." + p).sort(),
     );
-  }
+  });
 });
 
-test("Thing and subjectType are forbidden core fields", () => {
-  const old = structuredClone(manifests[1]) as Manifest & { things?: unknown };
-  old.things = { Order: { title: "Order", description: "Not core" } };
-  const interaction = old.interactions[
-    "order.cancel"
-  ] as (typeof old.interactions)[string] & { subjectType?: string };
-  interaction.subjectType = "Order";
-  const issues = validateManifest(old).map((d) => d.path);
-  assert.ok(issues.includes("$.things"));
-  assert.ok(issues.some((x) => x.endsWith("subjectType")));
-  assert.throws(() => new AnwaApp(old), /schema invalid/);
-});
-
-test("Schema detects unknown entrypoints and unsupported payload keywords", () => {
-  const bad = structuredClone(manifests[1]);
-  bad.entrypoints = ["missing"];
-  const schema = bad.interactions["order.get"].input as object as Record<
-    string,
-    unknown
-  >;
-  schema.pattern = "not supported";
-  const issues = validateManifest(bad).map((x) => x.path);
-  assert.ok(issues.some((x) => x.includes("entrypoints")));
-  assert.ok(issues.some((x) => x.includes("pattern")));
-});
-
-test("Type generation is keyed by top-level InteractionRef", () => {
-  const text = generateTypes(manifests[1]);
-  assert.match(text, /OrderCancelInput/);
-  assert.match(text, /OrderCancelHandler/);
-  assert.match(text, /"ORDER_ALREADY_SHIPPED"/);
-  assert.match(text, /"UNEXPECTED_ERROR"/);
-  assert.match(text, /ShipmentTrackHandler/);
-});
-
-test("Binding rejects absent or undeclared handlers", () => {
-  const app = new AnwaApp(manifests[0]);
-  assert.throws(
-    () =>
-      app.bind(
-        { "calculator.add": async () => reply(ok(1)) },
-        { public: ["calculator.add", "calculator.divide"] },
-      ),
-    /Unbound or invalid Interaction/,
-  );
-  assert.throws(
-    () =>
-      app.bind(
-        {
-          "calculator.add": async () => reply(ok(1)),
-          "calculator.divide": async () => reply(ok(1)),
-          unknown: async () => reply(ok(1)),
-        },
-        { public: ["calculator.add", "calculator.divide"] },
-      ),
-    /Unknown or invalid/,
-  );
-});
-
-test("Runtime enforces named guard before run and uses per-Interaction onDenied", async () => {
-  const doc = {
-    anwa: "0.2",
-    entrypoints: ["test.run"],
-    interactions: {
-      "test.run": {
-        kind: "action",
-        hasSideEffects: true,
-        idempotent: false,
-        description: "Guarded operation",
-        guard: "check",
-        errors: { EXPECTED_FAILURE: "Guard rejected" },
-      },
-    },
-  } as const satisfies Manifest;
-  let executed = 0;
-  let checks = 0;
-  const app = new AnwaApp(doc).bind(
+describe("SCHEMA — invalid declarations identify the offending field", () => {
+  const cases = [
     {
-      "test.run": {
-        run: async () => {
-          executed++;
-          return reply(ok(null));
-        },
-        onDenied: ({ error }) => {
-          assert.equal(error.code, "EXPECTED_FAILURE");
-          return [
-            {
-              ref: "test.run",
-              guidance: { kind: "retry", level: "available" },
-              when: { after: "PT30S" },
-            },
-          ];
-        },
-      },
+      name: "Thing is not a root capability",
+      document: { ...manifest(), things: {} },
+      path: "$.things",
     },
     {
-      // A retry candidate is disclosed only when the discovery policy permits it.
-      discoverable: () => true,
-      guards: {
-        check: async () => {
-          checks++;
-          return {
-            allowed: false,
-            error: { code: "EXPECTED_FAILURE", effects: "none" },
-          };
-        },
+      name: "subjectType is not an Interaction property",
+      document: manifest({ subjectType: "Task" }),
+      path: "$.interactions.test.run.subjectType",
+    },
+    {
+      name: "entrypoint must name a declared operation",
+      document: { ...manifest(), entrypoints: ["missing"] },
+      path: "$.entrypoints[0]",
+    },
+    {
+      name: "unsupported payload keyword is rejected",
+      document: manifest({ input: { type: "string", pattern: "x" } }),
+      path: "$.interactions.test.run.input.pattern",
+    },
+    {
+      name: "unknown ref is rejected",
+      document: manifest({ output: { $ref: "#/$defs/Missing" } }),
+      path: "$.interactions.test.run.output.$ref",
+    },
+    {
+      name: "ref cannot have sibling keywords",
+      document: {
+        ...manifest({ output: { $ref: "#/$defs/Text", type: "string" } }),
+        $defs: { Text: { type: "string" } },
       },
+      path: "$.interactions.test.run.output",
+    },
+    {
+      name: "recursive definitions are rejected",
+      document: {
+        ...manifest(),
+        $defs: { A: { $ref: "#/$defs/B" }, B: { $ref: "#/$defs/A" } },
+      },
+      path: "$.$defs.A",
+    },
+  ];
+  test.each(cases)("$name", ({ document, path }) => {
+    assert.deepEqual(
+      validateManifest(document).map((d) => d.path),
+      [path],
+    );
+    assert.throws(
+      () => createAnwaApp(document as Manifest),
+      /ANWA schema invalid/,
+    );
+  });
+});
+
+describe("CODEGEN — all published examples are valid contracts", () => {
+  test.each(["calculator", "orders", "reports", "todo"])(
+    "%s validates",
+    (demo) => {
+      assert.deepEqual(validateManifest(loadDemo(demo)), []);
     },
   );
-  const result = await app.interact("test.run");
-  assert.equal(executed, 0);
-  assert.equal(checks, 1);
-  assert.equal(result.outcome.kind, "settled");
-  if (result.outcome.kind === "settled" && !result.outcome.result.ok)
-    assert.equal(result.outcome.result.error.code, "EXPECTED_FAILURE");
-  assert.equal(result.context.next[0].ref, "test.run");
-});
-
-test("Invalid input never reaches the Guard or protected business run", async () => {
-  const schema = {
-    anwa: "0.2",
-    entrypoints: ["test.run"],
-    interactions: {
-      "test.run": {
-        kind: "action",
-        hasSideEffects: true,
-        idempotent: false,
-        description: "Guarded validation test",
-        guard: "check",
-        input: {
-          type: "object",
-          properties: { key: { type: "string" } },
-          required: ["key"],
-          additionalProperties: false,
-        },
-        errors: { EXPECTED_FAILURE: "Policy failure" },
-      },
-    },
-  } as const satisfies Manifest;
-  let checked = 0,
-    executed = 0;
-  const app = new AnwaApp(schema).bind(
-    {
-      "test.run": {
-        run: async () => {
-          executed++;
-          return reply(ok(null));
-        },
-        onDenied: () => [],
-      },
-    },
-    {
-      guards: {
-        check: async () => {
-          checked++;
-          return { allowed: true };
-        },
-      },
-    },
-  );
-  const invalid = await app.follow({ ref: "test.run", input: { key: 123 } });
-  assert.equal(checked, 0);
-  assert.equal(executed, 0);
-  if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
-    assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
-  const success = await app.interact("test.run", { key: "valid" });
-  assert.equal(success.outcome.kind, "settled");
-  assert.equal(checked, 1);
-  assert.equal(executed, 1);
-});
-
-test("Undeclared Guard errors are opaque and never execute the protected run", async () => {
-  const doc = {
-    anwa: "0.2",
-    entrypoints: ["test.run"],
-    interactions: {
-      "test.run": {
-        kind: "action",
-        hasSideEffects: true,
-        idempotent: false,
-        description: "Guard check",
-        guard: "check",
-        errors: { EXPECTED_FAILURE: "Expected" },
-      },
-    },
-  } as const satisfies Manifest;
-  let executed = 0;
-  const app = new AnwaApp(doc).bind(
-    {
-      "test.run": {
-        run: async () => {
-          executed++;
-          return reply(ok(null));
-        },
-        onDenied: () => [],
-      },
-    },
-    {
-      guards: {
-        check: async () =>
-          // Intentional runtime-contract violation to verify enforcement.
-          ({ allowed: false, error: { code: "SECRET_FAILURE" } }) as any,
-      },
-    },
-  );
-  const response = await app.interact("test.run");
-  assert.equal(executed, 0);
-  if (response.outcome.kind === "settled" && !response.outcome.result.ok)
-    assert.equal(response.outcome.result.error.code, "UNEXPECTED_ERROR");
-  assert.deepEqual(response.context, { next: [] });
-});
-
-test("Missing denial callback is rejected instead of silently bypassing policy", () => {
-  const doc = {
-    anwa: "0.2",
-    entrypoints: ["test.run"],
-    interactions: {
-      "test.run": {
-        kind: "action",
-        hasSideEffects: true,
-        idempotent: false,
-        description: "Guarded action",
-        guard: "check",
-        errors: { EXPECTED_FAILURE: "Denied" },
-      },
-    },
-  } as const satisfies Manifest;
-  const app = new AnwaApp(doc);
-  assert.throws(
-    () =>
-      app.bind(
-        {
-          // @ts-expect-error deliberate invalid binding checked again at runtime
-          "test.run": { run: async () => reply(ok(null)) },
-        },
-        { guards: { check: async () => ({ allowed: true }) } },
-      ),
-    /onDenied/,
+  test("shared Todo definitions expand to the checked-in literal contract", () => {
+    const generated = generateManifestModule(loadDemo("todo"));
+    const literal = generated
+      .split("export const schema = ")[1]
+      .split(" as const satisfies Manifest;")[0];
+    assert.deepEqual(JSON.parse(literal), generatedTodo);
+  });
+  test.each([
+    "OrderCancelInput",
+    "OrderCancelHandler",
+    '"ORDER_ALREADY_SHIPPED"',
+    '"UNEXPECTED_ERROR"',
+    "ShipmentTrackHandler",
+  ])("Orders declaration contains %s", (declaration) =>
+    assert.ok(generateTypes(loadDemo("orders")).includes(declaration)),
   );
 });
 
-test("Undeclared errors are mapped to opaque framework errors", async () => {
-  const app = new AnwaApp(minimal()).bind(
+describe("BIND — configuration fails before serving requests", () => {
+  const run = () => reply(ok("ran"));
+  const cases = [
     {
-      "test.run": async () => reply(fail("SECRET", "private")),
+      name: "unguarded operation must be explicitly public",
+      document: manifest(),
+      handlers: { "test.run": run },
+      options: {},
+      error: /explicit public/,
     },
-    { public: ["test.run"] },
-  );
-  const result = await app.interact("test.run");
-  if (result.outcome.kind === "settled" && !result.outcome.result.ok)
-    assert.deepEqual(result.outcome.result.error, {
+    {
+      name: "missing handler cannot be served",
+      document: manifest(),
+      handlers: {},
+      options: { public: ["test.run"] },
+      error: /Unbound or invalid/,
+    },
+    {
+      name: "undeclared handler cannot be registered",
+      document: manifest(),
+      handlers: { "test.run": run, missing: run },
+      options: { public: ["test.run"] },
+      error: /Unknown or invalid/,
+    },
+    {
+      name: "public list cannot bypass a Guard",
+      document: manifest({ guard: "check" }),
+      handlers: { "test.run": { run, onDenied: () => [] } },
+      options: {
+        public: ["test.run"],
+        guards: { check: () => ({ allowed: true }) },
+      },
+      error: /cannot bypass Guard/,
+    },
+    {
+      name: "guard name must be bound",
+      document: manifest({ guard: "check" }),
+      handlers: { "test.run": { run, onDenied: () => [] } },
+      options: {},
+      error: /Missing Guard/,
+    },
+    {
+      name: "guarded Query or Action must own its denial context",
+      document: manifest({ guard: "check" }),
+      handlers: { "test.run": { run } },
+      options: { guards: { check: () => ({ allowed: true }) } },
+      error: /onDenied/,
+    },
+    {
+      name: "public list must use declared references",
+      document: manifest(),
+      handlers: { "test.run": run },
+      options: { public: ["missing"] },
+      error: /Undeclared public/,
+    },
+  ];
+  test.each(cases)("$name", ({ document, handlers, options, error }) => {
+    // Malformed JavaScript bindings deliberately cross the compile-time boundary.
+    assert.throws(
+      () => createAnwaApp(document).bind(handlers as any, options as any),
+      error,
+    );
+  });
+});
+
+describe("DISPATCH — validation, Guard, denial hook and handler run in that order", () => {
+  const retry: NextInteraction[] = [
+    {
+      ref: "test.run",
+      input: { key: "valid" },
+      guidance: { kind: "retry", level: "available" },
+      when: { after: "PT30S" },
+    },
+  ];
+  const cases = [
+    {
+      name: "invalid input runs nothing",
+      input: { key: 42 },
+      decision: { allowed: true },
+      trace: [],
+      code: "INVALID_INPUT",
+      next: [],
+    },
+    {
+      name: "allowed call runs Guard then handler",
+      input: { key: "valid" },
+      decision: { allowed: true },
+      trace: ["guard", "run"],
+      code: null,
+      next: [],
+    },
+    {
+      name: "declared refusal runs denial hook but never handler",
+      input: { key: "valid" },
+      decision: { allowed: false, error: { code: "DENIED", effects: "none" } },
+      trace: ["guard", "onDenied"],
+      code: "DENIED",
+      next: retry,
+    },
+    {
+      name: "undeclared refusal does not run either handler",
+      input: { key: "valid" },
+      decision: { allowed: false, error: { code: "SECRET" } },
+      trace: ["guard"],
       code: "UNEXPECTED_ERROR",
-      message: "Unexpected application failure",
-      effects: "unknown",
-    });
-  assert.deepEqual(result.context, { next: [] });
-});
-
-test("Handler must return Outcome + Context, not just a bare Result", async () => {
-  const app = new AnwaApp(minimal()).bind(
-    {
-      "test.run": async () =>
-        ok(null) as unknown as import("../src/anwa.ts").SettledResponse,
+      next: [],
     },
-    { public: ["test.run"] },
-  );
-  const result = await app.interact("test.run");
-  if (result.outcome.kind === "settled" && !result.outcome.result.ok)
-    assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
+    {
+      name: "malformed decision fails closed",
+      input: { key: "valid" },
+      decision: { allowed: "true" },
+      trace: ["guard"],
+      code: "UNEXPECTED_ERROR",
+      next: [],
+    },
+  ];
+  test.each(cases)("$name", async (row) => {
+    const trace: string[] = [];
+    const app = createAnwaApp(manifest({ guard: "check" })).bind(
+      {
+        "test.run": {
+          run: () => {
+            trace.push("run");
+            return reply(ok("ran"));
+          },
+          onDenied: () => {
+            trace.push("onDenied");
+            return retry;
+          },
+        },
+      } as any,
+      {
+        discoverable: () => true,
+        guards: {
+          check: () => {
+            trace.push("guard");
+            return row.decision;
+          },
+        },
+      } as any,
+    );
+    const result = await app.follow({ ref: "test.run", input: row.input });
+    if (row.code === null) assert.equal(success(result), "ran");
+    else failure(result, row.code);
+    assert.deepEqual(trace, row.trace);
+    assert.deepEqual(result.context.next, row.next);
+  });
 });
 
-test("Invalid next candidate prevents success with malformed guidance", async () => {
-  for (const next of [
-    [{ ref: "missing" }],
-    [{ ref: "test.run", when: { after: "tomorrow" } }],
-    [{ ref: "test.run", guidance: { level: "critical" } }],
-    [{ ref: "test.run", input: { unknown: true } }],
-  ]) {
-    const app = new AnwaApp(minimal()).bind(
-      {
-        "test.run": async () => reply(ok(null), next as any),
+describe("RESULT — invalid application output is opaque and advertises no continuation", () => {
+  const cases: Array<{
+    name: string;
+    produce: () => unknown;
+    kind?: "action" | "query";
+  }> = [
+    {
+      name: "undeclared domain code",
+      produce: () => reply(fail("SECRET", "private")),
+    },
+    { name: "bare Result without envelope", produce: () => ok("ran") },
+    { name: "output violates its schema", produce: () => reply(ok(42)) },
+    {
+      name: "unknown outcome tag",
+      produce: () => ({ outcome: { kind: "unknown" }, context: { next: [] } }),
+    },
+    {
+      name: "Query cannot accept deferred execution",
+      kind: "query",
+      produce: () => ({
+        outcome: { kind: "accepted", execution: { id: "job" } },
+        context: { next: [] },
+      }),
+    },
+    {
+      name: "missing Context",
+      produce: () => ({ outcome: { kind: "settled", result: ok("ran") } }),
+    },
+    {
+      name: "synchronous throw",
+      produce: () => {
+        throw Error("private");
       },
+    },
+    {
+      name: "rejected promise",
+      produce: () => Promise.reject(Error("private")),
+    },
+    ...[
+      { name: "unknown next reference", next: { ref: "missing" } },
+      {
+        name: "invalid timing",
+        next: { ref: "test.run", when: { after: "tomorrow" } },
+      },
+      {
+        name: "invalid guidance",
+        next: { ref: "test.run", guidance: { level: "critical" } },
+      },
+      {
+        name: "invalid prebound input",
+        next: { ref: "test.run", input: { key: 42 } },
+      },
+    ].map(({ name, next }) => ({
+      name,
+      produce: () => reply(ok("ran"), [next] as any),
+    })),
+  ];
+  test.each(cases)("$name", async ({ produce, kind }) => {
+    const doc = manifest(
+      kind === "query"
+        ? { kind, hasSideEffects: undefined, idempotent: undefined }
+        : {},
+    );
+    const app = createAnwaApp(doc).bind({ "test.run": produce } as any, {
+      public: ["test.run"],
+    });
+    assert.deepEqual(
+      await app.interact("test.run", { key: "valid" }),
+      opaqueFailure,
+    );
+  });
+});
+
+describe("FACTORY — binding is immutable and methods are receiver-independent", () => {
+  test("rebinding produces isolated runtimes and leaves the unbound factory unchanged", async () => {
+    const factory = createAnwaApp(manifest());
+    const first = factory.bind(
+      { "test.run": () => reply(ok("first")) },
       { public: ["test.run"] },
     );
-    const result = await app.interact("test.run");
-    if (result.outcome.kind === "settled" && !result.outcome.result.ok)
-      assert.equal(result.outcome.result.error.code, "UNEXPECTED_ERROR");
-    assert.deepEqual(result.context, { next: [] });
-  }
+    const second = first.bind(
+      { "test.run": () => reply(ok("second")) },
+      { public: ["test.run"] },
+    );
+    const { interact, catalog } = first;
+    assert.deepEqual(factory.catalog().interactions, []);
+    assert.notEqual(first, second);
+    assert.equal(success(await interact("test.run", { key: "x" })), "first");
+    assert.equal(
+      success(await second.interact("test.run", { key: "x" })),
+      "second",
+    );
+    assert.deepEqual(catalog().entrypoints, ["test.run"]);
+  });
 });
 
-test("Each Handler chooses its own Context independently", async () => {
-  const base = minimal();
-  const doc: Manifest = {
-    ...base,
-    interactions: {
-      ...base.interactions,
-      "test.read": { kind: "query", description: "Read something" },
-    },
-  };
-  const app = new AnwaApp(doc).bind(
-    {
-      "test.run": async () =>
-        reply(ok(null), [
-          { ref: "test.read", guidance: { level: "recommended" } },
-        ]),
-      "test.read": async () =>
-        reply(ok("read"), [
-          { ref: "test.run", guidance: { level: "available" } },
-        ]),
-    },
-    { public: ["test.run", "test.read"] },
-  );
-  const one = await app.interact("test.run");
-  const two = await app.interact("test.read");
-  assert.equal(one.context.next[0].ref, "test.read");
-  assert.equal(two.context.next[0].ref, "test.run");
-});
-
-test("Todo shared schemas compile to the same concrete contract", () => {
-  const todo = manifests[3];
-  assert.equal(todo.$defs?.Task?.type, "object");
-  assert.equal(todo.$defs?.Project?.type, "object");
-  assert.equal(todo.$defs?.SavedQuery?.type, "object");
-  const generated = generateManifestModule(todo);
-  assert.equal(generated.includes('"$ref"'), false);
-  assert.equal(generated.includes('"$defs"'), false);
-  const literal = generated
-    .split("export const schema = ")[1]
-    .split(" as const satisfies Manifest;")[0];
-  assert.deepEqual(JSON.parse(literal), generatedTodo);
-});
-
-test("Local definitions validate inputs and outputs even without codegen", async () => {
+describe("REF — raw local definitions validate both inputs and outputs", () => {
   const doc = {
     anwa: "0.2",
-    entrypoints: ["test.echo"],
-    $defs: {
-      Word: { type: "string" },
-      Container: {
-        type: "object",
-        properties: { label: { $ref: "#/$defs/Word" } },
-        required: ["label"],
-        additionalProperties: false,
-      },
-    },
+    entrypoints: ["echo"],
+    $defs: { Text: { type: "string" } },
     interactions: {
-      "test.echo": {
+      echo: {
         kind: "query",
-        description: "Echo a shared payload",
-        input: { $ref: "#/$defs/Container" },
-        output: { $ref: "#/$defs/Container" },
+        description: "Echo",
+        input: { $ref: "#/$defs/Text" },
+        output: { $ref: "#/$defs/Text" },
       },
     },
   } as const satisfies Manifest;
-  assert.deepEqual(validateManifest(doc), []);
-  const app = new AnwaApp(doc).bind(
+  test.each([
     {
-      "test.echo": async ({ input }) => reply(ok(input)),
+      name: "invalid input never executes",
+      input: 42,
+      output: "hello",
+      expected: "INVALID_INPUT",
+      runs: 0,
     },
-    { public: ["test.echo"] },
-  );
-  const invalid = await app.follow({ ref: "test.echo", input: { label: 42 } });
-  assert.equal(invalid.outcome.kind, "settled");
-  if (invalid.outcome.kind === "settled" && !invalid.outcome.result.ok)
-    assert.equal(invalid.outcome.result.error.code, "INVALID_INPUT");
-  const valid = await app.follow({
-    ref: "test.echo",
-    input: { label: "works" },
-  });
-  if (valid.outcome.kind !== "settled" || !valid.outcome.result.ok)
-    throw Error("Expected valid shared schema");
-  assert.deepEqual(valid.outcome.result.value, { label: "works" });
-  const invalidOutput = new AnwaApp(doc).bind(
     {
-      "test.echo": async () => reply(ok({ label: 42 } as any)),
+      name: "valid input and output succeed",
+      input: "hello",
+      output: "hello",
+      expected: null,
+      runs: 1,
     },
-    { public: ["test.echo"] },
-  );
-  const broken = await invalidOutput.follow({
-    ref: "test.echo",
-    input: { label: "ok" },
-  });
-  if (broken.outcome.kind !== "settled" || broken.outcome.result.ok)
-    throw Error("Expected rejected output");
-  assert.equal(broken.outcome.result.error.code, "UNEXPECTED_ERROR");
-  assert.match(generateTypes(doc), /TestEchoInput = \{ "label": string;/);
-});
-
-test("Local schema refs reject unknown, mixed and cyclic definitions", () => {
-  const base = {
-    anwa: "0.2",
-    entrypoints: ["test.read"],
-    interactions: {
-      "test.read": {
-        kind: "query",
-        description: "Read",
-        output: { $ref: "#/$defs/Shared" },
+    {
+      name: "invalid output is opaque",
+      input: "hello",
+      output: 42,
+      expected: "UNEXPECTED_ERROR",
+      runs: 1,
+    },
+  ])("$name", async (row) => {
+    let runs = 0;
+    const app = createAnwaApp(doc).bind(
+      {
+        echo: () => {
+          runs++;
+          return reply(ok(row.output)) as any;
+        },
       },
-    },
-  } as const;
-  const missing = validateManifest(base);
-  assert.ok(missing.some((item) => item.path.endsWith(".$ref")));
-  const mixed = validateManifest({
-    ...base,
-    $defs: { Shared: { type: "string" } },
-    interactions: {
-      "test.read": {
-        ...base.interactions["test.read"],
-        output: { $ref: "#/$defs/Shared", type: "string" },
-      },
-    },
+      { public: ["echo"] },
+    );
+    const response = await app.follow({ ref: "echo", input: row.input });
+    if (row.expected === null) assert.equal(success(response), "hello");
+    else failure(response, row.expected);
+    assert.equal(runs, row.runs);
   });
-  assert.ok(mixed.some((item) => item.message.includes("only schema keyword")));
-  const cyclic = validateManifest({
-    ...base,
-    $defs: {
-      Shared: { $ref: "#/$defs/Other" },
-      Other: { $ref: "#/$defs/Shared" },
-    },
-  });
-  assert.ok(cyclic.some((item) => item.message.includes("Cyclic")));
 });

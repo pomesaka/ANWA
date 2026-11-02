@@ -1,8 +1,13 @@
-import { Result as NeverthrowResult, ResultAsync } from "neverthrow";
+import {
+  checkPayload,
+  validateGuardDecision,
+  validateResponse,
+  type ContractViolation,
+} from "./runtime/validation.ts";
+import { Result as NeverthrowResult, ResultAsync, okAsync } from "neverthrow";
 import { match } from "ts-pattern";
 import {
   validateManifest,
-  type DataSchema,
   type Manifest,
   type InteractionDefinition,
 } from "./schema-tools.ts";
@@ -37,12 +42,22 @@ export interface DiscoveryArgs {
 export type DiscoveryPolicy = (args: DiscoveryArgs) => boolean;
 
 /** Failed Event subscription: no Event handler ran or produced data. */
-export class ObservationDenied extends Error {
-  constructor(readonly code: string) {
-    super("Event subscription denied");
-    this.name = "ObservationDenied";
-  }
-}
+export type ObservationDenied = Error & {
+  name: "ObservationDenied";
+  code: string;
+};
+export const observationDenied = (code: string): ObservationDenied =>
+  Object.assign(new Error("Event subscription denied"), {
+    name: "ObservationDenied" as const,
+    code,
+  });
+export const isObservationDenied = (
+  error: unknown,
+): error is ObservationDenied =>
+  error instanceof Error &&
+  error.name === "ObservationDenied" &&
+  "code" in error &&
+  typeof error.code === "string";
 
 export interface DomainError<C extends string = string> {
   code: C;
@@ -181,89 +196,24 @@ function verifiedCaller(request?: RequestContext): VerifiedCaller | null {
   });
 }
 
-const duration =
-  /^P(?=.*\d)(?:\d+D)?(?:T(?:(?:\d+)H)?(?:(?:\d+)M)?(?:(?:\d+(?:\.\d+)?)S)?)?$/;
-const levels = new Set(["required", "recommended", "available"]);
-
-function checkPayload(
-  schema: DataSchema,
-  value: unknown,
-  path = "$",
-  definitions: Readonly<Record<string, DataSchema>> = {},
-): string | null {
-  if (schema.$ref)
-    return checkPayload(
-      definitions[schema.$ref.slice(8)],
-      value,
-      path,
-      definitions,
-    );
-  if (schema.enum && !schema.enum.some((item) => Object.is(item, value)))
-    return path + " not in enum";
-  const valid =
-    schema.type === "object"
-      ? value !== null && typeof value === "object" && !Array.isArray(value)
-      : schema.type === "array"
-        ? Array.isArray(value)
-        : schema.type === "integer"
-          ? Number.isInteger(value)
-          : schema.type === "number"
-            ? typeof value === "number" && Number.isFinite(value)
-            : schema.type === "null"
-              ? value === null
-              : typeof value === schema.type;
-  if (!valid) return path + " must be " + schema.type;
-  if (schema.type === "object") {
-    const obj = value as Record<string, unknown>;
-    for (const field of schema.required ?? [])
-      if (!own(obj, field)) return path + "." + field + " required";
-    for (const [field, child] of Object.entries(obj)) {
-      const fieldSchema = schema.properties?.[field];
-      if (!fieldSchema) {
-        if (schema.additionalProperties === false)
-          return path + "." + field + " not allowed";
-      } else {
-        const error = checkPayload(
-          fieldSchema,
-          child,
-          path + "." + field,
-          definitions,
-        );
-        if (error) return error;
-      }
-    }
-  }
-  if (schema.type === "array" && schema.items) {
-    for (const [index, item] of (value as unknown[]).entries()) {
-      const error = checkPayload(
-        schema.items,
-        item,
-        path + "[" + index + "]",
-        definitions,
-      );
-      if (error) return error;
-    }
-  }
-  return null;
+export interface Catalog {
+  anwa: "0.2";
+  entrypoints: string[];
+  interactions: Array<{
+    ref: string;
+    kind: InteractionDefinition["kind"];
+    description: string;
+  }>;
+}
+export type Description = { ref: string } & InteractionDefinition;
+export interface Discovery {
+  description: Description;
+  context: { next: NextInteraction[] };
 }
 
-export class AnwaApp<const M extends Manifest = Manifest> {
+/** Structural API; implementations have no prototype or receiver dependency. */
+export interface AnwaApp<M extends Manifest = Manifest> {
   readonly schema: M;
-  private readonly handlers = new Map<string, RuntimeBinding>();
-  private guards: Record<string, RuntimeGuard> = {};
-  private readonly publicRefs = new Set<string>();
-  private discoveryPolicy?: DiscoveryPolicy;
-
-  constructor(schema: M) {
-    const errors = validateManifest(schema);
-    if (errors.length)
-      throw Error(
-        "ANWA schema invalid:\n" +
-          errors.map((x) => x.path + ": " + x.message).join("\n"),
-      );
-    this.schema = schema;
-  }
-
   bind(
     handlers: BindingsFor<M>,
     ...settings: GuardNames<M> extends never
@@ -281,7 +231,95 @@ export class AnwaApp<const M extends Manifest = Manifest> {
             guards: GuardsFor<M>;
           },
         ]
-  ): this {
+  ): AnwaApp<M>;
+  catalog(request?: RequestContext): Catalog;
+  describe(ref: string, request?: RequestContext): Description;
+  discover(ref: string, request?: RequestContext): Discovery;
+  interact<R extends Refs<M> & ExecutableRefs<M>>(
+    ref: R,
+    ...args: string extends Refs<M>
+      ? [input?: unknown, request?: RequestContext]
+      : InputOf<Operation<M, R>> extends undefined
+        ? [input?: undefined, request?: RequestContext]
+        : [input: InputOf<Operation<M, R>>, request?: RequestContext]
+  ): Promise<
+    InteractionResponse<
+      OutputOf<Operation<M, R>>,
+      ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
+    >
+  >;
+  follow(
+    candidate: NextInteraction,
+    request?: RequestContext,
+  ): Promise<InteractionResponse>;
+  observe<R extends Refs<M> & ObservableRefs<M>>(
+    ref: R,
+    ...args: string extends Refs<M>
+      ? [
+          input?: unknown,
+          options?: { cursor?: number },
+          request?: RequestContext,
+        ]
+      : InputOf<Operation<M, R>> extends undefined
+        ? [
+            input?: undefined,
+            options?: { cursor?: number },
+            request?: RequestContext,
+          ]
+        : [
+            input: InputOf<Operation<M, R>>,
+            options?: { cursor?: number },
+            request?: RequestContext,
+          ]
+  ): AsyncIterable<unknown>;
+}
+
+interface RuntimeBindings {
+  handlersByRef: ReadonlyMap<string, RuntimeBinding>;
+  guardBindings: Readonly<Record<string, RuntimeGuard>>;
+  exposedRefs: ReadonlySet<string>;
+  discoveryPolicy?: DiscoveryPolicy;
+}
+
+export function createAnwaApp<const M extends Manifest>(schema: M): AnwaApp<M> {
+  const diagnostics = validateManifest(schema);
+  if (diagnostics.length)
+    throw Error(
+      "ANWA schema invalid:\n" +
+        diagnostics.map((x) => x.path + ": " + x.message).join("\n"),
+    );
+  return createRuntime(schema, {
+    handlersByRef: new Map(),
+    guardBindings: {},
+    exposedRefs: new Set(),
+  });
+}
+
+function createRuntime<const M extends Manifest>(
+  schema: M,
+  bindings: RuntimeBindings,
+): AnwaApp<M> {
+  const { handlersByRef, guardBindings, exposedRefs, discoveryPolicy } =
+    bindings;
+
+  function bind(
+    handlers: BindingsFor<M>,
+    ...settings: GuardNames<M> extends never
+      ? [
+          options: {
+            public?: readonly Refs<M>[];
+            discoverable?: DiscoveryPolicy;
+            guards?: GuardsFor<M>;
+          },
+        ]
+      : [
+          options: {
+            public?: readonly Refs<M>[];
+            discoverable?: DiscoveryPolicy;
+            guards: GuardsFor<M>;
+          },
+        ]
+  ): AnwaApp<M> {
     const options = settings[0] as {
       public?: readonly Refs<M>[];
       discoverable?: DiscoveryPolicy;
@@ -293,9 +331,9 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       throw Error("Public Interaction references must be an array");
     const publicSet = new Set<string>();
     for (const ref of publicRefs) {
-      if (typeof ref !== "string" || !own(this.schema.interactions, ref))
+      if (typeof ref !== "string" || !own(schema.interactions, ref))
         throw Error("Undeclared public Interaction: " + String(ref));
-      if (this.schema.interactions[ref].guard)
+      if (schema.interactions[ref].guard)
         throw Error(
           "Guarded Interaction cannot bypass Guard via public: " + ref,
         );
@@ -308,84 +346,97 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       throw Error("discoverable must be a function");
     const rawHandlers = handlers as Record<string, unknown>;
     const rawGuards = guards as Record<string, unknown>;
-    for (const [ref, spec] of Object.entries(this.schema.interactions)) {
-      const binding = rawHandlers[ref];
-      if (spec.guard) {
-        if (typeof rawGuards[spec.guard] !== "function")
-          throw Error("Missing Guard: " + spec.guard);
-        if (
-          !binding ||
-          typeof binding !== "object" ||
-          Array.isArray(binding) ||
-          typeof (binding as { run?: unknown }).run !== "function"
-        )
-          throw Error("Guarded Interaction requires {run}: " + ref);
-        if (
-          spec.kind !== "event" &&
-          typeof (binding as { onDenied?: unknown }).onDenied !== "function"
-        )
-          throw Error("Guarded Query/Action requires {run, onDenied}: " + ref);
-      } else if (!publicSet.has(ref)) {
-        throw Error(
-          "Interaction requires a named Guard or explicit public declaration: " +
-            ref,
-        );
-      } else if (typeof binding !== "function") {
-        throw Error("Unbound or invalid Interaction: " + ref);
-      }
+    for (const [ref, spec] of Object.entries(schema.interactions)) {
+      validateBinding(ref, spec, rawHandlers[ref], rawGuards, publicSet);
     }
     for (const ref of Object.keys(rawHandlers))
-      if (!own(this.schema.interactions, ref))
+      if (!own(schema.interactions, ref))
         throw Error("Unknown or invalid interaction binding: " + ref);
-    this.handlers.clear();
-    for (const [ref, value] of Object.entries(rawHandlers))
-      this.handlers.set(ref, value as RuntimeBinding);
-    this.guards = rawGuards as Record<string, RuntimeGuard>;
-    this.publicRefs.clear();
-    for (const ref of publicSet) this.publicRefs.add(ref);
-    this.discoveryPolicy = options.discoverable;
-    return this;
+    return createRuntime(schema, {
+      handlersByRef: new Map(
+        Object.entries(rawHandlers) as Array<[string, RuntimeBinding]>,
+      ),
+      guardBindings: Object.freeze({ ...rawGuards }) as Record<
+        string,
+        RuntimeGuard
+      >,
+      exposedRefs: publicSet,
+      discoveryPolicy: options.discoverable,
+    });
   }
 
-  private resolve(ref: string): {
+  function validateBinding(
+    ref: string,
+    spec: InteractionDefinition,
+    binding: unknown,
+    guards: Record<string, unknown>,
+    publicRefs: ReadonlySet<string>,
+  ): void {
+    if (spec.guard) return validateGuardedBinding(ref, spec, binding, guards);
+    if (!publicRefs.has(ref))
+      throw Error(
+        "Interaction requires a named Guard or explicit public declaration: " +
+          ref,
+      );
+    if (typeof binding !== "function")
+      throw Error("Unbound or invalid Interaction: " + ref);
+  }
+
+  function validateGuardedBinding(
+    ref: string,
+    spec: InteractionDefinition,
+    binding: unknown,
+    guards: Record<string, unknown>,
+  ): void {
+    if (typeof guards[spec.guard!] !== "function")
+      throw Error("Missing Guard: " + spec.guard);
+    if (
+      !binding ||
+      typeof binding !== "object" ||
+      Array.isArray(binding) ||
+      typeof (binding as { run?: unknown }).run !== "function"
+    )
+      throw Error("Guarded Interaction requires {run}: " + ref);
+    if (
+      spec.kind !== "event" &&
+      typeof (binding as { onDenied?: unknown }).onDenied !== "function"
+    )
+      throw Error("Guarded Query/Action requires {run, onDenied}: " + ref);
+  }
+
+  function resolve(ref: string): {
     spec: InteractionDefinition;
     handler: RuntimeBinding;
   } {
     if (
       typeof ref !== "string" ||
-      !own(this.schema.interactions, ref) ||
-      !this.handlers.has(ref)
+      !own(schema.interactions, ref) ||
+      !handlersByRef.has(ref)
     )
       throw Error("Unknown or unbound InteractionRef");
     return {
-      spec: this.schema.interactions[ref],
-      handler: this.handlers.get(ref)!,
+      spec: schema.interactions[ref],
+      handler: handlersByRef.get(ref)!,
     };
   }
 
-  private canDiscover(ref: string, caller: VerifiedCaller | null): boolean {
-    if (this.publicRefs.has(ref)) return true;
-    if (
-      !own(this.schema.interactions, ref) ||
-      !this.schema.interactions[ref].guard
-    )
+  function canDiscover(ref: string, caller: VerifiedCaller | null): boolean {
+    if (exposedRefs.has(ref)) return true;
+    if (!own(schema.interactions, ref) || !schema.interactions[ref].guard)
       return false;
     return NeverthrowResult.fromThrowable(
-      () => this.discoveryPolicy?.({ ref, caller }) === true,
+      () => discoveryPolicy?.({ ref, caller }) === true,
       () => ({ kind: "discovery-policy-failure" }) as const,
     )().unwrapOr(false); // Fail closed if the application policy throws.
   }
 
-  /** Discovery is filtered separately from invocation Guards; it has no resource input. */
-  catalog(request?: RequestContext) {
+  function catalog(request?: RequestContext) {
     const caller = verifiedCaller(request);
     return {
-      anwa: this.schema.anwa,
-      entrypoints: this.schema.entrypoints.filter((ref) =>
-        this.canDiscover(ref, caller),
-      ),
-      interactions: Object.entries(this.schema.interactions)
-        .filter(([ref]) => this.canDiscover(ref, caller))
+      anwa: schema.anwa,
+      entrypoints: schema.entrypoints.filter((ref) => canDiscover(ref, caller)),
+      interactions: Object.entries(schema.interactions)
+        .filter(([ref]) => canDiscover(ref, caller))
         .map(([ref, spec]) => ({
           ref,
           kind: spec.kind,
@@ -393,103 +444,19 @@ export class AnwaApp<const M extends Manifest = Manifest> {
         })),
     };
   }
-  describe(ref: string, request?: RequestContext) {
+
+  function describe(ref: string, request?: RequestContext) {
     const caller = verifiedCaller(request);
-    if (!this.canDiscover(ref, caller))
+    if (!canDiscover(ref, caller))
       throw Error("Unknown or undiscoverable Interaction");
-    return { ref, ...this.resolve(ref).spec };
-  }
-  discover(ref: string, request?: RequestContext) {
-    return { description: this.describe(ref, request), context: { next: [] } };
+    return { ref, ...resolve(ref).spec };
   }
 
-  private declaredError(spec: InteractionDefinition, error: DomainError): void {
-    if (
-      typeof error?.code !== "string" ||
-      ["INVALID_INPUT", "UNEXPECTED_ERROR"].includes(error.code) ||
-      own(error, "retry") ||
-      !own(spec.errors ?? {}, error.code)
-    ) {
-      throw Error("Undeclared domain error");
-    }
+  function discover(ref: string, request?: RequestContext) {
+    return { description: describe(ref, request), context: { next: [] } };
   }
 
-  private validateContext(context: unknown, source: string): void {
-    if (
-      !context ||
-      typeof context !== "object" ||
-      Array.isArray(context) ||
-      Object.keys(context).some((key) => key !== "next") ||
-      !Array.isArray((context as { next?: unknown }).next)
-    )
-      throw Error("Invalid Context");
-    for (const choice of (context as { next: unknown[] }).next) {
-      if (
-        !choice ||
-        typeof choice !== "object" ||
-        Array.isArray(choice) ||
-        Object.keys(choice).some(
-          (key) =>
-            !["ref", "input", "guidance", "when", "applicability"].includes(
-              key,
-            ),
-        )
-      )
-        throw Error("Invalid next candidate");
-      const next = choice as NextInteraction;
-      const { spec } = this.resolve(next.ref);
-      if (
-        own(next, "input") &&
-        (!spec.input ||
-          checkPayload(spec.input, next.input, "$", this.schema.$defs))
-      )
-        throw Error("Invalid bound next input");
-      if (next.guidance !== undefined) {
-        const guidance = next.guidance;
-        if (
-          !guidance ||
-          typeof guidance !== "object" ||
-          Array.isArray(guidance) ||
-          !Object.keys(guidance).length ||
-          Object.keys(guidance).some(
-            (key) => !["kind", "level"].includes(key),
-          ) ||
-          (guidance.kind !== undefined && guidance.kind !== "retry") ||
-          (guidance.level !== undefined && !levels.has(guidance.level))
-        )
-          throw Error("Invalid guidance");
-        if (guidance.kind === "retry" && next.ref !== source)
-          throw Error("Retry must use source InteractionRef");
-      }
-      if (next.when !== undefined) {
-        if (
-          !next.when ||
-          typeof next.when !== "object" ||
-          Array.isArray(next.when) ||
-          Object.keys(next.when).length !== 1 ||
-          !duration.test(next.when.after)
-        )
-          throw Error("Invalid timing");
-      }
-      if (next.applicability !== undefined) {
-        const value = next.applicability;
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).some(
-            (key) => !["state", "reason"].includes(key),
-          ) ||
-          !["available", "blocked", "unknown"].includes(value.state) ||
-          (value.reason !== undefined && typeof value.reason !== "string")
-        )
-          throw Error("Invalid applicability");
-      }
-    }
-  }
-
-  /** Runtime enforces the named Guard before run; onDenied only builds this Interaction's Context. */
-  async interact<R extends Refs<M> & ExecutableRefs<M>>(
+  async function interact<R extends Refs<M> & ExecutableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [input?: unknown, request?: RequestContext]
@@ -502,7 +469,7 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
     >
   > {
-    return this.interactInternal(ref, args[0], args[1]) as Promise<
+    return interactInternal(ref, args[0], args[1]) as Promise<
       InteractionResponse<
         OutputOf<Operation<M, R>>,
         ErrorCodes<Operation<M, R>> | "INVALID_INPUT" | "UNEXPECTED_ERROR"
@@ -510,121 +477,93 @@ export class AnwaApp<const M extends Manifest = Manifest> {
     >;
   }
 
-  /** Follow a runtime-selected candidate. Dynamic inputs are checked against the public schema. */
-  async follow(
+  async function follow(
     candidate: NextInteraction,
     request?: RequestContext,
   ): Promise<InteractionResponse> {
-    return this.interactInternal(candidate.ref, candidate.input, request);
+    return interactInternal(candidate.ref, candidate.input, request);
   }
 
-  /**
-   * Accept the public Outcome union only after checking its runtime shape.
-   * A handler can be supplied by JavaScript/untrusted adapters, so static
-   * TypeScript exhaustiveness is not sufficient at this boundary.
-   */
-  private verifiedResponse(
-    ref: string,
-    spec: InteractionDefinition,
-    response: InteractionResponse,
-    caller: VerifiedCaller | null,
-  ): InteractionResponse {
-    if (!response || !response.outcome)
-      throw Error("Handler must return reply(...)");
-    match(response.outcome)
-      .with({ kind: "accepted" }, (outcome) => {
-        if (
-          spec.kind !== "action" ||
-          typeof outcome.execution?.id !== "string" ||
-          !outcome.execution.id
-        )
-          throw Error("Invalid accepted outcome");
-      })
-      .with({ kind: "settled", result: { ok: true } }, ({ result }) => {
-        if (
-          spec.output &&
-          checkPayload(spec.output, result.value, "$", this.schema.$defs)
-        )
-          throw Error("Invalid handler output");
-      })
-      .with({ kind: "settled", result: { ok: false } }, ({ result }) => {
-        this.declaredError(spec, result.error);
-      })
-      .exhaustive();
-    this.validateContext(response.context, ref);
-    return {
-      ...response,
-      context: {
-        next: response.context.next.filter((choice) =>
-          this.canDiscover(choice.ref, caller),
-        ),
-      },
-    };
-  }
-
-  private async interactInternal(
+  async function interactInternal(
     ref: string,
     input?: unknown,
     request?: RequestContext,
   ): Promise<InteractionResponse> {
-    // Unknown refs and a forged trusted context are API usage errors.
-    // As before, these are not converted into application-level Results.
     const caller = verifiedCaller(request);
-    const { spec, handler } = this.resolve(ref);
+    const { spec, handler } = resolve(ref);
     if (spec.kind === "event")
       throw Error("Use observe for Event Interactions");
-
     const inputIssue = spec.input
-      ? checkPayload(spec.input, input, "$", this.schema.$defs)
+      ? checkPayload(spec.input, input, "$", schema.$defs)
       : input === undefined
         ? null
         : "Unexpected input";
     if (inputIssue) return reply(fail("INVALID_INPUT", inputIssue));
+    const params: RuntimeArgs = { ref, input, app: api, caller };
+    return dispatch(spec, handler, params)
+      .andThen((response) =>
+        attempt(() =>
+          validateResponse(schema, ref, response, (candidate) =>
+            handlersByRef.has(candidate),
+          ),
+        ).andThen((validated) => validated),
+      )
+      .map((response) => ({
+        ...response,
+        context: {
+          next: response.context.next.filter((candidate) =>
+            canDiscover(candidate.ref, caller),
+          ),
+        },
+      }))
+      .match(
+        (response) => response,
+        () => unexpected(),
+      );
+  }
 
-    // Handler/Guard failures are contained at one explicit async boundary.
-    // The library's ResultAsync catches both synchronous throws and
-    // rejected promises, so no try/catch is needed in the runtime.
+  function attempt<T>(
+    operation: () => T | Promise<T>,
+  ): ResultAsync<T, ContractViolation> {
     return ResultAsync.fromThrowable(
-      async (): Promise<InteractionResponse> => {
-        const params = { ref, input, app: this, caller };
-        let response: InteractionResponse;
-        if (spec.guard) {
-          const decision = await this.guards[spec.guard](params);
-          if (
-            typeof decision?.allowed !== "boolean" ||
-            (!decision.allowed && !decision.error?.code)
-          )
-            throw Error("Invalid Guard decision");
+      async () => operation(),
+      (): ContractViolation => ({ kind: "callback-failed" }),
+    )();
+  }
+
+  function evaluateGuard(
+    spec: InteractionDefinition,
+    params: RuntimeArgs,
+  ): ResultAsync<GuardDecision, ContractViolation> {
+    if (!spec.guard) return okAsync({ allowed: true });
+    return attempt(() => guardBindings[spec.guard!](params)).andThen(
+      (decision) => validateGuardDecision(spec, decision),
+    );
+  }
+
+  function dispatch(
+    spec: InteractionDefinition,
+    handler: RuntimeBinding,
+    params: RuntimeArgs,
+  ): ResultAsync<unknown, ContractViolation> {
+    const run = typeof handler === "function" ? handler : handler.run;
+    return evaluateGuard(spec, params).andThen((decision) =>
+      match(decision)
+        .with({ allowed: true }, () => attempt(() => run(params)))
+        .with({ allowed: false }, ({ error }) => {
           const guarded = handler as Extract<
             RuntimeBinding,
             { run: RuntimeRun }
           >;
-          if (!decision.allowed) {
-            this.declaredError(spec, decision.error);
-            const next = await guarded.onDenied!({
-              ...params,
-              error: decision.error,
-            });
-            response = reply({ ok: false, error: decision.error }, next);
-          } else {
-            response = (await guarded.run(params)) as InteractionResponse;
-          }
-        } else {
-          response = (await (handler as RuntimeRun)(
-            params,
-          )) as InteractionResponse;
-        }
-        return this.verifiedResponse(ref, spec, response, caller);
-      },
-      () => ({ kind: "unexpected-interaction-failure" }) as const,
-    )().match(
-      (response) => response,
-      () => unexpected(),
+          return attempt(() => guarded.onDenied!({ ...params, error })).map(
+            (next) => reply({ ok: false, error }, next),
+          );
+        })
+        .exhaustive(),
     );
   }
 
-  /** Async Guards are evaluated when an Event stream is first consumed, before the Event handler starts. */
-  observe<R extends Refs<M> & ObservableRefs<M>>(
+  function observe<R extends Refs<M> & ObservableRefs<M>>(
     ref: R,
     ...args: string extends Refs<M>
       ? [
@@ -646,38 +585,24 @@ export class AnwaApp<const M extends Manifest = Manifest> {
   ): AsyncIterable<unknown> {
     const [input, options = {}, request] = args;
     const caller = verifiedCaller(request);
-    const { spec, handler } = this.resolve(ref);
+    const { spec, handler } = resolve(ref);
     if (spec.kind !== "event")
       throw Error("Only Event Interactions may be observed");
     const invalid = spec.input
-      ? checkPayload(spec.input, input, "$", this.schema.$defs)
+      ? checkPayload(spec.input, input, "$", schema.$defs)
       : input === undefined
         ? null
         : "Unexpected event input";
     if (invalid) throw Error("Invalid event input");
-    return (async function* (runtime: AnwaApp<M>): AsyncGenerator<unknown> {
-      const params = { ref, input, app: runtime, caller };
-      if (spec.guard) {
-        const decision = await ResultAsync.fromThrowable(
-          async (): Promise<GuardDecision> => {
-            const guarded = await runtime.guards[spec.guard!](params);
-            if (
-              typeof guarded?.allowed !== "boolean" ||
-              (!guarded.allowed && !guarded.error?.code)
-            )
-              throw Error("Invalid Guard decision");
-            if (!guarded.allowed) runtime.declaredError(spec, guarded.error);
-            return guarded;
-          },
-          () => ({ kind: "guard-evaluation-failure" }) as const,
-        )().match(
-          (value) => value,
-          () => {
-            throw new ObservationDenied("UNEXPECTED_ERROR");
-          },
-        );
-        if (!decision.allowed) throw new ObservationDenied(decision.error.code);
-      }
+    return (async function* (): AsyncGenerator<unknown> {
+      const params = { ref, input, app: api, caller };
+      const decision = await evaluateGuard(spec, params).match(
+        (value) => value,
+        () => {
+          throw observationDenied("UNEXPECTED_ERROR");
+        },
+      );
+      if (!decision.allowed) throw observationDenied(decision.error.code);
       const run = typeof handler === "function" ? handler : handler.run;
       const stream = run({ ...params, ...options });
       if (
@@ -687,6 +612,18 @@ export class AnwaApp<const M extends Manifest = Manifest> {
       )
         throw Error("Event must return AsyncIterable");
       yield* stream as AsyncIterable<unknown>;
-    })(this);
+    })();
   }
+
+  const api: AnwaApp<M> = Object.freeze({
+    schema,
+    bind,
+    catalog,
+    describe,
+    discover,
+    interact,
+    follow,
+    observe,
+  });
+  return api;
 }

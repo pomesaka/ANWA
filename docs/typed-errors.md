@@ -35,7 +35,7 @@ in `src/anwa.ts` use the name `NeverthrowResult` to keep them distinct.
 - **Discovery policy exceptions:** `Result.fromThrowable` fails closed and
   suppresses access to protected Interaction descriptions.
 - **Event Guard exceptions:** `ResultAsync.fromThrowable` maps failures to
-  `ObservationDenied("UNEXPECTED_ERROR")`; an intentional declared Guard
+  `observationDenied("UNEXPECTED_ERROR")`; an intentional declared Guard
   denial uses its own code.
 - **HTTP protocol failures:** `HttpFailure` is a tagged union, separate from
   ANWA's domain errors. A single exhaustive `ts-pattern` match maps it to
@@ -47,9 +47,12 @@ in `src/anwa.ts` use the name `NeverthrowResult` to keep them distinct.
   boundary.
 
 New variants of `HttpFailure`, `Outcome`, or the CLI command union require
-an exhaustive match update at compile time. Tests assert that no authored
-TypeScript code under `src`, `demo`, `test` or `tools` contains
-`try/catch` statements.
+an exhaustive match update at compile time. Pure validators in
+`src/runtime/validation.ts` return tagged `ContractViolation` Results; ordinary
+validation failure no longer relies on throwing and catching an exception.
+The AST-based `architecture:check` command enforces the no-class/no-receiver/no-catch
+policy separately from behavioral tests. See [functional boundaries](functional-core.md)
+and [the executable specification index](../test/README.md).
 
 ## What this intentionally does **not** change
 

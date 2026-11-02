@@ -1,5 +1,6 @@
 import {
-  AnwaApp,
+  createAnwaApp,
+  type AnwaApp,
   fail,
   ok,
   reply,
@@ -60,7 +61,7 @@ export function createOrders(): AnwaApp<typeof schema> {
     ["shipped-ship", "delivered"],
   ]);
 
-  return new AnwaApp(schema).bind(
+  return createAnwaApp(schema).bind(
     {
       "order.get": {
         run: async ({ input }) => {

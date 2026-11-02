@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -150,104 +152,183 @@ func TestNativeServeMuxAndDiscovery(t *testing.T) {
 	}
 }
 
-func TestInvokeStatusesAuthenticationAndNoCallerSpoofing(t *testing.T) {
-	mux := server(t)
-	add := send(mux, "POST", "/anwa/invoke", `{"ref":"public.add","input":{"a":2,"b":3}}`, "")
-	if add.Code != 200 || !strings.Contains(add.Body.String(), `"value":5`) {
-		t.Fatalf("add: %d %s", add.Code, add.Body.String())
-	}
-	if add.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("must not cache")
-	}
-	failure := send(mux, "POST", "/anwa/invoke", `{"ref":"public.add","input":{"a":99,"b":0}}`, "")
-	if failure.Code != 200 || resultCode(t, failure) != "FAILURE" {
-		t.Fatalf("domain error: %d %s", failure.Code, failure.Body.String())
-	}
-	invalid := send(mux, "POST", "/anwa/invoke", `{"ref":"public.add","input":{"a":"2","b":3}}`, "")
-	if invalid.Code != 200 || resultCode(t, invalid) != "INVALID_INPUT" {
-		t.Fatalf("input: %d %s", invalid.Code, invalid.Body.String())
-	}
-	accepted := send(mux, "POST", "/anwa/invoke", `{"ref":"job.start"}`, "")
-	if accepted.Code != 202 || !strings.Contains(accepted.Body.String(), "execution-1") {
-		t.Fatalf("accepted: %d %s", accepted.Code, accepted.Body.String())
-	}
-	anonymous := send(mux, "POST", "/anwa/invoke", `{"ref":"private.read"}`, "")
-	if anonymous.Code != 200 || resultCode(t, anonymous) != "AUTH_REQUIRED" {
-		t.Fatalf("denial: %d %s", anonymous.Code, anonymous.Body.String())
-	}
-	spoof := send(mux, "POST", "/anwa/invoke", `{"ref":"private.read","caller":{"subject":"alice"}}`, "")
-	if spoof.Code != 400 {
-		t.Fatalf("spoof accepted: %d %s", spoof.Code, spoof.Body.String())
-	}
-	auth := send(mux, "POST", "/anwa/invoke", `{"ref":"private.read"}`, "Bearer valid-test-token")
-	if auth.Code != 200 || !strings.Contains(auth.Body.String(), `"value":"alice"`) {
-		t.Fatalf("verified auth: %d %s", auth.Code, auth.Body.String())
-	}
-	badToken := send(mux, "GET", "/anwa/catalog", "", "Bearer invalid")
-	if badToken.Code != 401 || strings.Contains(badToken.Body.String(), "bad token") {
-		t.Fatalf("leaked auth error: %d %s", badToken.Code, badToken.Body.String())
-	}
-}
-
-func TestProtocolErrorsAndRequestLimit(t *testing.T) {
-	mux := server(t)
-	tests := []struct {
-		method, path, body string
-		want               int
+func TestHTTP_InvokePreservesOutcomeAndContext(t *testing.T) {
+	cases := []struct {
+		name, body, token string
+		status            int
+		kind              string
+		value             any
+		code, executionID string
 	}{
-		{"GET", "/anwa/invoke", "", 405},
-		{"POST", "/anwa/catalog", "{}", 405},
-		{"GET", "/anwa/unknown", "", 404},
-		{"GET", "/anwa/interactions/unknown", "", 404},
-		{"POST", "/anwa/invoke", `{"ref":"unknown"}`, 404},
-		{"POST", "/anwa/invoke", `{"ref":"public.add"`, 400},
-		{"POST", "/anwa/invoke", `{"ref":"public.add"} {"ref":"job.start"}`, 400},
-		{"POST", "/anwa/invoke", `{"ref":"public.add","caller":"spoofed"}`, 400},
-		{"POST", "/anwa/invoke", `null`, 400},
+		{name: "successful addition", body: `{"ref":"public.add","input":{"a":2,"b":3}}`, status: 200, kind: "settled", value: float64(5)},
+		{name: "declared failure remains HTTP 200", body: `{"ref":"public.add","input":{"a":99,"b":0}}`, status: 200, kind: "settled", code: "FAILURE"},
+		{name: "invalid input remains HTTP 200", body: `{"ref":"public.add","input":{"a":"2","b":3}}`, status: 200, kind: "settled", code: "INVALID_INPUT"},
+		{name: "accepted work returns HTTP 202", body: `{"ref":"job.start"}`, status: 202, kind: "accepted", executionID: "execution-1"},
+		{name: "anonymous Guard denial", body: `{"ref":"private.read"}`, status: 200, kind: "settled", code: "AUTH_REQUIRED"},
+		{name: "verified caller is supplied separately", body: `{"ref":"private.read"}`, token: "Bearer valid-test-token", status: 200, kind: "settled", value: "alice"},
 	}
-	for _, tc := range tests {
-		t.Run(tc.method+tc.path+tc.body, func(t *testing.T) {
-			res := send(mux, tc.method, tc.path, tc.body, "")
-			if res.Code != tc.want {
-				t.Fatalf("want %d got %d: %s", tc.want, res.Code, res.Body.String())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := send(server(t), "POST", "/anwa/invoke", tc.body, tc.token)
+			if rec.Code != tc.status {
+				t.Fatalf("want status %d got %d: %s", tc.status, rec.Code, rec.Body.String())
 			}
-			// ServeMux owns route/method failures. Only ANWA handler failures
-			// are formatted as RFC 9457-style problem responses.
-			nativeMuxError := tc.want == 405 || tc.path == "/anwa/unknown"
-			if !nativeMuxError && tc.want >= 400 &&
-				!strings.HasPrefix(res.Header().Get("Content-Type"), "application/problem+json") {
-				t.Fatalf("missing problem details: %s", res.Header().Get("Content-Type"))
+			if rec.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("ANWA responses must not be cached")
 			}
-			if nativeMuxError && strings.HasPrefix(res.Header().Get("Content-Type"), "application/problem+json") {
-				t.Fatalf("expected ServeMux's standard error response, got %s", res.Header().Get("Content-Type"))
+			if !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
+				t.Fatalf("wrong media type: %s", rec.Header().Get("Content-Type"))
+			}
+			var body struct {
+				Outcome struct {
+					Kind   string `json:"kind"`
+					Result *struct {
+						OK    bool `json:"ok"`
+						Value any  `json:"value"`
+						Error *struct {
+							Code string `json:"code"`
+						} `json:"error"`
+					} `json:"result"`
+					Execution *struct {
+						ID string `json:"id"`
+					} `json:"execution"`
+				} `json:"outcome"`
+				Context *struct {
+					Next []anwa.Next `json:"next"`
+				} `json:"context"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Outcome.Kind != tc.kind || body.Context == nil || len(body.Context.Next) != 0 {
+				t.Fatalf("wrong envelope: %s", rec.Body.String())
+			}
+			if tc.kind == "accepted" {
+				if body.Outcome.Result != nil || body.Outcome.Execution == nil || body.Outcome.Execution.ID != tc.executionID {
+					t.Fatalf("expected deferred handle, got %s", rec.Body.String())
+				}
+				return
+			}
+			if body.Outcome.Result == nil || body.Outcome.Execution != nil {
+				t.Fatalf("expected settled result, got %s", rec.Body.String())
+			}
+			result := body.Outcome.Result
+			if tc.code != "" {
+				if result.OK || result.Error == nil || result.Error.Code != tc.code {
+					t.Fatalf("want failure %s got %s", tc.code, rec.Body.String())
+				}
+				return
+			}
+			if !result.OK || result.Error != nil || !reflect.DeepEqual(result.Value, tc.value) {
+				t.Fatalf("want success value %#v got %s", tc.value, rec.Body.String())
 			}
 		})
 	}
-	method := send(mux, "GET", "/anwa/invoke", "", "")
-	if method.Header().Get("Allow") != "POST" {
-		t.Fatal("ServeMux should set Allow: POST")
+}
+
+func TestHTTP_ProtocolFailuresDoNotBecomeDomainOutcomes(t *testing.T) {
+	cases := []struct {
+		name, method, path, body, token string
+		status                          int
+		code, allow                     string
+	}{
+		{name: "GET cannot invoke", method: "GET", path: "/anwa/invoke", status: 405, allow: "POST"},
+		{name: "POST cannot discover catalog", method: "POST", path: "/anwa/catalog", body: "{}", status: 405, allow: "GET, HEAD"},
+		{name: "unknown route uses native mux 404", method: "GET", path: "/anwa/unknown", status: 404},
+		{name: "unknown description", method: "GET", path: "/anwa/interactions/unknown", status: 404, code: "NOT_FOUND"},
+		{name: "unknown Interaction", method: "POST", path: "/anwa/invoke", body: `{"ref":"unknown"}`, status: 404, code: "NOT_FOUND"},
+		{name: "incomplete JSON", method: "POST", path: "/anwa/invoke", body: `{"ref":"public.add"`, status: 400, code: "INVALID_REQUEST"},
+		{name: "two JSON documents", method: "POST", path: "/anwa/invoke", body: `{"ref":"public.add"}{"ref":"job.start"}`, status: 400, code: "INVALID_REQUEST"},
+		{name: "caller spoofing in envelope", method: "POST", path: "/anwa/invoke", body: `{"ref":"private.read","caller":{"subject":"alice"}}`, status: 400, code: "INVALID_REQUEST"},
+		{name: "null is not an envelope", method: "POST", path: "/anwa/invoke", body: `null`, status: 400, code: "INVALID_REQUEST"},
+		{name: "invalid credential", method: "GET", path: "/anwa/catalog", token: "Bearer invalid", status: 401, code: "UNAUTHENTICATED"},
 	}
-	// GET patterns also match HEAD according to Go ServeMux semantics.
-	head := send(mux, "HEAD", "/anwa/catalog", "", "")
-	if head.Code != 200 {
-		t.Fatalf("ServeMux HEAD handling: %d", head.Code)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := send(server(t), tc.method, tc.path, tc.body, tc.token)
+			if rec.Code != tc.status {
+				t.Fatalf("want status %d got %d: %s", tc.status, rec.Code, rec.Body.String())
+			}
+			if rec.Header().Get("Allow") != tc.allow {
+				t.Fatalf("want Allow %q got %q", tc.allow, rec.Header().Get("Allow"))
+			}
+			media := "text/plain"
+			if tc.code != "" {
+				media = "application/problem+json"
+			}
+			if !strings.HasPrefix(rec.Header().Get("Content-Type"), media) {
+				t.Fatalf("want %s got %s", media, rec.Header().Get("Content-Type"))
+			}
+			if tc.code == "" {
+				return
+			} // Native mux owns the plain-text representation, not ANWA.
+			var body struct {
+				Code    string `json:"code"`
+				Status  int    `json:"status"`
+				Type    string `json:"type"`
+				Outcome any    `json:"outcome"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Code != tc.code || body.Status != tc.status || body.Type != "about:blank" || body.Outcome != nil {
+				t.Fatalf("wrong protocol error: %s", rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), "bad token") {
+				t.Fatal("authentication details leaked")
+			}
+		})
 	}
-	noContentType := httptest.NewRequest("POST", "/anwa/invoke", strings.NewReader("{}"))
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, noContentType)
-	if rec.Code != 415 {
-		t.Fatalf("missing content type accepted: %d", rec.Code)
+}
+
+func TestHTTP_RequestMediaAndSizeLimits(t *testing.T) {
+	cases := []struct {
+		name, media, body string
+		status            int
+		code              string
+	}{
+		{"missing Content-Type", "", "{}", 415, "UNSUPPORTED_MEDIA_TYPE"},
+		{"text Content-Type", "text/plain", "{}", 415, "UNSUPPORTED_MEDIA_TYPE"},
+		{"body beyond 20 bytes", "application/json", `{"ref":"public.add","input":{"a":1,"b":2}}`, 413, "PAYLOAD_TOO_LARGE"},
 	}
-	h, err := New(demo(t), Options{MaxBodyBytes: 20})
-	if err != nil {
-		t.Fatal(err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h, err := New(demo(t), Options{MaxBodyBytes: 20})
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest("POST", "/anwa/invoke", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", tc.media)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.status {
+				t.Fatalf("want %d got %d", tc.status, rec.Code)
+			}
+			var body struct {
+				Code string `json:"code"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Code != tc.code {
+				t.Fatalf("want code %s got %s", tc.code, body.Code)
+			}
+		})
 	}
-	large := send(h, "POST", "/anwa/invoke", `{"ref":"public.add","input":{"a":1,"b":2}}`, "")
-	if large.Code != 413 {
-		t.Fatalf("large request: %d", large.Code)
-	}
-	if _, err := New(demo(t), Options{Prefix: "/anwa/"}); err == nil {
-		t.Fatal("invalid prefix accepted")
+}
+
+func TestHTTP_InvalidConfigurationFailsBeforeServing(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options Options
+	}{
+		{"trailing slash", Options{Prefix: "/anwa/"}}, {"root prefix", Options{Prefix: "/"}}, {"negative body limit", Options{MaxBodyBytes: -1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := New(demo(t), tc.options); err == nil {
+				t.Fatal("invalid configuration accepted")
+			}
+		})
 	}
 }
 
@@ -317,5 +398,29 @@ func TestExplicitNullDoesNotMeanOmittedInput(t *testing.T) {
 		`{"ref":"private.read","input":null}`, "Bearer valid-test-token")
 	if explicitNull.Code != 200 || resultCode(t, explicitNull) != "INVALID_INPUT" {
 		t.Fatalf("explicit null must not be treated as omitted: %d %s", explicitNull.Code, explicitNull.Body.String())
+	}
+}
+
+func TestHTTP_GetPatternAlsoAcceptsHead(t *testing.T) {
+	server := httptest.NewServer(server(t))
+	defer server.Close()
+	request, err := http.NewRequest(http.MethodHead, server.URL+"/anwa/catalog", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		t.Fatalf("want HEAD 200 got %d", response.StatusCode)
+	}
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 0 {
+		t.Fatalf("HEAD must have no body, got %s", data)
 	}
 }

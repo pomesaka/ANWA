@@ -11,7 +11,7 @@ The author-maintained JSON is used to generate [a typed contract](../../demo/ord
 ## Handler, Guard and Context
 
 ```ts
-const app = new AnwaApp(schema).bind({
+const app = createAnwaApp(schema).bind({
   "order.cancel": {
     // Runtime calls this only after the declared Guard allows invocation.
     run: async ({input}) => {
