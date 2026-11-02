@@ -211,14 +211,26 @@ func TestProtocolErrorsAndRequestLimit(t *testing.T) {
 			if res.Code != tc.want {
 				t.Fatalf("want %d got %d: %s", tc.want, res.Code, res.Body.String())
 			}
-			if tc.want >= 400 && !strings.HasPrefix(res.Header().Get("Content-Type"), "application/problem+json") {
+			// ServeMux owns route/method failures. Only ANWA handler failures
+			// are formatted as RFC 9457-style problem responses.
+			nativeMuxError := tc.want == 405 || tc.path == "/anwa/unknown"
+			if !nativeMuxError && tc.want >= 400 &&
+				!strings.HasPrefix(res.Header().Get("Content-Type"), "application/problem+json") {
 				t.Fatalf("missing problem details: %s", res.Header().Get("Content-Type"))
+			}
+			if nativeMuxError && strings.HasPrefix(res.Header().Get("Content-Type"), "application/problem+json") {
+				t.Fatalf("expected ServeMux's standard error response, got %s", res.Header().Get("Content-Type"))
 			}
 		})
 	}
 	method := send(mux, "GET", "/anwa/invoke", "", "")
 	if method.Header().Get("Allow") != "POST" {
-		t.Fatal("missing Allow")
+		t.Fatal("ServeMux should set Allow: POST")
+	}
+	// GET patterns also match HEAD according to Go ServeMux semantics.
+	head := send(mux, "HEAD", "/anwa/catalog", "", "")
+	if head.Code != 200 {
+		t.Fatalf("ServeMux HEAD handling: %d", head.Code)
 	}
 	noContentType := httptest.NewRequest("POST", "/anwa/invoke", strings.NewReader("{}"))
 	rec := httptest.NewRecorder()
@@ -247,6 +259,13 @@ func TestCustomPrefixAndNoDefaultAuthentication(t *testing.T) {
 	r := send(h, "GET", "/agent/catalog", "", "")
 	if r.Code != 200 || strings.Contains(r.Body.String(), "private.read") {
 		t.Fatalf("default auth must be anonymous: %d %s", r.Code, r.Body.String())
+	}
+	// A caller can add its own route directly to the returned *http.ServeMux.
+	h.HandleFunc("GET /agent/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	if health := send(h, "GET", "/agent/health", "", ""); health.Code != 204 {
+		t.Fatalf("custom route: %d", health.Code)
 	}
 }
 
