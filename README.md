@@ -80,7 +80,7 @@ The [Todo authoring manifest](demo/todo/anwa.json) reuses `Task`, `Project`, and
 
 ANWA can be called remotely using an optional [HTTP binding](docs/http-binding.md): `GET /anwa/catalog`, `GET /anwa/interactions/{ref}` and `POST /anwa/invoke`. It preserves the existing `Outcome + Context` and Guard semantics. The host supplies its own router and authentication middleware/callback; the binding does not authenticate credentials or implement automatic retries.
 
-- **Go**: `go/httpbinding.New(app, opts)` returns `http.Handler` for `http.ServeMux` or compatible Go routers. The Go Calculator can be served with `cd go && go run ./examples/calculator -listen 127.0.0.1:8080`.
+- **Go**: `go/httpbinding.New(app, opts)` returns a method-aware `*http.ServeMux` implementing `http.Handler`, for hosting in `http.ServeMux` or compatible Go routers. The Go Calculator can be served with `cd go && go run ./examples/calculator -listen 127.0.0.1:8080`.
 - **TypeScript**: `createAnwaFetchHandler(app, opts)` accepts Web `Request` and returns `Response`. [Hono demo](demo/http/hono.ts): `app.all("/anwa/*", (c) => handler(c.req.raw))` with the rest of Hono unchanged.
 
 Event streams, idempotency-key deduplication, CORS, TLS configuration and production credential verification remain deliberately outside this first binding.
